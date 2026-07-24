@@ -1,0 +1,30 @@
+# Maven
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+!backend/.mvn/wrapper/maven-wrapper.properties
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Spring Boot static (빌드 산출물 - React 빌드 후 생성됨)
+backend/src/main/resources/static/assets/
+backend/src/main/resources/static/index.html
+backend/src/main/resources/static/favicon.svg
+backend/src/main/resources/static/icons.svg
+
+# Env
+.env
+*.env.local
+
+# Logs
+*.log

@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: windmill
+
+claude:
+  api:
+    key: ${CLAUDE_API_KEY:}
+
+tourapi:
+  key: ${TOURAPI_KEY:}
+
+weather:
+  api:
+    key: ${WEATHER_API_KEY:}
+
+logging:
+  level:
+    com.windmill: INFO
