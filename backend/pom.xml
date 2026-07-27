@@ -15,7 +15,7 @@
     <artifactId>windmill-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>windmill-backend</name>
-    <description>우리 여기로 가자 - 실시간 여행 일정 재조정 서비스</description>
+    <description>바람따라 - 실시간 변수 대응 여행 일정 서비스</description>
 
     <properties>
         <java.version>21</java.version>
@@ -33,6 +33,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

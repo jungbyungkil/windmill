@@ -1,20 +1,53 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
     name: windmill
+  datasource:
+    url: jdbc:h2:file:./data/windmill;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  h2:
+    console:
+      enabled: ${H2_CONSOLE_ENABLED:false}
+      path: /h2-console
 
 claude:
   api:
     key: ${CLAUDE_API_KEY:}
 
+# 한국관광공사 OpenAPI (data.go.kr) - 서비스별 base URL은 client 구현체에 고정, 여기는 인증키만
 tourapi:
   key: ${TOURAPI_KEY:}
+  kor-service-base-url: https://apis.data.go.kr/B551011/KorService2
+  related-attraction-base-url: https://apis.data.go.kr/B551011/TarRlteTarService1
+  crowd-rate-base-url: https://apis.data.go.kr/B551011/TatsCnctrRateService
+  visitor-stats-base-url: https://apis.data.go.kr/B551011/DataLabService
 
+# 기상청 단기예보
 weather:
   api:
     key: ${WEATHER_API_KEY:}
+    base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0
+
+# MVP 타겟 지역: 속초 - 두 지역코드 체계 공존 (계획 문서 1절 참고)
+# lDongRegnCd/lDongSignguCd는 추정값 - ldongCode2 실호출로 검증 필요 (작업 #12)
+windmill:
+  region:
+    sokcho:
+      new-region-cd: "51"
+      new-signgu-cd: "210"
+      legacy-area-cd: "51"
+      legacy-signgu-cd: "51210"
+      # TODO: 기상청 공식 격자좌표 변환표로 검증 필요 (미검증 참고값)
+      weather-nx: "87"
+      weather-ny: "141"
 
 logging:
   level:
