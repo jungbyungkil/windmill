@@ -15,6 +15,9 @@ import java.util.List;
  * 기상청 단기예보 조회서비스 (VilageFcstInfoService_2.0, getVilageFcst).
  * 3시간 간격 발표(02,05,08,11,14,17,20,23시), 5km 격자(nx,ny) 기준.
  * ⚠ nx/ny는 위경도가 아닌 기상청 격자좌표 - 지역별 변환은 기상청 공식 변환표로 확정 필요.
+ *
+ * data.go.kr은 1인당 서비스키 1개로 활용신청한 모든 공공데이터포털 OpenAPI(관광공사/기상청 포함)를
+ * 이용할 수 있으므로, 별도 WEATHER_API_KEY 없이 tourapi.key(TOURAPI_KEY)를 그대로 재사용한다.
  */
 @Slf4j
 @Component
@@ -30,7 +33,7 @@ public class WeatherClient {
 
     public WeatherClient(WebClient.Builder webClientBuilder,
                           @Value("${weather.api.base-url}") String baseUrl,
-                          @Value("${weather.api.key:}") String serviceKey) {
+                          @Value("${tourapi.key:}") String serviceKey) {
         this.webClient = webClientBuilder.clone().baseUrl(baseUrl).build();
         this.serviceKey = serviceKey;
     }

@@ -31,10 +31,9 @@ tourapi:
   crowd-rate-base-url: https://apis.data.go.kr/B551011/TatsCnctrRateService
   visitor-stats-base-url: https://apis.data.go.kr/B551011/DataLabService
 
-# 기상청 단기예보
+# 기상청 단기예보 - 별도 키 없이 tourapi.key(data.go.kr 통합 서비스키)를 재사용
 weather:
   api:
-    key: ${WEATHER_API_KEY:}
     base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0
 
 # MVP 타겟 지역: 속초 - 두 지역코드 체계 공존 (계획 문서 1절 참고)
