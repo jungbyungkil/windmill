@@ -3,7 +3,7 @@ package com.windmill.service.docent;
 import com.windmill.domain.DocentAudio;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.repository.DocentAudioRepository;
-import com.windmill.service.ai.ClaudeService;
+import com.windmill.service.ai.OpenAiService;
 import com.windmill.service.tourapi.TourAttractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import reactor.core.scheduler.Schedulers;
 public class DocentScriptService {
 
     private final TourAttractionService tourAttractionService;
-    private final ClaudeService claudeService;
+    private final OpenAiService openAiService;
     private final TtsProvider ttsProvider;
     private final DocentAudioRepository docentAudioRepository;
 
@@ -34,7 +34,7 @@ public class DocentScriptService {
 
     private Mono<DocentAudio> generate(String contentId, int contentTypeId, String language) {
         return tourAttractionService.getDetail(contentId, contentTypeId)
-                .flatMap(detail -> claudeService.complete(buildPrompt(detail, language))
+                .flatMap(detail -> openAiService.complete(buildPrompt(detail, language))
                         .map(script -> script.isBlank() ? fallbackScript(detail) : script)
                         .map(script -> DocentAudio.builder()
                                 .contentId(contentId)

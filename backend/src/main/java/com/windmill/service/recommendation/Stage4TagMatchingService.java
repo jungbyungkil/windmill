@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RelatedCandidate;
-import com.windmill.service.ai.ClaudeService;
+import com.windmill.service.ai.OpenAiService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class Stage4TagMatchingService {
 
-    private final ClaudeService claudeService;
+    private final OpenAiService openAiService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Mono<List<RecommendationCandidate>> match(List<RelatedCandidate> candidates, List<String> requestedTags,
@@ -33,11 +33,11 @@ public class Stage4TagMatchingService {
         if (candidates.isEmpty()) {
             return Mono.just(List.of());
         }
-        if (!claudeService.isConfigured()) {
+        if (!openAiService.isConfigured()) {
             return Mono.just(fallback(candidates));
         }
         String prompt = buildPrompt(candidates, requestedTags, naturalLanguageQuery);
-        return claudeService.complete(prompt)
+        return openAiService.complete(prompt)
                 .map(response -> parseResponse(response, candidates))
                 .onErrorReturn(fallback(candidates));
     }
@@ -68,7 +68,7 @@ public class Stage4TagMatchingService {
 
     private List<RecommendationCandidate> parseResponse(String response, List<RelatedCandidate> candidates) {
         try {
-            String json = ClaudeService.stripJsonFence(response);
+            String json = OpenAiService.stripJsonFence(response);
             JsonNode array = objectMapper.readTree(json);
             Map<String, JsonNode> byName = new HashMap<>();
             array.forEach(node -> byName.put(node.path("placeName").asText(""), node));
@@ -88,7 +88,7 @@ public class Stage4TagMatchingService {
                 return toCandidate(c, matchedTags, oneLiner);
             }).collect(Collectors.toList());
         } catch (Exception e) {
-            log.warn("[Stage4] Claude 응답 파싱 실패, 기본 문장으로 대체: {}", e.getMessage());
+            log.warn("[Stage4] OpenAI 응답 파싱 실패, 기본 문장으로 대체: {}", e.getMessage());
             return fallback(candidates);
         }
     }

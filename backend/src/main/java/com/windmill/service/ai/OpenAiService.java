@@ -15,21 +15,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Claude API 래퍼 - 4단계 파이프라인의 마지막 단계(태그매칭·문장생성)와 도슨트 스크립트 생성에만 사용.
- * 후보 필터링/정렬에는 절대 관여하지 않음 (Stage4TagMatchingService 참고).
+ * OpenAI Chat Completions API 래퍼 - 4단계 파이프라인의 마지막 단계(태그매칭·문장생성)와
+ * 도슨트 스크립트 생성에만 사용. 후보 필터링/정렬에는 절대 관여하지 않음 (Stage4TagMatchingService 참고).
  */
 @Slf4j
 @Service
-public class ClaudeService {
+public class OpenAiService {
 
-    @Value("${claude.api.key:}")
+    @Value("${openai.api.key:}")
     private String apiKey;
+
+    @Value("${openai.api.model:gpt-4o-mini}")
+    private String model;
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ClaudeService(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.clone().baseUrl("https://api.anthropic.com").build();
+    public OpenAiService(WebClient.Builder webClientBuilder) {
+        this.webClient = webClientBuilder.clone().baseUrl("https://api.openai.com").build();
     }
 
     public boolean isConfigured() {
@@ -41,21 +44,20 @@ public class ClaudeService {
             return Mono.just("");
         }
         Map<String, Object> body = new HashMap<>();
-        body.put("model", "claude-sonnet-4-6");
+        body.put("model", model);
         body.put("max_tokens", 2000);
         body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
 
         return webClient.post()
-                .uri("/v1/messages")
+                .uri("/v1/chat/completions")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", "2023-06-01")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(String.class)
                 .map(this::extractText)
                 .onErrorResume(e -> {
-                    log.error("Claude API 호출 실패: {}", e.getMessage());
+                    log.error("OpenAI API 호출 실패: {}", e.getMessage());
                     return Mono.just("");
                 });
     }
@@ -75,9 +77,9 @@ public class ClaudeService {
     private String extractText(String responseBody) {
         try {
             JsonNode node = objectMapper.readTree(responseBody);
-            return node.path("content").get(0).path("text").asText();
+            return node.path("choices").get(0).path("message").path("content").asText();
         } catch (Exception e) {
-            log.warn("Claude 응답 파싱 실패: {}", e.getMessage());
+            log.warn("OpenAI 응답 파싱 실패: {}", e.getMessage());
             return "";
         }
     }
