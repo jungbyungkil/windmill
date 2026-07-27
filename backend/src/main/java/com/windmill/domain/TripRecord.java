@@ -35,8 +35,9 @@ public class TripRecord {
     @Column(nullable = false)
     private int rerouteCount = 0;
 
+    // EAGER: open-in-view=false + 트랜잭션 밖 DTO 변환 조합에서 LAZY면 LazyInitializationException 발생 (Itinerary.items 참고)
     @Builder.Default
-    @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "tripRecord", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<VisitFeedback> visitFeedback = new ArrayList<>();
 
     @Column(nullable = false)

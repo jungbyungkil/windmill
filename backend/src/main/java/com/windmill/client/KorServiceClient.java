@@ -114,9 +114,9 @@ public class KorServiceClient {
                 .retrieve()
                 .bodyToMono(String.class)
                 .map(KtoApiResponseParser::parseItems)
-                .map(items -> items.isEmpty() ? null : items.get(0))
+                .flatMap(items -> items.isEmpty() ? Mono.empty() : Mono.just(items.get(0)))
                 .doOnError(e -> log.error("detailCommon2 호출 실패: {}", e.getMessage()))
-                .onErrorReturn((JsonNode) null);
+                .onErrorResume(e -> Mono.empty());
     }
 
     /** 소개정보 조회 (detailIntro2) - 타입별 응답 필드가 다름 (영업시간/휴무일 등) */
@@ -135,9 +135,9 @@ public class KorServiceClient {
                 .retrieve()
                 .bodyToMono(String.class)
                 .map(KtoApiResponseParser::parseItems)
-                .map(items -> items.isEmpty() ? null : items.get(0))
+                .flatMap(items -> items.isEmpty() ? Mono.empty() : Mono.just(items.get(0)))
                 .doOnError(e -> log.error("detailIntro2 호출 실패: {}", e.getMessage()))
-                .onErrorReturn((JsonNode) null);
+                .onErrorResume(e -> Mono.empty());
     }
 
     /** 이미지정보 조회 (detailImage2) */

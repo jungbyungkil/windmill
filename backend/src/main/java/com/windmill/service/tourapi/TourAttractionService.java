@@ -1,6 +1,7 @@
 package com.windmill.service.tourapi;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.windmill.client.KorServiceClient;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.TourAttractionSummary;
@@ -62,7 +63,8 @@ public class TourAttractionService {
         Mono<JsonNode> introMono = korServiceClient.detailIntro(contentId, contentTypeId);
         Mono<List<JsonNode>> imagesMono = korServiceClient.detailImages(contentId);
 
-        return Mono.zip(commonMono.defaultIfEmpty(null), introMono.defaultIfEmpty(null), imagesMono)
+        return Mono.zip(commonMono.defaultIfEmpty(NullNode.getInstance()),
+                        introMono.defaultIfEmpty(NullNode.getInstance()), imagesMono)
                 .map(tuple -> buildDetail(contentId, contentTypeId, tuple.getT1(), tuple.getT2(), tuple.getT3()))
                 .doOnNext(detail -> detailCache.put(contentId, detail));
     }
@@ -73,7 +75,7 @@ public class TourAttractionService {
                 .contentId(contentId)
                 .contentTypeId(String.valueOf(contentTypeId));
 
-        if (common != null) {
+        if (!common.isNull()) {
             builder.title(common.path("title").asText(null))
                     .overview(common.path("overview").asText(null))
                     .homepage(common.path("homepage").asText(null))
@@ -84,7 +86,7 @@ public class TourAttractionService {
                     .tel(common.path("tel").asText(null));
         }
 
-        builder.introFields(intro == null ? Map.of() : jsonNodeToMap(intro));
+        builder.introFields(intro.isNull() ? Map.of() : jsonNodeToMap(intro));
         builder.imageUrls(images.stream()
                 .map(img -> img.path("originimgurl").asText(null))
                 .filter(url -> url != null && !url.isBlank())

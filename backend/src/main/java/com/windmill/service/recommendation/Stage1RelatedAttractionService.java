@@ -26,6 +26,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class Stage1RelatedAttractionService {
 
+    /** data.go.kr 요청 제한(429) 방지를 위한 후속 단계 외부 API 동시 호출 상한 */
+    private static final int EXTERNAL_CALL_CONCURRENCY = 4;
+    /** 후속 단계(이름매칭/영업시간/집중률)로 넘길 후보 상한 - 연관순위(rank) 기준 상위만 사용해 API 쿼터 절약 */
+    private static final int MAX_CANDIDATES = 20;
+
     private final RelatedAttractionClient relatedAttractionClient;
     private final KorServiceClient korServiceClient;
 
@@ -67,7 +72,10 @@ public class Stage1RelatedAttractionService {
             }
             List<RelatedCandidate> result = new ArrayList<>(byName.values());
             result.sort(Comparator.comparingInt(RelatedCandidate::getRank));
-            log.info("[Stage1] 연관관광지 후보 {}건 확보 (seed={})", result.size(), seedPlaceName);
+            if (result.size() > MAX_CANDIDATES) {
+                result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
+            }
+            log.info("[Stage1] 연관관광지 후보 {}건 확보(상위 {}건로 제한, seed={})", result.size(), MAX_CANDIDATES, seedPlaceName);
             return result;
         });
     }
@@ -79,7 +87,7 @@ public class Stage1RelatedAttractionService {
      */
     public Mono<List<RelatedCandidate>> resolveContentIds(List<RelatedCandidate> candidates) {
         return Flux.fromIterable(candidates)
-                .flatMap(this::resolveOne)
+                .flatMap(this::resolveOne, EXTERNAL_CALL_CONCURRENCY)
                 .filter(c -> c.getContentId() != null)
                 .collectList()
                 .doOnNext(list -> log.info("[Stage1] KorService2 이름매칭 성공 {}건 / {}건 중", list.size(), candidates.size()));

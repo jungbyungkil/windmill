@@ -22,6 +22,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class Stage3CrowdRateFilter {
 
+    /** data.go.kr 요청 제한(429) 방지를 위한 동시 호출 상한 */
+    private static final int EXTERNAL_CALL_CONCURRENCY = 4;
+
     private final CrowdRateClient crowdRateClient;
 
     @Value("${windmill.region.sokcho.legacy-area-cd}")
@@ -32,7 +35,7 @@ public class Stage3CrowdRateFilter {
 
     public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates) {
         return Flux.fromIterable(candidates)
-                .flatMap(this::attachCrowdRate)
+                .flatMap(this::attachCrowdRate, EXTERNAL_CALL_CONCURRENCY)
                 .collectList()
                 .map(list -> {
                     list.sort(Comparator.comparing(RelatedCandidate::getCrowdRate,

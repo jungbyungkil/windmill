@@ -37,7 +37,7 @@ weather:
     base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0
 
 # MVP 타겟 지역: 속초 - 두 지역코드 체계 공존 (계획 문서 1절 참고)
-# lDongRegnCd/lDongSignguCd는 추정값 - ldongCode2 실호출로 검증 필요 (작업 #12)
+# lDongRegnCd/lDongSignguCd는 ldongCode2 실호출로 검증 완료 (2026-07-27, /api/ldong-codes?lDongRegnCd=51)
 windmill:
   region:
     sokcho:
