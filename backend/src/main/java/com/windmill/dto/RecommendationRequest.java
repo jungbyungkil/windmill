@@ -13,6 +13,8 @@ public class RecommendationRequest {
     private List<String> tags;             // #아이동반 #실내 등
     private String naturalLanguageQuery;   // "아이랑 갈만한 곳"
     private List<String> excludeContentIds;
+    /** 이 세션이 "별로"로 평가한 장소명 - 추천 정확도 개선 (기록 태깅 → 추천 반영) */
+    private List<String> excludePlaceNames;
     /** 트리거 우선회피 정렬 힌트 - 대안 추천 시에만 사용 */
     private AvoidanceHint avoidanceHint;
 

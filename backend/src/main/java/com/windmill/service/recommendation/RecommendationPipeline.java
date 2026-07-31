@@ -36,6 +36,9 @@ public class RecommendationPipeline {
         Set<String> exclude = request.getExcludeContentIds() == null
                 ? Set.of()
                 : Set.copyOf(request.getExcludeContentIds());
+        Set<String> excludeNames = request.getExcludePlaceNames() == null
+                ? Set.of()
+                : Set.copyOf(request.getExcludePlaceNames());
 
         return stage1.fetch(request.getSeedPlaceName())
                 .flatMap(stage1::resolveContentIds)
@@ -45,6 +48,9 @@ public class RecommendationPipeline {
                 .flatMap(stage2::filter)
                 .flatMap(stage3::filter)
                 .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
+                .map(list -> list.stream()
+                        .filter(c -> !excludeNames.contains(c.getPlaceName()))
+                        .collect(Collectors.toList()))
                 .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint()))
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
     }

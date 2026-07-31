@@ -17,4 +17,5 @@ public class RecommendationCandidate {
     private List<String> matchedTags;  // Stage4 LLM 매칭 결과
     private String oneLiner;           // Stage4 LLM 생성 한 문장
     private int rank;                  // 연관순위 (Stage1)
+    private String suggestedTime;      // InitialPlanService(5단계, 초안 배치)에서만 채워짐 - "HH:mm"
 }

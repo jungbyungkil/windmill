@@ -3,6 +3,7 @@ package com.windmill.service.trip;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.TripRecord;
 import com.windmill.domain.VisitFeedback;
+import com.windmill.domain.VisitRating;
 import com.windmill.dto.CreateTripRecordRequest;
 import com.windmill.dto.VisitFeedbackRequest;
 import com.windmill.repository.ItineraryRepository;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +50,16 @@ public class TripRecordService {
     @Transactional(readOnly = true)
     public List<TripRecord> findBySession(String sessionUuid) {
         return tripRecordRepository.findBySessionUuid(sessionUuid);
+    }
+
+    /** 이 세션이 "별로"로 평가한 장소명 - 추천 파이프라인에서 제외 힌트로 사용 (기획안: 기록 → 추천 정확도 개선) */
+    @Transactional(readOnly = true)
+    public Set<String> getBadPlaceNames(String sessionUuid) {
+        return tripRecordRepository.findBySessionUuid(sessionUuid).stream()
+                .flatMap(record -> record.getVisitFeedback().stream())
+                .filter(fb -> fb.getRating() == VisitRating.BAD)
+                .map(VisitFeedback::getPlaceName)
+                .collect(Collectors.toSet());
     }
 
     private List<VisitFeedback> toFeedbackEntities(List<VisitFeedbackRequest> requests, TripRecord record) {

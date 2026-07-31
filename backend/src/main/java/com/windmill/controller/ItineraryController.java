@@ -8,8 +8,10 @@ import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.ItineraryService;
+import com.windmill.service.recommendation.InitialPlanService;
 import com.windmill.service.recommendation.RecommendationPipeline;
 import com.windmill.service.trigger.TriggerDetectionService;
+import com.windmill.service.trip.TripRecordService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +31,8 @@ public class ItineraryController {
     private final ItineraryService itineraryService;
     private final TriggerDetectionService triggerDetectionService;
     private final RecommendationPipeline recommendationPipeline;
+    private final InitialPlanService initialPlanService;
+    private final TripRecordService tripRecordService;
 
     @PostMapping
     public Mono<ResponseEntity<ItineraryResponse>> create(
@@ -98,15 +102,46 @@ public class ItineraryController {
                 .map(ResponseEntity::ok);
     }
 
+    /**
+     * AI 초기 일정 초안 생성 (5단계). 4단계 파이프라인이 검증한 실제 후보 중 상위 placeCount건을
+     * LLM이 순서/제안시각만 배정해 돌려준다 - 결과는 바로 저장되지 않고 프론트에서 검토 후 addItem으로 반영.
+     */
+    @GetMapping("/{id}/auto-plan")
+    public Mono<ResponseEntity<List<RecommendationCandidate>>> autoPlan(
+            @PathVariable Long id,
+            @RequestParam(required = false) List<String> tags,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "5") int placeCount) {
+        return Mono.fromCallable(() -> itineraryService.get(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(itinerary -> initialPlanService.draft(buildAutoPlanRequest(itinerary, tags, query), placeCount))
+                .map(ResponseEntity::ok);
+    }
+
+    private RecommendationRequest buildAutoPlanRequest(Itinerary itinerary, List<String> tags, String query) {
+        List<String> excludeContentIds = itinerary.getItems().stream()
+                .map(item -> item.getContentId())
+                .collect(Collectors.toList());
+        List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
+        return RecommendationRequest.builder()
+                .tags(tags)
+                .naturalLanguageQuery(query)
+                .excludeContentIds(excludeContentIds)
+                .excludePlaceNames(excludePlaceNames)
+                .build();
+    }
+
     private RecommendationRequest buildAlternativeRequest(Itinerary itinerary,
                                                             RecommendationRequest.AvoidanceHint avoid,
                                                             String seedPlaceName) {
         List<String> excludeContentIds = itinerary.getItems().stream()
                 .map(item -> item.getContentId())
                 .collect(Collectors.toList());
+        List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
         return RecommendationRequest.builder()
                 .seedPlaceName(seedPlaceName)
                 .excludeContentIds(excludeContentIds)
+                .excludePlaceNames(excludePlaceNames)
                 .avoidanceHint(avoid)
                 .build();
     }

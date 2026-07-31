@@ -14,6 +14,8 @@ import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 바람개비 실시간 변수 감지 - 기상/혼잡도/영업상태 3조건.
@@ -35,10 +37,11 @@ public class TriggerDetectionService {
     public Mono<TriggerResult> detectForItinerary(Itinerary itinerary) {
         if (itinerary.getItems().isEmpty()) {
             return Mono.just(TriggerResult.builder()
-                    .triggerCount(0).level(TriggerLevel.NORMAL).triggerDetails(List.of()).build());
+                    .triggerCount(0).level(TriggerLevel.NORMAL).triggerDetails(List.of())
+                    .affectedItemIds(List.of()).build());
         }
         return Flux.fromIterable(itinerary.getItems())
-                .flatMap(this::detect)
+                .flatMap(item -> detect(item).map(result -> Map.entry(item.getId(), result)))
                 .collectList()
                 .map(this::aggregate);
     }
@@ -61,14 +64,22 @@ public class TriggerDetectionService {
                 .defaultIfEmpty(buildResult(weatherTrigger, crowdTrigger, false));
     }
 
-    private TriggerResult aggregate(List<TriggerResult> perItem) {
-        boolean weather = perItem.stream().anyMatch(TriggerResult::isWeatherTrigger);
-        boolean crowd = perItem.stream().anyMatch(TriggerResult::isCrowdTrigger);
-        boolean business = perItem.stream().anyMatch(TriggerResult::isBusinessTrigger);
-        return buildResult(weather, crowd, business);
+    private TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem) {
+        boolean weather = perItem.stream().anyMatch(e -> e.getValue().isWeatherTrigger());
+        boolean crowd = perItem.stream().anyMatch(e -> e.getValue().isCrowdTrigger());
+        boolean business = perItem.stream().anyMatch(e -> e.getValue().isBusinessTrigger());
+        List<Long> affectedItemIds = perItem.stream()
+                .filter(e -> e.getValue().isWeatherTrigger() || e.getValue().isCrowdTrigger() || e.getValue().isBusinessTrigger())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        return buildResult(weather, crowd, business, affectedItemIds);
     }
 
     private TriggerResult buildResult(boolean weather, boolean crowd, boolean business) {
+        return buildResult(weather, crowd, business, List.of());
+    }
+
+    private TriggerResult buildResult(boolean weather, boolean crowd, boolean business, List<Long> affectedItemIds) {
         int count = (weather ? 1 : 0) + (crowd ? 1 : 0) + (business ? 1 : 0);
         List<String> details = new ArrayList<>();
         if (weather) {
@@ -88,6 +99,7 @@ public class TriggerDetectionService {
                 .triggerCount(count)
                 .level(level)
                 .triggerDetails(details)
+                .affectedItemIds(affectedItemIds)
                 .build();
     }
 }
