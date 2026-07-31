@@ -35,8 +35,9 @@ public class ItineraryItem {
     /** "09:00" 같은 시간 문자열 - 프론트에서 형식 통제 */
     private String scheduledTime;
 
+    // EAGER: open-in-view=false + 트랜잭션 밖 DTO 변환 조합에서 LAZY면 LazyInitializationException 발생 (Itinerary.items 참고)
     @Builder.Default
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "itinerary_item_tags", joinColumns = @JoinColumn(name = "itinerary_item_id"))
     @Column(name = "tag")
     private List<String> tags = new ArrayList<>();
