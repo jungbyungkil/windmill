@@ -4,7 +4,6 @@ WORKDIR /app
 COPY frontend/package*.json frontend/
 RUN cd frontend && npm ci
 COPY frontend frontend
-COPY backend/src/main/resources/static backend/src/main/resources/static
 RUN cd frontend && npm run build
 
 # === 2단계: Spring Boot 백엔드 빌드 ===
