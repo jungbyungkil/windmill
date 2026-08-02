@@ -1,0 +1,44 @@
+databases:
+  - name: windmill-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: windmill
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: singapore
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_HOST
+        fromDatabase:
+          name: windmill-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: windmill-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: windmill-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: windmill-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: windmill-db
+          property: password
+      - key: TOURAPI_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: H2_CONSOLE_ENABLED
+        value: "false"

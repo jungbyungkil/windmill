@@ -1,0 +1,15 @@
+# Render 배포용 프로필 (SPRING_PROFILES_ACTIVE=prod)
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
