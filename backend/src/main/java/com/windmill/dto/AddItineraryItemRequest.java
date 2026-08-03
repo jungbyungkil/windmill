@@ -12,6 +12,7 @@ public class AddItineraryItemRequest {
     private Integer contentTypeId;
     @NotBlank
     private String placeName;
+    private String thumbnailUrl;
     private String scheduledTime;
     private List<String> tags;
     private Double crowdRate;

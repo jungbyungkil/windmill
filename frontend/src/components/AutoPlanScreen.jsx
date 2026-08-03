@@ -83,6 +83,11 @@ export default function AutoPlanScreen({ onGenerate, onConfirm, onSkip }) {
         {draft.map((c) => (
           <label key={c.contentId} className="auto-plan-draft-item">
             <input type="checkbox" checked={!!checked[c.contentId]} onChange={() => toggleChecked(c.contentId)} />
+            {c.thumbnailUrl ? (
+              <img className="item-thumb" src={c.thumbnailUrl} alt={c.placeName} loading="lazy" />
+            ) : (
+              <div className="item-thumb item-thumb-placeholder">🌬️</div>
+            )}
             <span className="draft-time">{c.suggestedTime}</span>
             <span className="draft-body">
               <span className="draft-name">{c.placeName}</span>

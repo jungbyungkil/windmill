@@ -1,6 +1,12 @@
 export default function ItineraryItemCard({ item, onUpdateTime, onTogglePin, onDelete, onOpenDocent }) {
   return (
     <div className={`item-card ${item.pinned ? 'pinned' : ''}`}>
+      {item.thumbnailUrl ? (
+        <img className="item-thumb" src={item.thumbnailUrl} alt={item.placeName} loading="lazy" />
+      ) : (
+        <div className="item-thumb item-thumb-placeholder">🌬️</div>
+      )}
+
       <input
         type="time"
         className="item-time"

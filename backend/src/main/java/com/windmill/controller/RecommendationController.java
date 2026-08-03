@@ -1,5 +1,6 @@
 package com.windmill.controller;
 
+import com.windmill.domain.CompanionType;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.service.recommendation.RecommendationPipeline;
@@ -24,6 +25,9 @@ public class RecommendationController {
     @GetMapping
     public Mono<ResponseEntity<List<RecommendationCandidate>>> recommend(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam String regionCode,
+            @RequestParam(required = false, defaultValue = "false") boolean withPet,
+            @RequestParam(required = false) CompanionType companionType,
             @RequestParam(required = false) String seedPlaceName,
             @RequestParam(required = false) List<String> tags,
             @RequestParam(required = false) String query,
@@ -37,6 +41,9 @@ public class RecommendationController {
 
         return badPlaceNamesMono.flatMap(badPlaceNames -> {
             RecommendationRequest request = RecommendationRequest.builder()
+                    .regionCode(regionCode)
+                    .withPet(withPet)
+                    .companionType(companionType)
                     .seedPlaceName(seedPlaceName)
                     .tags(tags)
                     .naturalLanguageQuery(query)

@@ -13,6 +13,7 @@ public class ItineraryItemResponse {
     private String contentId;
     private Integer contentTypeId;
     private String placeName;
+    private String thumbnailUrl;
     private String scheduledTime;
     private List<String> tags;
     private Double crowdRate;
@@ -26,6 +27,7 @@ public class ItineraryItemResponse {
                 .contentId(item.getContentId())
                 .contentTypeId(item.getContentTypeId())
                 .placeName(item.getPlaceName())
+                .thumbnailUrl(item.getThumbnailUrl())
                 .scheduledTime(item.getScheduledTime())
                 .tags(item.getTags())
                 .crowdRate(item.getCrowdRate())

@@ -3,8 +3,11 @@ package com.windmill.service.itinerary;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.CreateItineraryRequest;
+import com.windmill.dto.RegionCode;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.repository.ItineraryRepository;
+import com.windmill.service.region.RegionCodeService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,12 +24,22 @@ import java.util.List;
 public class ItineraryService {
 
     private final ItineraryRepository itineraryRepository;
+    private final RegionCodeService regionCodeService;
 
     @Transactional
-    public Itinerary create(String sessionUuid, String destination) {
+    public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
+        RegionCode region = regionCodeService.find(request.getSignguFullCode())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + request.getSignguFullCode()));
         Itinerary itinerary = Itinerary.builder()
                 .sessionUuid(sessionUuid)
-                .destination(destination == null || destination.isBlank() ? "속초" : destination)
+                .signguFullCode(region.getSignguFullCode())
+                .regionDisplayName(region.getSidoName() + " " + region.getSignguName())
+                .weatherNx(region.getWeatherNx())
+                .weatherNy(region.getWeatherNy())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .companionType(request.getCompanionType())
+                .withPet(request.isWithPet())
                 .build();
         return itineraryRepository.save(itinerary);
     }
@@ -51,6 +64,7 @@ public class ItineraryService {
                 .contentId(request.getContentId())
                 .contentTypeId(request.getContentTypeId())
                 .placeName(request.getPlaceName())
+                .thumbnailUrl(request.getThumbnailUrl())
                 .scheduledTime(request.getScheduledTime())
                 .tags(request.getTags() == null ? List.of() : request.getTags())
                 .crowdRate(request.getCrowdRate())

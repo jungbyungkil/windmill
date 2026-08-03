@@ -2,11 +2,12 @@ package com.windmill.service.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.client.KorServiceClient;
+import com.windmill.client.PetFriendlyAttractionClient;
 import com.windmill.client.RelatedAttractionClient;
+import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -33,20 +34,15 @@ public class Stage1RelatedAttractionService {
 
     private final RelatedAttractionClient relatedAttractionClient;
     private final KorServiceClient korServiceClient;
+    private final PetFriendlyAttractionClient petFriendlyAttractionClient;
 
-    @Value("${windmill.region.sokcho.legacy-area-cd}")
-    private String areaCd;
-
-    @Value("${windmill.region.sokcho.legacy-signgu-cd}")
-    private String signguCd;
-
-    @Value("${windmill.region.sokcho.new-region-cd}")
-    private String lDongRegnCd;
-
-    @Value("${windmill.region.sokcho.new-signgu-cd}")
-    private String lDongSignguCd;
-
-    public Mono<List<RelatedCandidate>> fetch(String seedPlaceName) {
+    public Mono<List<RelatedCandidate>> fetch(RegionCode region, String seedPlaceName, boolean withPet) {
+        if (withPet) {
+            return fetchPetFriendly(region, seedPlaceName);
+        }
+        // legacy areaCd/signguCd는 LDONG에서 파생됨: areaCd=lDongRegnCd, signguCd=signguFullCode (RegionCodeService 참고)
+        String areaCd = region.getLDongRegnCd();
+        String signguCd = region.getSignguFullCode();
         Mono<List<JsonNode>> itemsMono = (seedPlaceName == null || seedPlaceName.isBlank())
                 ? relatedAttractionClient.areaBasedRelated(areaCd, signguCd, 100, 1)
                 : relatedAttractionClient.searchKeywordRelated(areaCd, signguCd, seedPlaceName, 50, 1);
@@ -81,20 +77,62 @@ public class Stage1RelatedAttractionService {
     }
 
     /**
+     * 반려동물 동반 시 TarRlteTarService1(연관관광지) 대신 전용 KorPetTourService2를 후보 소스로 쓴다.
+     * 이 API 응답은 KorService2와 동일 스키마(contentid/title/firstimage)라 resolveContentIds의
+     * 별도 이름매칭 조인이 필요 없다 - contentId가 이미 채워진 채로 반환된다.
+     */
+    private Mono<List<RelatedCandidate>> fetchPetFriendly(RegionCode region, String seedPlaceName) {
+        Mono<List<JsonNode>> itemsMono = (seedPlaceName == null || seedPlaceName.isBlank())
+                ? petFriendlyAttractionClient.areaBasedList(region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                : petFriendlyAttractionClient.searchKeyword(seedPlaceName, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1);
+
+        return itemsMono.map(items -> {
+            List<RelatedCandidate> result = new ArrayList<>();
+            int rank = 1;
+            for (JsonNode item : items) {
+                String name = item.path("title").asText(null);
+                if (name == null || name.isBlank()) {
+                    continue;
+                }
+                String thumbnail = item.path("firstimage").asText(null);
+                result.add(RelatedCandidate.builder()
+                        .placeName(name)
+                        .contentId(item.path("contentid").asText(null))
+                        .contentTypeId(parseContentTypeId(item))
+                        .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
+                        .categoryLcls("반려동물동반")
+                        .rank(rank++)
+                        .build());
+            }
+            log.info("[Stage1] 반려동물동반 후보 {}건 확보 (seed={})", result.size(), seedPlaceName);
+            return result;
+        });
+    }
+
+    private Integer parseContentTypeId(JsonNode item) {
+        String typeId = item.path("contenttypeid").asText(null);
+        return typeId == null || typeId.isBlank() ? null : Integer.valueOf(typeId);
+    }
+
+    /**
      * 연관관광지 API는 KorService2의 contentId와 무관한 자체 코드만 제공하므로,
      * 관광지명(placeName) 기준 키워드검색(searchKeyword2)으로 조인해 contentId/contentTypeId를 채운다.
      * 매칭 실패(동명이인/표기 차이 등)한 후보는 제외하고 로그만 남긴다.
      */
-    public Mono<List<RelatedCandidate>> resolveContentIds(List<RelatedCandidate> candidates) {
+    public Mono<List<RelatedCandidate>> resolveContentIds(List<RelatedCandidate> candidates, RegionCode region) {
         return Flux.fromIterable(candidates)
-                .flatMap(this::resolveOne, EXTERNAL_CALL_CONCURRENCY)
+                .flatMap(c -> resolveOne(c, region), EXTERNAL_CALL_CONCURRENCY)
                 .filter(c -> c.getContentId() != null)
                 .collectList()
                 .doOnNext(list -> log.info("[Stage1] KorService2 이름매칭 성공 {}건 / {}건 중", list.size(), candidates.size()));
     }
 
-    private Mono<RelatedCandidate> resolveOne(RelatedCandidate candidate) {
-        return korServiceClient.searchKeyword(candidate.getPlaceName(), null, lDongRegnCd, lDongSignguCd, 1, 1)
+    private Mono<RelatedCandidate> resolveOne(RelatedCandidate candidate, RegionCode region) {
+        if (candidate.getContentId() != null) {
+            // 반려동물동반 소스(fetchPetFriendly)는 이미 contentId가 채워져 있어 재조회 불필요
+            return Mono.just(candidate);
+        }
+        return korServiceClient.searchKeyword(candidate.getPlaceName(), null, region.getLDongRegnCd(), region.getLDongSignguCd(), 1, 1)
                 .map(items -> {
                     if (items.isEmpty()) {
                         log.warn("[Stage1] '{}' KorService2 이름매칭 실패 - 후보에서 제외", candidate.getPlaceName());
@@ -104,6 +142,8 @@ public class Stage1RelatedAttractionService {
                     candidate.setContentId(match.path("contentid").asText(null));
                     String typeId = match.path("contenttypeid").asText(null);
                     candidate.setContentTypeId(typeId == null ? null : Integer.valueOf(typeId));
+                    String thumbnail = match.path("firstimage").asText(null);
+                    candidate.setThumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail);
                     return candidate;
                 })
                 .defaultIfEmpty(candidate)

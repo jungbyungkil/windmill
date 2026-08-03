@@ -3,61 +3,63 @@ package com.windmill.service.trigger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.client.CrowdRateClient;
 import com.windmill.client.WeatherClient;
-import jakarta.annotation.PostConstruct;
+import com.windmill.dto.RegionCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 30분마다 속초 지역의 집중률/기상 원본 데이터를 갱신해 RegionConditionCache에 저장.
- * 프론트 폴링(trigger-status)은 이 캐시만 조회하므로 매 요청마다 외부 API를 호출하지 않는다.
+ * 지역별 집중률/기상 원본 데이터를 on-demand로 갱신해 RegionConditionCache에 저장.
+ * 예전엔 속초 한 지역만 30분 고정 스케줄로 프리페치했지만, 전국 250여 지역으로 확장되며
+ * 매번 전체를 프리페치하면 API 쿼터 낭비가 커 실제 활성 일정이 있는 지역만 필요 시점에 갱신한다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TriggerScheduler {
 
-    private static final long THIRTY_MINUTES_MS = 30 * 60 * 1000L;
-
     private final CrowdRateClient crowdRateClient;
     private final WeatherClient weatherClient;
     private final RegionConditionCache cache;
 
-    @Value("${windmill.region.sokcho.legacy-area-cd}")
-    private String areaCd;
-
-    @Value("${windmill.region.sokcho.legacy-signgu-cd}")
-    private String signguCd;
-
-    @Value("${windmill.region.sokcho.weather-nx}")
-    private String nx;
-
-    @Value("${windmill.region.sokcho.weather-ny}")
-    private String ny;
-
-    @PostConstruct
-    public void initialRefresh() {
-        refresh();
-    }
-
-    @Scheduled(fixedRate = THIRTY_MINUTES_MS)
-    public void refresh() {
-        refreshCrowdRates();
-        refreshWeather();
-    }
-
-    private void refreshCrowdRates() {
-        if (!crowdRateClient.isConfigured()) {
-            return;
+    /** 캐시가 없거나 TTL(30분)이 지났으면 그 지역만 갱신 후 반환. 최신이면 외부 API 호출 없이 즉시 반환 */
+    public Mono<RegionCondition> ensureFresh(RegionCode region) {
+        RegionCondition cached = cache.get(region.getSignguFullCode());
+        if (cached != null) {
+            return Mono.just(cached);
         }
-        crowdRateClient.crowdRateList(areaCd, signguCd, null, 100, 1)
-                .subscribe(items -> {
+        return refresh(region);
+    }
+
+    private Mono<RegionCondition> refresh(RegionCode region) {
+        return Mono.zip(refreshCrowdRates(region), refreshWeather(region).defaultIfEmpty(Double.NaN))
+                .map(tuple -> {
+                    Double pop = Double.isNaN(tuple.getT2()) ? null : tuple.getT2();
+                    RegionCondition condition = RegionCondition.builder()
+                            .crowdRateByPlaceName(tuple.getT1())
+                            .currentPop(pop)
+                            .refreshedAt(Instant.now())
+                            .build();
+                    cache.put(region.getSignguFullCode(), condition);
+                    log.info("[TriggerScheduler] {} 캐시 갱신 완료 (집중률 {}건, POP={})",
+                            region.getSignguName(), condition.getCrowdRateByPlaceName().size(), pop);
+                    return condition;
+                });
+    }
+
+    private Mono<Map<String, Double>> refreshCrowdRates(RegionCode region) {
+        if (!crowdRateClient.isConfigured()) {
+            return Mono.just(Map.of());
+        }
+        // legacy areaCd/signguCd는 LDONG에서 파생됨: areaCd=lDongRegnCd, signguCd=signguFullCode
+        return crowdRateClient.crowdRateList(region.getLDongRegnCd(), region.getSignguFullCode(), null, 100, 1)
+                .map(items -> {
                     Map<String, Double> today = new HashMap<>();
                     for (JsonNode item : items) {
                         String name = item.path("tAtsNm").asText(null);
@@ -65,21 +67,21 @@ public class TriggerScheduler {
                             today.put(name, item.path("cnctrRate").asDouble());
                         }
                     }
-                    cache.updateCrowdRates(today);
-                    log.info("[TriggerScheduler] 집중률 캐시 갱신 완료 ({}건)", today.size());
-                }, e -> log.error("[TriggerScheduler] 집중률 갱신 실패: {}", e.getMessage()));
+                    return today;
+                })
+                .onErrorReturn(Map.of());
     }
 
-    private void refreshWeather() {
-        if (!weatherClient.isConfigured()) {
-            return;
+    private Mono<Double> refreshWeather(RegionCode region) {
+        if (!weatherClient.isConfigured() || region.getWeatherNx() == null || region.getWeatherNy() == null) {
+            return Mono.empty();
         }
-        weatherClient.getVillageForecast(nx, ny)
-                .subscribe(items -> {
+        return weatherClient.getVillageForecast(region.getWeatherNx(), region.getWeatherNy())
+                .flatMap(items -> {
                     Double pop = extractLatestPop(items);
-                    cache.updatePop(pop);
-                    log.info("[TriggerScheduler] 기상 캐시 갱신 완료 (POP={})", pop);
-                }, e -> log.error("[TriggerScheduler] 기상 갱신 실패: {}", e.getMessage()));
+                    return pop == null ? Mono.empty() : Mono.just(pop);
+                })
+                .onErrorResume(e -> Mono.empty());
     }
 
     /** 발표 회차 예보 중 가장 이른(현재에 가장 가까운) 시각의 강수확률(POP)을 사용 */

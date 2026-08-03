@@ -111,6 +111,7 @@ public class Stage4TagMatchingService {
                 .contentId(c.getContentId())
                 .placeName(c.getPlaceName())
                 .category(c.getCategoryLcls())
+                .thumbnailUrl(c.getThumbnailUrl())
                 .crowdRate(c.getCrowdRate())
                 .freeRatePercent(c.getCrowdRate() == null ? null : 100 - c.getCrowdRate())
                 .matchedTags(matchedTags)

@@ -1,4 +1,4 @@
-export default function DocentModal({ open, placeName, script, loading, error, onClose }) {
+export default function DocentModal({ open, placeName, script, audioUrl, loading, error, onClose }) {
   if (!open) return null;
 
   return (
@@ -22,6 +22,12 @@ export default function DocentModal({ open, placeName, script, loading, error, o
           )}
 
           {!loading && error && <p className="error-msg">❌ {error}</p>}
+
+          {!loading && !error && audioUrl && (
+            <audio className="docent-audio" controls src={audioUrl}>
+              브라우저가 오디오 재생을 지원하지 않아요.
+            </audio>
+          )}
 
           {!loading && !error && script && (
             <blockquote className="docent-script">{script}</blockquote>

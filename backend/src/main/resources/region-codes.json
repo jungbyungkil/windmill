@@ -1,0 +1,2592 @@
+[
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11110",
+    "signguName": "종로구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "110",
+    "weatherNx": 60,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11140",
+    "signguName": "중구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "140",
+    "weatherNx": 60,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11170",
+    "signguName": "용산구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "170",
+    "weatherNx": 60,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11200",
+    "signguName": "성동구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "200",
+    "weatherNx": 61,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11215",
+    "signguName": "광진구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "215",
+    "weatherNx": 62,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11230",
+    "signguName": "동대문구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "230",
+    "weatherNx": 61,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11260",
+    "signguName": "중랑구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "260",
+    "weatherNx": 62,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11290",
+    "signguName": "성북구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "290",
+    "weatherNx": 61,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11305",
+    "signguName": "강북구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "305",
+    "weatherNx": 60,
+    "weatherNy": 129
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11320",
+    "signguName": "도봉구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "320",
+    "weatherNx": 61,
+    "weatherNy": 129
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11350",
+    "signguName": "노원구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "350",
+    "weatherNx": 62,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11380",
+    "signguName": "은평구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "380",
+    "weatherNx": 59,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11410",
+    "signguName": "서대문구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "410",
+    "weatherNx": 59,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11440",
+    "signguName": "마포구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "440",
+    "weatherNx": 58,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11470",
+    "signguName": "양천구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "470",
+    "weatherNx": 58,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11500",
+    "signguName": "강서구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "500",
+    "weatherNx": 57,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11530",
+    "signguName": "구로구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "530",
+    "weatherNx": 57,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11545",
+    "signguName": "금천구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "545",
+    "weatherNx": 59,
+    "weatherNy": 124
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11560",
+    "signguName": "영등포구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "560",
+    "weatherNx": 59,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11590",
+    "signguName": "동작구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "590",
+    "weatherNx": 59,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11620",
+    "signguName": "관악구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "620",
+    "weatherNx": 59,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11650",
+    "signguName": "서초구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "650",
+    "weatherNx": 60,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11680",
+    "signguName": "강남구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "680",
+    "weatherNx": 61,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11710",
+    "signguName": "송파구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "710",
+    "weatherNx": 62,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "11",
+    "sidoName": "서울특별시",
+    "signguFullCode": "11740",
+    "signguName": "강동구",
+    "lDongRegnCd": "11",
+    "lDongSignguCd": "740",
+    "weatherNx": 62,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12110",
+    "signguName": "목포시",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "110",
+    "weatherNx": 50,
+    "weatherNy": 66
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12130",
+    "signguName": "여수시",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "130",
+    "weatherNx": 74,
+    "weatherNy": 66
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12150",
+    "signguName": "순천시",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "150",
+    "weatherNx": 70,
+    "weatherNy": 69
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12170",
+    "signguName": "나주시",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "170",
+    "weatherNx": 55,
+    "weatherNy": 71
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12190",
+    "signguName": "광양시",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "190",
+    "weatherNx": 73,
+    "weatherNy": 69
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12210",
+    "signguName": "동구",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "210",
+    "weatherNx": 59,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12240",
+    "signguName": "서구",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "240",
+    "weatherNx": 58,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12270",
+    "signguName": "남구",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "270",
+    "weatherNx": 59,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12300",
+    "signguName": "북구",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "300",
+    "weatherNx": 59,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12330",
+    "signguName": "광산구",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "330",
+    "weatherNx": 58,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12710",
+    "signguName": "담양군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "710",
+    "weatherNx": 60,
+    "weatherNy": 78
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12720",
+    "signguName": "곡성군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "720",
+    "weatherNx": 66,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12730",
+    "signguName": "구례군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "730",
+    "weatherNx": 67,
+    "weatherNy": 76
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12740",
+    "signguName": "고흥군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "740",
+    "weatherNx": 69,
+    "weatherNy": 60
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12750",
+    "signguName": "보성군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "750",
+    "weatherNx": 62,
+    "weatherNy": 65
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12760",
+    "signguName": "화순군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "760",
+    "weatherNx": 59,
+    "weatherNy": 71
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12770",
+    "signguName": "장흥군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "770",
+    "weatherNx": 63,
+    "weatherNy": 82
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12780",
+    "signguName": "강진군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "780",
+    "weatherNx": 57,
+    "weatherNy": 61
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12790",
+    "signguName": "해남군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "790",
+    "weatherNx": 55,
+    "weatherNy": 59
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12800",
+    "signguName": "영암군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "800",
+    "weatherNx": 53,
+    "weatherNy": 65
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12810",
+    "signguName": "무안군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "810",
+    "weatherNx": 49,
+    "weatherNy": 73
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12820",
+    "signguName": "함평군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "820",
+    "weatherNx": 53,
+    "weatherNy": 72
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12830",
+    "signguName": "영광군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "830",
+    "weatherNx": 53,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12840",
+    "signguName": "장성군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "840",
+    "weatherNx": 56,
+    "weatherNy": 78
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12850",
+    "signguName": "완도군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "850",
+    "weatherNx": 57,
+    "weatherNy": 56
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12860",
+    "signguName": "진도군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "860",
+    "weatherNx": 49,
+    "weatherNy": 59
+  },
+  {
+    "sidoCode": "12",
+    "sidoName": "전남광주통합특별시",
+    "signguFullCode": "12870",
+    "signguName": "신안군",
+    "lDongRegnCd": "12",
+    "lDongSignguCd": "870",
+    "weatherNx": 45,
+    "weatherNy": 65
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26110",
+    "signguName": "중구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "110",
+    "weatherNx": 97,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26140",
+    "signguName": "서구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "140",
+    "weatherNx": 97,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26170",
+    "signguName": "동구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "170",
+    "weatherNx": 97,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26200",
+    "signguName": "영도구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "200",
+    "weatherNx": 98,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26230",
+    "signguName": "부산진구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "230",
+    "weatherNx": 98,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26260",
+    "signguName": "동래구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "260",
+    "weatherNx": 98,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26290",
+    "signguName": "남구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "290",
+    "weatherNx": 98,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26320",
+    "signguName": "북구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "320",
+    "weatherNx": 97,
+    "weatherNy": 76
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26350",
+    "signguName": "해운대구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "350",
+    "weatherNx": 99,
+    "weatherNy": 76
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26380",
+    "signguName": "사하구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "380",
+    "weatherNx": 96,
+    "weatherNy": 73
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26410",
+    "signguName": "금정구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "410",
+    "weatherNx": 97,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26440",
+    "signguName": "강서구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "440",
+    "weatherNx": 95,
+    "weatherNy": 76
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26470",
+    "signguName": "연제구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "470",
+    "weatherNx": 98,
+    "weatherNy": 76
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26500",
+    "signguName": "수영구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "500",
+    "weatherNx": 99,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26530",
+    "signguName": "사상구",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "530",
+    "weatherNx": 96,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "26",
+    "sidoName": "부산광역시",
+    "signguFullCode": "26710",
+    "signguName": "기장군",
+    "lDongRegnCd": "26",
+    "lDongSignguCd": "710",
+    "weatherNx": 100,
+    "weatherNy": 79
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27110",
+    "signguName": "중구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "110",
+    "weatherNx": 89,
+    "weatherNy": 90
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27140",
+    "signguName": "동구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "140",
+    "weatherNx": 91,
+    "weatherNy": 91
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27170",
+    "signguName": "서구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "170",
+    "weatherNx": 88,
+    "weatherNy": 91
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27200",
+    "signguName": "남구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "200",
+    "weatherNx": 88,
+    "weatherNy": 90
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27230",
+    "signguName": "북구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "230",
+    "weatherNx": 89,
+    "weatherNy": 91
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27260",
+    "signguName": "수성구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "260",
+    "weatherNx": 90,
+    "weatherNy": 91
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27290",
+    "signguName": "달서구",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "290",
+    "weatherNx": 88,
+    "weatherNy": 89
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27710",
+    "signguName": "달성군",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "710",
+    "weatherNx": 90,
+    "weatherNy": 89
+  },
+  {
+    "sidoCode": "27",
+    "sidoName": "대구광역시",
+    "signguFullCode": "27720",
+    "signguName": "군위군",
+    "lDongRegnCd": "27",
+    "lDongSignguCd": "720",
+    "weatherNx": 90,
+    "weatherNy": 96
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28125",
+    "signguName": "제물포구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "125",
+    "weatherNx": 54,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28155",
+    "signguName": "영종구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "155",
+    "weatherNx": 50,
+    "weatherNy": 124
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28177",
+    "signguName": "미추홀구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "177",
+    "weatherNx": 54,
+    "weatherNy": 124
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28185",
+    "signguName": "연수구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "185",
+    "weatherNx": 54,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28200",
+    "signguName": "남동구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "200",
+    "weatherNx": 56,
+    "weatherNy": 124
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28237",
+    "signguName": "부평구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "237",
+    "weatherNx": 55,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28245",
+    "signguName": "계양구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "245",
+    "weatherNx": 56,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28275",
+    "signguName": "서해구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "275",
+    "weatherNx": 54,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28290",
+    "signguName": "검단구",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "290",
+    "weatherNx": 53,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28710",
+    "signguName": "강화군",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "710",
+    "weatherNx": 49,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "28",
+    "sidoName": "인천광역시",
+    "signguFullCode": "28720",
+    "signguName": "옹진군",
+    "lDongRegnCd": "28",
+    "lDongSignguCd": "720",
+    "weatherNx": 51,
+    "weatherNy": 120
+  },
+  {
+    "sidoCode": "30",
+    "sidoName": "대전광역시",
+    "signguFullCode": "30110",
+    "signguName": "동구",
+    "lDongRegnCd": "30",
+    "lDongSignguCd": "110",
+    "weatherNx": 68,
+    "weatherNy": 100
+  },
+  {
+    "sidoCode": "30",
+    "sidoName": "대전광역시",
+    "signguFullCode": "30140",
+    "signguName": "중구",
+    "lDongRegnCd": "30",
+    "lDongSignguCd": "140",
+    "weatherNx": 68,
+    "weatherNy": 100
+  },
+  {
+    "sidoCode": "30",
+    "sidoName": "대전광역시",
+    "signguFullCode": "30170",
+    "signguName": "서구",
+    "lDongRegnCd": "30",
+    "lDongSignguCd": "170",
+    "weatherNx": 67,
+    "weatherNy": 101
+  },
+  {
+    "sidoCode": "30",
+    "sidoName": "대전광역시",
+    "signguFullCode": "30200",
+    "signguName": "유성구",
+    "lDongRegnCd": "30",
+    "lDongSignguCd": "200",
+    "weatherNx": 67,
+    "weatherNy": 102
+  },
+  {
+    "sidoCode": "30",
+    "sidoName": "대전광역시",
+    "signguFullCode": "30230",
+    "signguName": "대덕구",
+    "lDongRegnCd": "30",
+    "lDongSignguCd": "230",
+    "weatherNx": 68,
+    "weatherNy": 103
+  },
+  {
+    "sidoCode": "31",
+    "sidoName": "울산광역시",
+    "signguFullCode": "31110",
+    "signguName": "중구",
+    "lDongRegnCd": "31",
+    "lDongSignguCd": "110",
+    "weatherNx": 102,
+    "weatherNy": 85
+  },
+  {
+    "sidoCode": "31",
+    "sidoName": "울산광역시",
+    "signguFullCode": "31140",
+    "signguName": "남구",
+    "lDongRegnCd": "31",
+    "lDongSignguCd": "140",
+    "weatherNx": 102,
+    "weatherNy": 84
+  },
+  {
+    "sidoCode": "31",
+    "sidoName": "울산광역시",
+    "signguFullCode": "31170",
+    "signguName": "동구",
+    "lDongRegnCd": "31",
+    "lDongSignguCd": "170",
+    "weatherNx": 104,
+    "weatherNy": 84
+  },
+  {
+    "sidoCode": "31",
+    "sidoName": "울산광역시",
+    "signguFullCode": "31200",
+    "signguName": "북구",
+    "lDongRegnCd": "31",
+    "lDongSignguCd": "200",
+    "weatherNx": 103,
+    "weatherNy": 84
+  },
+  {
+    "sidoCode": "31",
+    "sidoName": "울산광역시",
+    "signguFullCode": "31710",
+    "signguName": "울주군",
+    "lDongRegnCd": "31",
+    "lDongSignguCd": "710",
+    "weatherNx": 97,
+    "weatherNy": 84
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41111",
+    "signguName": "수원시 장안구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "111",
+    "weatherNx": 60,
+    "weatherNy": 121
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41113",
+    "signguName": "수원시 권선구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "113",
+    "weatherNx": 61,
+    "weatherNy": 120
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41115",
+    "signguName": "수원시 팔달구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "115",
+    "weatherNx": 61,
+    "weatherNy": 121
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41117",
+    "signguName": "수원시 영통구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "117",
+    "weatherNx": 62,
+    "weatherNy": 120
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41131",
+    "signguName": "성남시 수정구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "131",
+    "weatherNx": 62,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41133",
+    "signguName": "성남시 중원구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "133",
+    "weatherNx": 62,
+    "weatherNy": 124
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41135",
+    "signguName": "성남시 분당구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "135",
+    "weatherNx": 62,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41150",
+    "signguName": "의정부시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "150",
+    "weatherNx": 61,
+    "weatherNy": 131
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41171",
+    "signguName": "안양시 만안구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "171",
+    "weatherNx": 59,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41173",
+    "signguName": "안양시 동안구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "173",
+    "weatherNx": 60,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41190",
+    "signguName": "부천시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "190",
+    "weatherNx": 56,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41192",
+    "signguName": "부천시 원미구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "192",
+    "weatherNx": 56,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41194",
+    "signguName": "부천시 소사구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "194",
+    "weatherNx": 57,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41196",
+    "signguName": "부천시 오정구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "196",
+    "weatherNx": 57,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41210",
+    "signguName": "광명시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "210",
+    "weatherNx": 58,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41220",
+    "signguName": "평택시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "220",
+    "weatherNx": 59,
+    "weatherNy": 113
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41250",
+    "signguName": "동두천시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "250",
+    "weatherNx": 62,
+    "weatherNy": 135
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41270",
+    "signguName": "안산시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "270",
+    "weatherNx": -2242,
+    "weatherNy": 1509
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41271",
+    "signguName": "안산시 상록구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "271",
+    "weatherNx": 57,
+    "weatherNy": 121
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41273",
+    "signguName": "안산시 단원구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "273",
+    "weatherNx": 53,
+    "weatherNy": 121
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41281",
+    "signguName": "고양시 덕양구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "281",
+    "weatherNx": 59,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41285",
+    "signguName": "고양시 일산동구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "285",
+    "weatherNx": 56,
+    "weatherNy": 129
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41287",
+    "signguName": "고양시 일산서구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "287",
+    "weatherNx": 56,
+    "weatherNy": 129
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41290",
+    "signguName": "과천시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "290",
+    "weatherNx": 60,
+    "weatherNy": 124
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41310",
+    "signguName": "구리시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "310",
+    "weatherNx": 62,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41360",
+    "signguName": "남양주시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "360",
+    "weatherNx": 65,
+    "weatherNy": 131
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41370",
+    "signguName": "오산시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "370",
+    "weatherNx": 61,
+    "weatherNy": 118
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41390",
+    "signguName": "시흥시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "390",
+    "weatherNx": 56,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41410",
+    "signguName": "군포시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "410",
+    "weatherNx": 59,
+    "weatherNy": 122
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41430",
+    "signguName": "의왕시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "430",
+    "weatherNx": 60,
+    "weatherNy": 122
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41450",
+    "signguName": "하남시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "450",
+    "weatherNx": 64,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41461",
+    "signguName": "용인시 처인구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "461",
+    "weatherNx": 66,
+    "weatherNy": 117
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41463",
+    "signguName": "용인시 기흥구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "463",
+    "weatherNx": 62,
+    "weatherNy": 120
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41465",
+    "signguName": "용인시 수지구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "465",
+    "weatherNx": 62,
+    "weatherNy": 121
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41480",
+    "signguName": "파주시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "480",
+    "weatherNx": 55,
+    "weatherNy": 132
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41500",
+    "signguName": "이천시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "500",
+    "weatherNx": 68,
+    "weatherNy": 118
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41550",
+    "signguName": "안성시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "550",
+    "weatherNx": 63,
+    "weatherNy": 116
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41570",
+    "signguName": "김포시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "570",
+    "weatherNx": 53,
+    "weatherNy": 130
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41590",
+    "signguName": "화성시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "590",
+    "weatherNx": 59,
+    "weatherNy": 117
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41591",
+    "signguName": "화성시 만세구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "591",
+    "weatherNx": 55,
+    "weatherNy": 117
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41593",
+    "signguName": "화성시 효행구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "593",
+    "weatherNx": 60,
+    "weatherNy": 119
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41595",
+    "signguName": "화성시 병점구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "595",
+    "weatherNx": 61,
+    "weatherNy": 119
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41597",
+    "signguName": "화성시 동탄구",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "597",
+    "weatherNx": 62,
+    "weatherNy": 119
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41610",
+    "signguName": "광주시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "610",
+    "weatherNx": 65,
+    "weatherNy": 122
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41630",
+    "signguName": "양주시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "630",
+    "weatherNx": 61,
+    "weatherNy": 131
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41650",
+    "signguName": "포천시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "650",
+    "weatherNx": 65,
+    "weatherNy": 139
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41670",
+    "signguName": "여주시",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "670",
+    "weatherNx": 70,
+    "weatherNy": 122
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41800",
+    "signguName": "연천군",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "800",
+    "weatherNx": 58,
+    "weatherNy": 136
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41820",
+    "signguName": "가평군",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "820",
+    "weatherNx": 69,
+    "weatherNy": 135
+  },
+  {
+    "sidoCode": "41",
+    "sidoName": "경기도",
+    "signguFullCode": "41830",
+    "signguName": "양평군",
+    "lDongRegnCd": "41",
+    "lDongSignguCd": "830",
+    "weatherNx": 72,
+    "weatherNy": 126
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43111",
+    "signguName": "청주시 상당구",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "111",
+    "weatherNx": 73,
+    "weatherNy": 106
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43112",
+    "signguName": "청주시 서원구",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "112",
+    "weatherNx": 68,
+    "weatherNy": 107
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43113",
+    "signguName": "청주시 흥덕구",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "113",
+    "weatherNx": 68,
+    "weatherNy": 106
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43114",
+    "signguName": "청주시 청원구",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "114",
+    "weatherNx": 68,
+    "weatherNy": 109
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43130",
+    "signguName": "충주시",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "130",
+    "weatherNx": 78,
+    "weatherNy": 114
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43150",
+    "signguName": "제천시",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "150",
+    "weatherNx": 79,
+    "weatherNy": 117
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43720",
+    "signguName": "보은군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "720",
+    "weatherNx": 73,
+    "weatherNy": 103
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43730",
+    "signguName": "옥천군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "730",
+    "weatherNx": 70,
+    "weatherNy": 98
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43740",
+    "signguName": "영동군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "740",
+    "weatherNx": 74,
+    "weatherNy": 96
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43745",
+    "signguName": "증평군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "745",
+    "weatherNx": 71,
+    "weatherNy": 110
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43750",
+    "signguName": "진천군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "750",
+    "weatherNx": 68,
+    "weatherNy": 111
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43760",
+    "signguName": "괴산군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "760",
+    "weatherNx": 73,
+    "weatherNy": 107
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43770",
+    "signguName": "음성군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "770",
+    "weatherNx": 71,
+    "weatherNy": 114
+  },
+  {
+    "sidoCode": "43",
+    "sidoName": "충청북도",
+    "signguFullCode": "43800",
+    "signguName": "단양군",
+    "lDongRegnCd": "43",
+    "lDongSignguCd": "800",
+    "weatherNx": 85,
+    "weatherNy": 115
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44131",
+    "signguName": "천안시 동남구",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "131",
+    "weatherNx": 63,
+    "weatherNy": 110
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44133",
+    "signguName": "천안시 서북구",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "133",
+    "weatherNx": 62,
+    "weatherNy": 113
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44150",
+    "signguName": "공주시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "150",
+    "weatherNx": 65,
+    "weatherNy": 101
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44180",
+    "signguName": "보령시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "180",
+    "weatherNx": 52,
+    "weatherNy": 99
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44200",
+    "signguName": "아산시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "200",
+    "weatherNx": 60,
+    "weatherNy": 109
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44210",
+    "signguName": "서산시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "210",
+    "weatherNx": 53,
+    "weatherNy": 108
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44230",
+    "signguName": "논산시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "230",
+    "weatherNx": 66,
+    "weatherNy": 96
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44250",
+    "signguName": "계룡시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "250",
+    "weatherNx": 65,
+    "weatherNy": 99
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44270",
+    "signguName": "당진시",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "270",
+    "weatherNx": 57,
+    "weatherNy": 113
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44710",
+    "signguName": "금산군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "710",
+    "weatherNx": 71,
+    "weatherNy": 95
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44760",
+    "signguName": "부여군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "760",
+    "weatherNx": 59,
+    "weatherNy": 98
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44770",
+    "signguName": "서천군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "770",
+    "weatherNx": 55,
+    "weatherNy": 93
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44790",
+    "signguName": "청양군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "790",
+    "weatherNx": 59,
+    "weatherNy": 102
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44800",
+    "signguName": "홍성군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "800",
+    "weatherNx": 55,
+    "weatherNy": 106
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44810",
+    "signguName": "예산군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "810",
+    "weatherNx": 57,
+    "weatherNy": 106
+  },
+  {
+    "sidoCode": "44",
+    "sidoName": "충청남도",
+    "signguFullCode": "44825",
+    "signguName": "태안군",
+    "lDongRegnCd": "44",
+    "lDongSignguCd": "825",
+    "weatherNx": 46,
+    "weatherNy": 111
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47111",
+    "signguName": "포항시 남구",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "111",
+    "weatherNx": 105,
+    "weatherNy": 91
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47113",
+    "signguName": "포항시 북구",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "113",
+    "weatherNx": 102,
+    "weatherNy": 95
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47130",
+    "signguName": "경주시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "130",
+    "weatherNx": 100,
+    "weatherNy": 90
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47150",
+    "signguName": "김천시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "150",
+    "weatherNx": 77,
+    "weatherNy": 93
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47170",
+    "signguName": "안동시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "170",
+    "weatherNx": 93,
+    "weatherNy": 105
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47190",
+    "signguName": "구미시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "190",
+    "weatherNx": 84,
+    "weatherNy": 98
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47210",
+    "signguName": "영주시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "210",
+    "weatherNx": 86,
+    "weatherNy": 113
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47230",
+    "signguName": "영천시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "230",
+    "weatherNx": 98,
+    "weatherNy": 93
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47250",
+    "signguName": "상주시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "250",
+    "weatherNx": 76,
+    "weatherNy": 105
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47280",
+    "signguName": "문경시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "280",
+    "weatherNx": 79,
+    "weatherNy": 107
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47290",
+    "signguName": "경산시",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "290",
+    "weatherNx": 92,
+    "weatherNy": 93
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47730",
+    "signguName": "의성군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "730",
+    "weatherNx": 90,
+    "weatherNy": 99
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47750",
+    "signguName": "청송군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "750",
+    "weatherNx": 95,
+    "weatherNy": 99
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47760",
+    "signguName": "영양군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "760",
+    "weatherNx": 97,
+    "weatherNy": 107
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47770",
+    "signguName": "영덕군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "770",
+    "weatherNx": 102,
+    "weatherNy": 107
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47820",
+    "signguName": "청도군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "820",
+    "weatherNx": 88,
+    "weatherNy": 87
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47830",
+    "signguName": "고령군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "830",
+    "weatherNx": 82,
+    "weatherNy": 89
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47840",
+    "signguName": "성주군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "840",
+    "weatherNx": 81,
+    "weatherNy": 89
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47850",
+    "signguName": "칠곡군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "850",
+    "weatherNx": 85,
+    "weatherNy": 94
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47900",
+    "signguName": "예천군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "900",
+    "weatherNx": 86,
+    "weatherNy": 107
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47920",
+    "signguName": "봉화군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "920",
+    "weatherNx": 90,
+    "weatherNy": 115
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47930",
+    "signguName": "울진군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "930",
+    "weatherNx": 102,
+    "weatherNy": 115
+  },
+  {
+    "sidoCode": "47",
+    "sidoName": "경상북도",
+    "signguFullCode": "47940",
+    "signguName": "울릉군",
+    "lDongRegnCd": "47",
+    "lDongSignguCd": "940",
+    "weatherNx": 125,
+    "weatherNy": 128
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48121",
+    "signguName": "창원시 의창구",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "121",
+    "weatherNx": 89,
+    "weatherNy": 78
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48123",
+    "signguName": "창원시 성산구",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "123",
+    "weatherNx": 91,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48125",
+    "signguName": "창원시 마산합포구",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "125",
+    "weatherNx": 87,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48127",
+    "signguName": "창원시 마산회원구",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "127",
+    "weatherNx": 89,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48129",
+    "signguName": "창원시 진해구",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "129",
+    "weatherNx": 91,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48170",
+    "signguName": "진주시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "170",
+    "weatherNx": 81,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48220",
+    "signguName": "통영시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "220",
+    "weatherNx": 86,
+    "weatherNy": 68
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48240",
+    "signguName": "사천시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "240",
+    "weatherNx": 78,
+    "weatherNy": 71
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48250",
+    "signguName": "김해시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "250",
+    "weatherNx": 94,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48270",
+    "signguName": "밀양시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "270",
+    "weatherNx": 92,
+    "weatherNy": 82
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48310",
+    "signguName": "거제시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "310",
+    "weatherNx": 91,
+    "weatherNy": 68
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48330",
+    "signguName": "양산시",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "330",
+    "weatherNx": 97,
+    "weatherNy": 83
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48720",
+    "signguName": "의령군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "720",
+    "weatherNx": 84,
+    "weatherNy": 78
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48730",
+    "signguName": "함안군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "730",
+    "weatherNx": 86,
+    "weatherNy": 77
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48740",
+    "signguName": "창녕군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "740",
+    "weatherNx": 86,
+    "weatherNy": 83
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48820",
+    "signguName": "고성군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "820",
+    "weatherNx": 85,
+    "weatherNy": 74
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48840",
+    "signguName": "남해군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "840",
+    "weatherNx": 79,
+    "weatherNy": 65
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48850",
+    "signguName": "하동군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "850",
+    "weatherNx": 74,
+    "weatherNy": 75
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48860",
+    "signguName": "산청군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "860",
+    "weatherNx": 75,
+    "weatherNy": 80
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48870",
+    "signguName": "함양군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "870",
+    "weatherNx": 74,
+    "weatherNy": 82
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48880",
+    "signguName": "거창군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "880",
+    "weatherNx": 77,
+    "weatherNy": 84
+  },
+  {
+    "sidoCode": "48",
+    "sidoName": "경상남도",
+    "signguFullCode": "48890",
+    "signguName": "합천군",
+    "lDongRegnCd": "48",
+    "lDongSignguCd": "890",
+    "weatherNx": 80,
+    "weatherNy": 83
+  },
+  {
+    "sidoCode": "50",
+    "sidoName": "제주특별자치도",
+    "signguFullCode": "50110",
+    "signguName": "제주시",
+    "lDongRegnCd": "50",
+    "lDongSignguCd": "110",
+    "weatherNx": 47,
+    "weatherNy": 35
+  },
+  {
+    "sidoCode": "50",
+    "sidoName": "제주특별자치도",
+    "signguFullCode": "50130",
+    "signguName": "서귀포시",
+    "lDongRegnCd": "50",
+    "lDongSignguCd": "130",
+    "weatherNx": 59,
+    "weatherNy": 37
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51110",
+    "signguName": "춘천시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "110",
+    "weatherNx": 72,
+    "weatherNy": 133
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51130",
+    "signguName": "원주시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "130",
+    "weatherNx": 77,
+    "weatherNy": 122
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51150",
+    "signguName": "강릉시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "150",
+    "weatherNx": 93,
+    "weatherNy": 132
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51170",
+    "signguName": "동해시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "170",
+    "weatherNx": 96,
+    "weatherNy": 127
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51190",
+    "signguName": "태백시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "190",
+    "weatherNx": 95,
+    "weatherNy": 120
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51210",
+    "signguName": "속초시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "210",
+    "weatherNx": 86,
+    "weatherNy": 141
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51230",
+    "signguName": "삼척시",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "230",
+    "weatherNx": 99,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51720",
+    "signguName": "홍천군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "720",
+    "weatherNx": 75,
+    "weatherNy": 130
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51730",
+    "signguName": "횡성군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "730",
+    "weatherNx": 79,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51750",
+    "signguName": "영월군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "750",
+    "weatherNx": 82,
+    "weatherNy": 123
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51760",
+    "signguName": "평창군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "760",
+    "weatherNx": 83,
+    "weatherNy": 125
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51770",
+    "signguName": "정선군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "770",
+    "weatherNx": 88,
+    "weatherNy": 121
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51780",
+    "signguName": "철원군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "780",
+    "weatherNx": 68,
+    "weatherNy": 141
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51790",
+    "signguName": "화천군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "790",
+    "weatherNx": 71,
+    "weatherNy": 137
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51800",
+    "signguName": "양구군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "800",
+    "weatherNx": 77,
+    "weatherNy": 139
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51810",
+    "signguName": "인제군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "810",
+    "weatherNx": 83,
+    "weatherNy": 141
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51820",
+    "signguName": "고성군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "820",
+    "weatherNx": 86,
+    "weatherNy": 143
+  },
+  {
+    "sidoCode": "51",
+    "sidoName": "강원특별자치도",
+    "signguFullCode": "51830",
+    "signguName": "양양군",
+    "lDongRegnCd": "51",
+    "lDongSignguCd": "830",
+    "weatherNx": 88,
+    "weatherNy": 138
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52111",
+    "signguName": "전주시 완산구",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "111",
+    "weatherNx": 63,
+    "weatherNy": 89
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52113",
+    "signguName": "전주시 덕진구",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "113",
+    "weatherNx": 63,
+    "weatherNy": 89
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52130",
+    "signguName": "군산시",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "130",
+    "weatherNx": 56,
+    "weatherNy": 92
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52140",
+    "signguName": "익산시",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "140",
+    "weatherNx": 60,
+    "weatherNy": 93
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52180",
+    "signguName": "정읍시",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "180",
+    "weatherNx": 58,
+    "weatherNy": 83
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52190",
+    "signguName": "남원시",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "190",
+    "weatherNx": 70,
+    "weatherNy": 80
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52210",
+    "signguName": "김제시",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "210",
+    "weatherNx": 59,
+    "weatherNy": 88
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52710",
+    "signguName": "완주군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "710",
+    "weatherNx": 63,
+    "weatherNy": 87
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52720",
+    "signguName": "진안군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "720",
+    "weatherNx": 68,
+    "weatherNy": 92
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52730",
+    "signguName": "무주군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "730",
+    "weatherNx": 74,
+    "weatherNy": 92
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52740",
+    "signguName": "장수군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "740",
+    "weatherNx": 72,
+    "weatherNy": 86
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52750",
+    "signguName": "임실군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "750",
+    "weatherNx": 63,
+    "weatherNy": 85
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52770",
+    "signguName": "순창군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "770",
+    "weatherNx": 63,
+    "weatherNy": 79
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52790",
+    "signguName": "고창군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "790",
+    "weatherNx": 55,
+    "weatherNy": 80
+  },
+  {
+    "sidoCode": "52",
+    "sidoName": "전북특별자치도",
+    "signguFullCode": "52800",
+    "signguName": "부안군",
+    "lDongRegnCd": "52",
+    "lDongSignguCd": "800",
+    "weatherNx": 53,
+    "weatherNy": 86
+  },
+  {
+    "sidoCode": "36110",
+    "sidoName": "세종특별자치시",
+    "signguFullCode": "3611036110",
+    "signguName": "세종특별자치시",
+    "lDongRegnCd": "36110",
+    "lDongSignguCd": "36110",
+    "weatherNx": 66,
+    "weatherNy": 106
+  }
+]

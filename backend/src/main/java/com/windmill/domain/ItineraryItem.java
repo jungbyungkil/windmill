@@ -32,6 +32,9 @@ public class ItineraryItem {
     @Column(nullable = false)
     private String placeName;
 
+    /** firstimage - 없으면 null(프론트에서 플레이스홀더 표시) */
+    private String thumbnailUrl;
+
     /** "09:00" 같은 시간 문자열 - 프론트에서 형식 통제 */
     private String scheduledTime;
 

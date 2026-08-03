@@ -2,10 +2,12 @@ package com.windmill.service.trigger;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
+import com.windmill.dto.RegionCode;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.TriggerLevel;
 import com.windmill.dto.TriggerResult;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
+import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,7 +32,8 @@ public class TriggerDetectionService {
     /** 집중률(%) 임계치 - 여유율 10% 이하(=집중률 90% 이상)면 혼잡도 트리거 */
     private static final double CROWD_RATE_THRESHOLD = 90.0;
 
-    private final RegionConditionCache regionConditionCache;
+    private final TriggerScheduler triggerScheduler;
+    private final RegionCodeService regionCodeService;
     private final TourAttractionService tourAttractionService;
 
     /** 일정 전체 기준 - 트리거 조건 3종을 항목들에 걸쳐 OR로 판정 */
@@ -40,18 +43,21 @@ public class TriggerDetectionService {
                     .triggerCount(0).level(TriggerLevel.NORMAL).triggerDetails(List.of())
                     .affectedItemIds(List.of()).build());
         }
-        return Flux.fromIterable(itinerary.getItems())
-                .flatMap(item -> detect(item).map(result -> Map.entry(item.getId(), result)))
-                .collectList()
-                .map(this::aggregate);
+        RegionCode region = regionCodeService.find(itinerary.getSignguFullCode())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + itinerary.getSignguFullCode()));
+        return triggerScheduler.ensureFresh(region)
+                .flatMap(condition -> Flux.fromIterable(itinerary.getItems())
+                        .flatMap(item -> detect(item, condition).map(result -> Map.entry(item.getId(), result)))
+                        .collectList()
+                        .map(this::aggregate));
     }
 
     /** 단일 일정 항목 기준 트리거 판정 */
-    public Mono<TriggerResult> detect(ItineraryItem item) {
-        boolean weatherTrigger = regionConditionCache.getCurrentPop() != null
-                && regionConditionCache.getCurrentPop() >= WEATHER_POP_THRESHOLD;
+    public Mono<TriggerResult> detect(ItineraryItem item, RegionCondition condition) {
+        boolean weatherTrigger = condition.getCurrentPop() != null
+                && condition.getCurrentPop() >= WEATHER_POP_THRESHOLD;
 
-        Double crowdRate = regionConditionCache.getCrowdRate(item.getPlaceName());
+        Double crowdRate = condition.getCrowdRate(item.getPlaceName());
         boolean crowdTrigger = crowdRate != null && crowdRate >= CROWD_RATE_THRESHOLD;
 
         if (item.getContentId() == null || item.getContentTypeId() == null) {

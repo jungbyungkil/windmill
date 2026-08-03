@@ -10,7 +10,6 @@ import RecommendationSearch from './components/RecommendationSearch';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
-import { SOKCHO_NX, SOKCHO_NY } from './constants';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -37,6 +36,7 @@ export default function App() {
   const [docentOpen, setDocentOpen] = useState(false);
   const [docentPlaceName, setDocentPlaceName] = useState('');
   const [docentScript, setDocentScript] = useState('');
+  const [docentAudioUrl, setDocentAudioUrl] = useState(null);
   const [docentLoading, setDocentLoading] = useState(false);
   const [docentError, setDocentError] = useState(null);
 
@@ -64,16 +64,18 @@ export default function App() {
   useEffect(() => {
     if (!itineraryId) return;
     refreshTrigger();
-    api.getWeather(SOKCHO_NX, SOKCHO_NY).then(setWeatherItems).catch(() => setWeatherItems(null));
+    if (itinerary?.weatherNx && itinerary?.weatherNy) {
+      api.getWeather(itinerary.weatherNx, itinerary.weatherNy).then(setWeatherItems).catch(() => setWeatherItems(null));
+    }
     const id = setInterval(refreshTrigger, TRIGGER_POLL_MS);
     return () => clearInterval(id);
-  }, [itineraryId, refreshTrigger]);
+  }, [itineraryId, itinerary?.weatherNx, itinerary?.weatherNy, refreshTrigger]);
 
-  async function handleCreate() {
+  async function handleCreate(formData) {
     setCreating(true);
     setCreateError(null);
     try {
-      const result = await api.createItinerary(sessionId, '속초');
+      const result = await api.createItinerary(sessionId, formData);
       setItinerary(result);
       setItineraryId(result.itineraryId);
       setShowAutoPlan(true);
@@ -103,7 +105,14 @@ export default function App() {
     setRecoLoading(true);
     try {
       const excludeContentIds = itinerary.items.map((i) => i.contentId).filter(Boolean);
-      const results = await api.getRecommendations({ query, tags, excludeContentIds });
+      const results = await api.getRecommendations({
+        regionCode: itinerary.signguFullCode,
+        withPet: itinerary.withPet,
+        companionType: itinerary.companionType,
+        query,
+        tags,
+        excludeContentIds,
+      });
       setRecoResults(results);
     } catch {
       setRecoResults([]);
@@ -116,6 +125,7 @@ export default function App() {
     const result = await api.addItem(itineraryId, {
       contentId: candidate.contentId,
       placeName: candidate.placeName,
+      thumbnailUrl: candidate.thumbnailUrl,
       tags: candidate.matchedTags,
       crowdRate: candidate.crowdRate,
     });
@@ -174,6 +184,7 @@ export default function App() {
         const result = await api.addItem(itineraryId, {
           contentId: top.contentId,
           placeName: top.placeName,
+          thumbnailUrl: top.thumbnailUrl,
           scheduledTime: affectedItem.scheduledTime,
           tags: top.matchedTags,
           crowdRate: top.crowdRate,
@@ -204,6 +215,7 @@ export default function App() {
       result = await api.addItem(itineraryId, {
         contentId: candidate.contentId,
         placeName: candidate.placeName,
+        thumbnailUrl: candidate.thumbnailUrl,
         scheduledTime: candidate.suggestedTime,
         tags: candidate.matchedTags,
         crowdRate: candidate.crowdRate,
@@ -217,6 +229,7 @@ export default function App() {
     setDocentOpen(true);
     setDocentPlaceName(item.placeName);
     setDocentScript('');
+    setDocentAudioUrl(null);
     setDocentError(null);
 
     if (!item.contentTypeId) {
@@ -227,6 +240,7 @@ export default function App() {
     try {
       const result = await api.getDocent(item.contentId, item.contentTypeId);
       setDocentScript(result.scriptText);
+      setDocentAudioUrl(result.audioUrl || null);
     } catch (e) {
       setDocentError(e.message);
     } finally {
@@ -326,6 +340,7 @@ export default function App() {
         open={docentOpen}
         placeName={docentPlaceName}
         script={docentScript}
+        audioUrl={docentAudioUrl}
         loading={docentLoading}
         error={docentError}
         onClose={() => setDocentOpen(false)}

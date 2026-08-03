@@ -2,6 +2,7 @@ package com.windmill.controller;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
@@ -37,8 +38,8 @@ public class ItineraryController {
     @PostMapping
     public Mono<ResponseEntity<ItineraryResponse>> create(
             @RequestHeader("X-Session-Id") String sessionId,
-            @RequestParam(required = false) String destination) {
-        return Mono.fromCallable(() -> itineraryService.create(sessionId, destination))
+            @Valid @RequestBody CreateItineraryRequest request) {
+        return Mono.fromCallable(() -> itineraryService.create(sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ItineraryResponse::from)
                 .map(ResponseEntity::ok);
@@ -124,6 +125,9 @@ public class ItineraryController {
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
         return RecommendationRequest.builder()
+                .regionCode(itinerary.getSignguFullCode())
+                .withPet(itinerary.isWithPet())
+                .companionType(itinerary.getCompanionType())
                 .tags(tags)
                 .naturalLanguageQuery(query)
                 .excludeContentIds(excludeContentIds)
@@ -139,6 +143,9 @@ public class ItineraryController {
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
         return RecommendationRequest.builder()
+                .regionCode(itinerary.getSignguFullCode())
+                .withPet(itinerary.isWithPet())
+                .companionType(itinerary.getCompanionType())
                 .seedPlaceName(seedPlaceName)
                 .excludeContentIds(excludeContentIds)
                 .excludePlaceNames(excludePlaceNames)

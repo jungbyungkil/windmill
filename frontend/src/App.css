@@ -203,6 +203,53 @@
   max-width: 320px;
 }
 
+.trip-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: left;
+}
+
+.trip-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trip-form-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.trip-form-region-selects,
+.trip-form-date-range {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.trip-form select,
+.trip-form input[type='date'] {
+  flex: 1;
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.trip-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+  margin-top: 4px;
+}
+
 /* ---------- Auto plan screen ---------- */
 
 .auto-plan-screen {
@@ -506,6 +553,23 @@
   border-color: color-mix(in srgb, var(--sea) 45%, var(--sand-border));
 }
 
+.item-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--sand);
+}
+
+.item-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--muted);
+}
+
 .item-time {
   border: 1px solid var(--sand-border);
   border-radius: 8px;
@@ -586,17 +650,42 @@
   background: var(--sand-card);
   border: 1px solid var(--sand-border);
   border-radius: 14px;
-  padding: 14px;
+  overflow: hidden;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.reco-card > *:not(.reco-thumb) {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+
+.reco-card > *:last-child {
+  margin-bottom: 14px;
+}
+
+.reco-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--sand);
+}
+
+.reco-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--muted);
+}
+
 .reco-head {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 12px;
 }
 
 .reco-rank {
@@ -719,6 +808,11 @@
 .docent-place {
   font-weight: 700;
   font-size: 15px;
+}
+
+.docent-audio {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .docent-script {

@@ -32,8 +32,16 @@ function qs(params) {
   return str ? `?${str}` : '';
 }
 
-export function createItinerary(sessionId, destination) {
-  return request(`/itineraries${qs({ destination })}`, { method: 'POST', sessionId });
+export function getRegions() {
+  return request('/regions');
+}
+
+export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet }) {
+  return request('/itineraries', {
+    method: 'POST',
+    sessionId,
+    body: { signguFullCode, startDate, endDate, companionType, withPet },
+  });
 }
 
 export function getItinerary(itineraryId) {
@@ -64,8 +72,8 @@ export function getAutoPlan(itineraryId, { tags, query, placeCount } = {}) {
   return request(`/itineraries/${itineraryId}/auto-plan${qs({ tags, query, placeCount })}`);
 }
 
-export function getRecommendations({ seedPlaceName, tags, query, excludeContentIds } = {}) {
-  return request(`/recommendations${qs({ seedPlaceName, tags, query, excludeContentIds })}`);
+export function getRecommendations({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds } = {}) {
+  return request(`/recommendations${qs({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds })}`);
 }
 
 export function getWeather(nx, ny) {

@@ -1,6 +1,12 @@
 export default function RecommendationCard({ candidate, onAdd, adding }) {
   return (
     <div className="reco-card">
+      {candidate.thumbnailUrl ? (
+        <img className="reco-thumb" src={candidate.thumbnailUrl} alt={candidate.placeName} loading="lazy" />
+      ) : (
+        <div className="reco-thumb reco-thumb-placeholder">🌬️</div>
+      )}
+
       <div className="reco-head">
         <span className="reco-rank">#{candidate.rank}</span>
         <span className="reco-name">{candidate.placeName}</span>

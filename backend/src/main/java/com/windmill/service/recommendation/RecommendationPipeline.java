@@ -2,7 +2,9 @@ package com.windmill.service.recommendation;
 
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
+import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
+import com.windmill.service.region.RegionCodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,10 +30,14 @@ public class RecommendationPipeline {
     private final Stage2BusinessHoursFilter stage2;
     private final Stage3CrowdRateFilter stage3;
     private final Stage4TagMatchingService stage4;
+    private final RegionCodeService regionCodeService;
 
     public Mono<List<RecommendationCandidate>> recommend(RecommendationRequest request) {
-        log.info("[Pipeline] 추천 시작 - seed={}, tags={}, avoid={}",
-                request.getSeedPlaceName(), request.getTags(), request.getAvoidanceHint());
+        log.info("[Pipeline] 추천 시작 - region={}, seed={}, tags={}, avoid={}",
+                request.getRegionCode(), request.getSeedPlaceName(), request.getTags(), request.getAvoidanceHint());
+
+        RegionCode region = regionCodeService.find(request.getRegionCode())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + request.getRegionCode()));
 
         Set<String> exclude = request.getExcludeContentIds() == null
                 ? Set.of()
@@ -40,13 +46,14 @@ public class RecommendationPipeline {
                 ? Set.of()
                 : Set.copyOf(request.getExcludePlaceNames());
 
-        return stage1.fetch(request.getSeedPlaceName())
-                .flatMap(stage1::resolveContentIds)
+        return stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
+                .flatMap(list -> stage1.resolveContentIds(list, region))
                 .map(list -> list.stream()
                         .filter(c -> !exclude.contains(c.getContentId()))
                         .collect(Collectors.toList()))
                 .flatMap(stage2::filter)
-                .flatMap(stage3::filter)
+                .flatMap(list -> stage3.filter(list, region))
+                .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
                 .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
                 .map(list -> list.stream()
                         .filter(c -> !excludeNames.contains(c.getPlaceName()))

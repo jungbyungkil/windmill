@@ -1,6 +1,7 @@
 package com.windmill.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.util.TourApiWebClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,8 +28,8 @@ public class KorServiceClient {
     public KorServiceClient(WebClient.Builder webClientBuilder,
                              @Value("${tourapi.kor-service-base-url}") String baseUrl,
                              @Value("${tourapi.key:}") String serviceKey) {
-        this.webClient = webClientBuilder.clone().baseUrl(baseUrl).build();
-        this.serviceKey = serviceKey;
+        this.webClient = TourApiWebClientFactory.create(webClientBuilder, baseUrl);
+        this.serviceKey = TourApiWebClientFactory.encode(serviceKey);
     }
 
     public boolean isConfigured() {
@@ -80,7 +81,7 @@ public class KorServiceClient {
                             .queryParam("MobileApp", MOBILE_APP)
                             .queryParam("_type", "json")
                             .queryParam("arrange", "C")
-                            .queryParam("keyword", keyword);
+                            .queryParam("keyword", TourApiWebClientFactory.encode(keyword));
                     if (contentTypeId != null) {
                         uriBuilder.queryParam("contentTypeId", contentTypeId);
                     }

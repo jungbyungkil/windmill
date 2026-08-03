@@ -1,31 +1,108 @@
 import { useState, useEffect } from 'react';
 import PinwheelHero from './PinwheelHero';
-import WeatherBanner from './WeatherBanner';
 import * as api from '../api/windmillApi';
-import { SOKCHO_NX, SOKCHO_NY } from '../constants';
+import { COMPANION_TYPE_OPTIONS } from '../constants';
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function CreateTripScreen({ onCreate, loading, error }) {
-  // 위치기반 상황 알림: 앱 실행 즉시(일정 생성 전) 현재 속초 날씨를 보여준다.
-  // 실제 OS 푸시 알림은 서비스워커/VAPID 인프라가 필요해 MVP 범위 밖 — 인앱 배너로 대체.
-  const [weatherItems, setWeatherItems] = useState(null);
+  const [regions, setRegions] = useState([]);
+  const [regionsError, setRegionsError] = useState(null);
+  const [sidoCode, setSidoCode] = useState('');
+  const [signguFullCode, setSignguFullCode] = useState('');
+  const [startDate, setStartDate] = useState(todayIso());
+  const [endDate, setEndDate] = useState(todayIso());
+  const [companionType, setCompanionType] = useState('SOLO');
+  const [withPet, setWithPet] = useState(false);
 
   useEffect(() => {
-    api.getWeather(SOKCHO_NX, SOKCHO_NY).then(setWeatherItems).catch(() => setWeatherItems(null));
+    api.getRegions()
+      .then((list) => {
+        setRegions(list);
+        if (list.length > 0) setSidoCode(list[0].sidoCode);
+      })
+      .catch((e) => setRegionsError(e.message));
   }, []);
+
+  const selectedSido = regions.find((r) => r.sidoCode === sidoCode);
+  const signguOptions = selectedSido?.signgus || [];
+
+  useEffect(() => {
+    if (signguOptions.length > 0 && !signguOptions.some((s) => s.signguFullCode === signguFullCode)) {
+      setSignguFullCode(signguOptions[0].signguFullCode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidoCode, regions]);
+
+  const canSubmit = signguFullCode && startDate && endDate && startDate <= endDate;
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    onCreate({ signguFullCode, startDate, endDate, companionType, withPet });
+  }
 
   return (
     <div className="create-trip-screen">
       <PinwheelHero />
       <h1 className="brand-title">바람따라</h1>
-      <p className="brand-tagline">바람이 알려주는 실시간 여행, 속초를 바람따라 걸어보세요</p>
+      <p className="brand-tagline">바람이 알려주는 실시간 여행, 어디로 떠나볼까요?</p>
 
-      <WeatherBanner items={weatherItems} />
+      <form className="trip-form" onSubmit={handleSubmit}>
+        <div className="trip-form-row">
+          <label className="trip-form-label">여행 지역</label>
+          {regionsError && <div className="error-msg">❌ 지역 목록을 불러오지 못했어요: {regionsError}</div>}
+          <div className="trip-form-region-selects">
+            <select value={sidoCode} onChange={(e) => setSidoCode(e.target.value)} disabled={regions.length === 0}>
+              {regions.map((r) => (
+                <option key={r.sidoCode} value={r.sidoCode}>{r.sidoName}</option>
+              ))}
+            </select>
+            <select value={signguFullCode} onChange={(e) => setSignguFullCode(e.target.value)} disabled={signguOptions.length === 0}>
+              {signguOptions.map((s) => (
+                <option key={s.signguFullCode} value={s.signguFullCode}>{s.signguName}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-      <button className="btn-primary btn-start" onClick={onCreate} disabled={loading}>
-        {loading ? '여행 준비 중...' : '🌊 속초 여행 시작하기'}
-      </button>
+        <div className="trip-form-row">
+          <label className="trip-form-label">여행 날짜</label>
+          <div className="trip-form-date-range">
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+            <span>~</span>
+            <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
+          </div>
+        </div>
 
-      {error && <div className="error-msg">❌ {error}</div>}
+        <div className="trip-form-row">
+          <label className="trip-form-label">누구와 함께하나요?</label>
+          <div className="reco-tag-row">
+            {COMPANION_TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`tag ${companionType === opt.value ? 'selected' : ''}`}
+                onClick={() => setCompanionType(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <label className="trip-form-checkbox">
+            <input type="checkbox" checked={withPet} onChange={(e) => setWithPet(e.target.checked)} />
+            🐾 반려동물과 함께해요
+          </label>
+        </div>
+
+        <button className="btn-primary btn-start" type="submit" disabled={loading || !canSubmit}>
+          {loading ? '여행 준비 중...' : '🌬️ 여행 시작하기'}
+        </button>
+
+        {error && <div className="error-msg">❌ {error}</div>}
+      </form>
 
       <p className="create-trip-hint">
         비가 오거나, 붐비거나, 동선이 꼬이면 바람개비가 알아서 신호를 보내요.

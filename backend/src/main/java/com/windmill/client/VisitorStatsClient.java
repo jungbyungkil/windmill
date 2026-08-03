@@ -1,6 +1,7 @@
 package com.windmill.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.util.TourApiWebClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -25,8 +26,8 @@ public class VisitorStatsClient {
     public VisitorStatsClient(WebClient.Builder webClientBuilder,
                                @Value("${tourapi.visitor-stats-base-url}") String baseUrl,
                                @Value("${tourapi.key:}") String serviceKey) {
-        this.webClient = webClientBuilder.clone().baseUrl(baseUrl).build();
-        this.serviceKey = serviceKey;
+        this.webClient = TourApiWebClientFactory.create(webClientBuilder, baseUrl);
+        this.serviceKey = TourApiWebClientFactory.encode(serviceKey);
     }
 
     public boolean isConfigured() {

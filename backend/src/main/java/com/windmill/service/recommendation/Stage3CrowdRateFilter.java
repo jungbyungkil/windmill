@@ -1,10 +1,10 @@
 package com.windmill.service.recommendation;
 
 import com.windmill.client.CrowdRateClient;
+import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,15 +27,9 @@ public class Stage3CrowdRateFilter {
 
     private final CrowdRateClient crowdRateClient;
 
-    @Value("${windmill.region.sokcho.legacy-area-cd}")
-    private String areaCd;
-
-    @Value("${windmill.region.sokcho.legacy-signgu-cd}")
-    private String signguCd;
-
-    public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates) {
+    public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates, RegionCode region) {
         return Flux.fromIterable(candidates)
-                .flatMap(this::attachCrowdRate, EXTERNAL_CALL_CONCURRENCY)
+                .flatMap(c -> attachCrowdRate(c, region), EXTERNAL_CALL_CONCURRENCY)
                 .collectList()
                 .map(list -> {
                     list.sort(Comparator.comparing(RelatedCandidate::getCrowdRate,
@@ -45,8 +39,9 @@ public class Stage3CrowdRateFilter {
                 });
     }
 
-    private Mono<RelatedCandidate> attachCrowdRate(RelatedCandidate candidate) {
-        return crowdRateClient.crowdRateList(areaCd, signguCd, candidate.getPlaceName(), 1, 1)
+    private Mono<RelatedCandidate> attachCrowdRate(RelatedCandidate candidate, RegionCode region) {
+        // legacy areaCd/signguCd는 LDONG에서 파생됨: areaCd=lDongRegnCd, signguCd=signguFullCode
+        return crowdRateClient.crowdRateList(region.getLDongRegnCd(), region.getSignguFullCode(), candidate.getPlaceName(), 1, 1)
                 .map(items -> {
                     if (!items.isEmpty()) {
                         candidate.setCrowdRate(items.get(0).path("cnctrRate").asDouble());
