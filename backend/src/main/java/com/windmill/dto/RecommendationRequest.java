@@ -24,6 +24,9 @@ public class RecommendationRequest {
     private List<String> excludePlaceNames;
     /** 트리거 우선회피 정렬 힌트 - 대안 추천 시에만 사용 */
     private AvoidanceHint avoidanceHint;
+    /** 거리(km) 계산 기준점 - 보통 일정에 이미 담긴 마지막 장소. null이면 distanceKm 없이 반환 */
+    private String originContentId;
+    private Integer originContentTypeId;
 
     public enum AvoidanceHint { CROWD, WEATHER, BUSINESS }
 }

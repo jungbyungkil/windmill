@@ -31,7 +31,9 @@ public class RecommendationController {
             @RequestParam(required = false) String seedPlaceName,
             @RequestParam(required = false) List<String> tags,
             @RequestParam(required = false) String query,
-            @RequestParam(required = false) List<String> excludeContentIds) {
+            @RequestParam(required = false) List<String> excludeContentIds,
+            @RequestParam(required = false) String originContentId,
+            @RequestParam(required = false) Integer originContentTypeId) {
 
         Mono<List<String>> badPlaceNamesMono = sessionId == null || sessionId.isBlank()
                 ? Mono.just(List.of())
@@ -49,6 +51,8 @@ public class RecommendationController {
                     .naturalLanguageQuery(query)
                     .excludeContentIds(excludeContentIds)
                     .excludePlaceNames(badPlaceNames)
+                    .originContentId(originContentId)
+                    .originContentTypeId(originContentTypeId)
                     .build();
 
             return recommendationPipeline.recommend(request);

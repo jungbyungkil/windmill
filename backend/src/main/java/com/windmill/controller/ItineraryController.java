@@ -1,7 +1,9 @@
 package com.windmill.controller;
 
 import com.windmill.domain.Itinerary;
+import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.RecommendationCandidate;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -79,6 +82,16 @@ public class ItineraryController {
                 .map(ResponseEntity::ok);
     }
 
+    /** 일자별 페이지 확정/해제 - 확정해야 프론트가 "다음 날 보기"로 이동을 허용한다 */
+    @PatchMapping("/{id}/days/{date}")
+    public Mono<ResponseEntity<ItineraryResponse>> confirmDay(@PathVariable Long id, @PathVariable LocalDate date,
+                                                                @RequestBody ConfirmDayRequest request) {
+        return Mono.fromCallable(() -> itineraryService.confirmDay(id, date, request.isConfirmed()))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ItineraryResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
     /** 바람개비 상태 조회 - 프론트가 1~5분 주기로 폴링. 캐시된 지역 데이터만 사용해 즉시 응답. */
     @GetMapping("/{id}/trigger-status")
     public Mono<ResponseEntity<TriggerResult>> triggerStatus(@PathVariable Long id) {
@@ -124,6 +137,7 @@ public class ItineraryController {
                 .map(item -> item.getContentId())
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
+        ItineraryItem origin = lastItem(itinerary);
         return RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
@@ -132,6 +146,8 @@ public class ItineraryController {
                 .naturalLanguageQuery(query)
                 .excludeContentIds(excludeContentIds)
                 .excludePlaceNames(excludePlaceNames)
+                .originContentId(origin == null ? null : origin.getContentId())
+                .originContentTypeId(origin == null ? null : origin.getContentTypeId())
                 .build();
     }
 
@@ -142,6 +158,7 @@ public class ItineraryController {
                 .map(item -> item.getContentId())
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
+        ItineraryItem origin = lastItem(itinerary);
         return RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
@@ -150,6 +167,14 @@ public class ItineraryController {
                 .excludeContentIds(excludeContentIds)
                 .excludePlaceNames(excludePlaceNames)
                 .avoidanceHint(avoid)
+                .originContentId(origin == null ? null : origin.getContentId())
+                .originContentTypeId(origin == null ? null : origin.getContentTypeId())
                 .build();
+    }
+
+    /** 거리(km) 표시 기준점 - "지금 있는 곳"을 대신할 정보가 없어 이미 담긴 마지막 장소를 기준으로 삼는다 */
+    private ItineraryItem lastItem(Itinerary itinerary) {
+        List<ItineraryItem> items = itinerary.getItems();
+        return items.isEmpty() ? null : items.get(items.size() - 1);
     }
 }

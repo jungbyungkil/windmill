@@ -5,6 +5,7 @@ import { TAG_OPTIONS } from '../constants';
 export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId }) {
   const [query, setQuery] = useState('');
   const [tags, setTags] = useState([]);
+  const [freeOnly, setFreeOnly] = useState(false);
 
   function toggleTag(tag) {
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
@@ -14,6 +15,8 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
     e.preventDefault();
     onSearch({ query, tags });
   }
+
+  const visibleResults = freeOnly ? (results || []).filter((c) => c.isFree) : results;
 
   return (
     <div className="reco-search">
@@ -38,17 +41,24 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
             </button>
           ))}
         </div>
+        <label className="trip-form-checkbox reco-free-filter">
+          <input type="checkbox" checked={freeOnly} onChange={(e) => setFreeOnly(e.target.checked)} />
+          🎫 무료 장소만 보기
+        </label>
+
         <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? '찾는 중...' : '🔍 추천받기'}
         </button>
       </form>
 
       {results !== null && (
-        results.length === 0 ? (
-          <p className="empty-state">조건에 맞는 추천 결과가 없어요. 다른 태그로 시도해보세요.</p>
+        visibleResults.length === 0 ? (
+          <p className="empty-state">
+            {freeOnly ? '무료 장소가 없어요. 필터를 해제해보세요.' : '조건에 맞는 추천 결과가 없어요. 다른 태그로 시도해보세요.'}
+          </p>
         ) : (
           <div className="reco-grid">
-            {results.map((c) => (
+            {visibleResults.map((c) => (
               <RecommendationCard
                 key={c.contentId}
                 candidate={c}

@@ -5,7 +5,9 @@ import CreateTripScreen from './components/CreateTripScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import PinwheelHero from './components/PinwheelHero';
 import WeatherBanner from './components/WeatherBanner';
+import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
+import DayTabs from './components/DayTabs';
 import RecommendationSearch from './components/RecommendationSearch';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
@@ -28,6 +30,7 @@ export default function App() {
   const [recoResults, setRecoResults] = useState(null);
   const [recoLoading, setRecoLoading] = useState(false);
   const [addingContentId, setAddingContentId] = useState(null);
+  const [addingFestivalId, setAddingFestivalId] = useState(null);
 
   const [altOpen, setAltOpen] = useState(false);
   const [altCandidates, setAltCandidates] = useState([]);
@@ -47,6 +50,9 @@ export default function App() {
   const [autoReplacing, setAutoReplacing] = useState(false);
   const [autoReplaceNotice, setAutoReplaceNotice] = useState(null);
 
+  const [activeDate, setActiveDate] = useState(null);
+  const [confirmingDay, setConfirmingDay] = useState(false);
+
   // 새로고침 시 저장된 itineraryId로 일정 복원
   useEffect(() => {
     if (!itineraryId) return;
@@ -55,6 +61,29 @@ export default function App() {
       .catch(() => setItineraryId(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itineraryId]);
+
+  // 일정이 새로 로드되면 여행 시작일을 기본 활성 날짜로
+  useEffect(() => {
+    if (itinerary?.startDate && !activeDate) {
+      setActiveDate(itinerary.startDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itinerary?.startDate]);
+
+  // 아직 담기지 않았거나(day 미지정 레거시) 활성 날짜와 다른 항목은 다른 날 페이지에 숨긴다
+  const visibleItems = itinerary
+    ? itinerary.items.filter((i) => (i.visitDate || itinerary.startDate) === activeDate)
+    : [];
+
+  async function handleToggleConfirmDay(date, confirmed) {
+    setConfirmingDay(true);
+    try {
+      const result = await api.confirmDay(itineraryId, date, confirmed);
+      setItinerary(result);
+    } finally {
+      setConfirmingDay(false);
+    }
+  }
 
   const refreshTrigger = useCallback(() => {
     if (!itineraryId) return;
@@ -105,6 +134,7 @@ export default function App() {
     setRecoLoading(true);
     try {
       const excludeContentIds = itinerary.items.map((i) => i.contentId).filter(Boolean);
+      const lastItem = itinerary.items[itinerary.items.length - 1];
       const results = await api.getRecommendations({
         regionCode: itinerary.signguFullCode,
         withPet: itinerary.withPet,
@@ -112,6 +142,9 @@ export default function App() {
         query,
         tags,
         excludeContentIds,
+        // 거리(km) 표시 기준점 - 이미 담긴 마지막 장소 (없으면 거리 없이 반환됨)
+        originContentId: lastItem?.contentId,
+        originContentTypeId: lastItem?.contentTypeId,
       });
       setRecoResults(results);
     } catch {
@@ -121,16 +154,33 @@ export default function App() {
     }
   }
 
-  async function addCandidateToItinerary(candidate) {
+  async function addCandidateToItinerary(candidate, visitDate = activeDate) {
     const result = await api.addItem(itineraryId, {
       contentId: candidate.contentId,
+      contentTypeId: candidate.contentTypeId,
       placeName: candidate.placeName,
       thumbnailUrl: candidate.thumbnailUrl,
       tags: candidate.matchedTags,
       crowdRate: candidate.crowdRate,
+      visitDate,
+      addr1: candidate.addr1,
+      tel: candidate.tel,
+      useFeeText: candidate.useFeeText,
+      isFree: candidate.isFree,
+      restDateText: candidate.restDateText,
     });
     setItinerary(result);
     return result;
+  }
+
+  async function handleAddFestival(festival) {
+    setAddingFestivalId(festival.contentId);
+    try {
+      await addCandidateToItinerary(festival);
+      refreshTrigger();
+    } finally {
+      setAddingFestivalId(null);
+    }
   }
 
   async function handleAddRecommendation(candidate) {
@@ -183,11 +233,19 @@ export default function App() {
         await api.deleteItem(itineraryId, affectedItem.itemId);
         const result = await api.addItem(itineraryId, {
           contentId: top.contentId,
+          contentTypeId: top.contentTypeId,
           placeName: top.placeName,
           thumbnailUrl: top.thumbnailUrl,
           scheduledTime: affectedItem.scheduledTime,
           tags: top.matchedTags,
           crowdRate: top.crowdRate,
+          // 교체 대상이었던 항목이 속했던 날짜를 그대로 유지
+          visitDate: affectedItem.visitDate || itinerary.startDate,
+          addr1: top.addr1,
+          tel: top.tel,
+          useFeeText: top.useFeeText,
+          isFree: top.isFree,
+          restDateText: top.restDateText,
         });
         setItinerary(result);
         setAutoReplaceNotice(`"${affectedItem.placeName}"을(를) "${top.placeName}"(으)로 자동 교체했어요.`);
@@ -214,11 +272,17 @@ export default function App() {
     for (const candidate of selected) {
       result = await api.addItem(itineraryId, {
         contentId: candidate.contentId,
+        contentTypeId: candidate.contentTypeId,
         placeName: candidate.placeName,
         thumbnailUrl: candidate.thumbnailUrl,
         scheduledTime: candidate.suggestedTime,
         tags: candidate.matchedTags,
         crowdRate: candidate.crowdRate,
+        addr1: candidate.addr1,
+        tel: candidate.tel,
+        useFeeText: candidate.useFeeText,
+        isFree: candidate.isFree,
+        restDateText: candidate.restDateText,
       });
     }
     setItinerary(result);
@@ -248,11 +312,12 @@ export default function App() {
     }
   }
 
-  async function handleSubmitTripRecord({ overallNote, visitFeedback }) {
+  async function handleSubmitTripRecord({ overallRating, overallNote, visitFeedback }) {
     setTripSubmitting(true);
     try {
       await api.createTripRecord(sessionId, {
         itineraryId,
+        overallRating,
         overallNote,
         rerouteCount,
         visitFeedback,
@@ -306,8 +371,24 @@ export default function App() {
 
         <WeatherBanner items={weatherItems} />
 
+        <FestivalBanner
+          festivals={trigger?.festivalSuggestions}
+          onAdd={handleAddFestival}
+          addingId={addingFestivalId}
+        />
+
+        <DayTabs
+          startDate={itinerary.startDate}
+          endDate={itinerary.endDate}
+          activeDate={activeDate}
+          confirmedDates={itinerary.confirmedDates}
+          onSelectDate={setActiveDate}
+          onToggleConfirm={handleToggleConfirmDay}
+          confirming={confirmingDay}
+        />
+
         <ItineraryList
-          items={itinerary.items}
+          items={visibleItems}
           onUpdateTime={handleUpdateTime}
           onTogglePin={handleTogglePin}
           onDelete={handleDeleteItem}

@@ -64,6 +64,10 @@ export function getTriggerStatus(itineraryId) {
   return request(`/itineraries/${itineraryId}/trigger-status`);
 }
 
+export function confirmDay(itineraryId, date, confirmed) {
+  return request(`/itineraries/${itineraryId}/days/${date}`, { method: 'PATCH', body: { confirmed } });
+}
+
 export function getAlternatives(itineraryId, { avoid, seedPlaceName } = {}) {
   return request(`/itineraries/${itineraryId}/alternatives${qs({ avoid, seedPlaceName })}`);
 }
@@ -72,8 +76,8 @@ export function getAutoPlan(itineraryId, { tags, query, placeCount } = {}) {
   return request(`/itineraries/${itineraryId}/auto-plan${qs({ tags, query, placeCount })}`);
 }
 
-export function getRecommendations({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds } = {}) {
-  return request(`/recommendations${qs({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds })}`);
+export function getRecommendations({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
+  return request(`/recommendations${qs({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
 export function getWeather(nx, ny) {
@@ -86,4 +90,8 @@ export function getDocent(contentId, contentTypeId, lang = 'ko') {
 
 export function createTripRecord(sessionId, record) {
   return request('/trip-records', { method: 'POST', sessionId, body: record });
+}
+
+export function getRegionTripHighlights(signguFullCode) {
+  return request(`/trip-records/region/${signguFullCode}/highlights`);
 }

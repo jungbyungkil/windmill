@@ -8,6 +8,7 @@ const RATINGS = [
 
 export default function TripRecordModal({ open, items, submitting, onSubmit, onClose }) {
   const [ratings, setRatings] = useState({});
+  const [overallRating, setOverallRating] = useState(null);
   const [overallNote, setOverallNote] = useState('');
 
   if (!open) return null;
@@ -20,7 +21,7 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
     const visitFeedback = items
       .filter((item) => ratings[item.itemId])
       .map((item) => ({ itemId: item.itemId, placeName: item.placeName, rating: ratings[item.itemId] }));
-    onSubmit({ overallNote, visitFeedback });
+    onSubmit({ overallRating, overallNote, visitFeedback });
   }
 
   return (
@@ -32,6 +33,27 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
         </div>
 
         <p className="modal-desc">다녀온 곳은 어땠나요? 다음 바람따라 추천에 반영할게요.</p>
+
+        <div className="feedback-row overall-rating-row">
+          <span className="feedback-name">이번 여행 전체는요?</span>
+          <div className="feedback-ratings">
+            {RATINGS.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                className={`rating-btn ${overallRating === r.value ? 'selected' : ''}`}
+                onClick={() => setOverallRating(r.value)}
+              >
+                {r.icon}
+              </button>
+            ))}
+          </div>
+        </div>
+        {overallRating === 'GOOD' && (
+          <p className="modal-desc overall-rating-hint">
+            🎉 이 여행은 같은 지역으로 떠나는 다른 여행자들에게도 보여드릴게요!
+          </p>
+        )}
 
         <div className="feedback-list">
           {items.map((item) => (

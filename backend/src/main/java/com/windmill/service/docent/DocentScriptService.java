@@ -16,7 +16,7 @@ import reactor.core.scheduler.Schedulers;
  * 도슨트 스크립트 제공 - 한국관광공사 공식 오디오 가이드(오디/Odii)가 있으면 그대로 쓰고(LLM 미호출),
  * 없을 때만 팀 오리지널 캐릭터("바람이") 페르소나로 OpenAI가 스크립트를 생성하는 폴백 경로를 탄다.
  * "가능한 한 관광공사 API로, OpenAI는 불가피한 경우만" 원칙 - Odii가 커버 못 하는 콘텐츠만 LLM이 채운다.
- * TTS 실제 합성은 TtsProvider 구현체 교체로 추후 연결 (LLM 폴백 경로는 현재 NoOpTtsProvider, 스크립트만 제공).
+ * LLM 폴백 경로는 스크립트 생성 후 TtsProvider(OpenAiTtsProvider)로 실제 음성까지 합성해 audioData에 저장한다.
  */
 @Slf4j
 @Service
@@ -71,12 +71,25 @@ public class DocentScriptService {
     private Mono<DocentAudio> generateWithLlm(String contentId, TourAttractionDetail detail, String language) {
         return openAiService.complete(buildPrompt(detail, language))
                 .map(script -> script.isBlank() ? fallbackScript(detail) : script)
-                .map(script -> DocentAudio.builder()
-                        .contentId(contentId)
-                        .language(language)
-                        .scriptText(script)
-                        .audioUrl(ttsProvider.synthesize(script, language))
-                        .build());
+                .flatMap(script -> ttsProvider.synthesize(script, language)
+                        .map(audioBytes -> DocentAudio.builder()
+                                .contentId(contentId)
+                                .language(language)
+                                .scriptText(script)
+                                .audioData(audioBytes)
+                                .build())
+                        .defaultIfEmpty(DocentAudio.builder()
+                                .contentId(contentId)
+                                .language(language)
+                                .scriptText(script)
+                                .build()));
+    }
+
+    /** DocentController가 /api/docent/audio/{id}에서 바이트를 스트리밍할 때 사용 */
+    public Mono<byte[]> getAudioBytes(Long id) {
+        return Mono.fromCallable(() -> docentAudioRepository.findById(id).map(DocentAudio::getAudioData).orElse(null))
+                .subscribeOn(Schedulers.boundedElastic())
+                .filter(bytes -> bytes != null && bytes.length > 0);
     }
 
     private String buildPrompt(TourAttractionDetail detail, String language) {

@@ -15,7 +15,19 @@ export default function RecommendationCard({ candidate, onAdd, adding }) {
 
       {candidate.oneLiner && <p className="reco-oneliner">{candidate.oneLiner}</p>}
 
+      <div className="reco-info">
+        {candidate.addr1 && <div className="reco-info-row">📍 {candidate.addr1}</div>}
+        {(candidate.isFree || candidate.useFeeText) && (
+          <div className="reco-info-row">🎫 {candidate.isFree ? '무료' : candidate.useFeeText}</div>
+        )}
+        {candidate.tel && <div className="reco-info-row">☎️ {candidate.tel}</div>}
+        {candidate.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {candidate.restDateText}</div>}
+      </div>
+
       <div className="reco-meta">
+        {candidate.distanceKm !== null && candidate.distanceKm !== undefined && (
+          <span className="reco-distance">👣 {candidate.distanceKm.toFixed(1)}km</span>
+        )}
         {candidate.freeRatePercent !== null && candidate.freeRatePercent !== undefined && (
           <span className="reco-free-rate">여유율 {Math.round(candidate.freeRatePercent)}%</span>
         )}

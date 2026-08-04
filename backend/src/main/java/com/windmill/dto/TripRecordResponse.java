@@ -15,6 +15,7 @@ public class TripRecordResponse {
     private String sessionUuid;
     private Long itineraryId;
     private String overallNote;
+    private String overallRating;
     private int rerouteCount;
     private List<VisitFeedbackResponse> visitFeedback;
     private String completedAt;
@@ -43,6 +44,7 @@ public class TripRecordResponse {
                 .sessionUuid(record.getSessionUuid())
                 .itineraryId(record.getItinerary() == null ? null : record.getItinerary().getId())
                 .overallNote(record.getOverallNote())
+                .overallRating(record.getOverallRating() == null ? null : record.getOverallRating().name())
                 .rerouteCount(record.getRerouteCount())
                 .visitFeedback(record.getVisitFeedback().stream()
                         .map(VisitFeedbackResponse::from)

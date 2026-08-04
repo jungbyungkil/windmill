@@ -29,8 +29,12 @@ public class DocentAudio {
     @Column(nullable = false)
     private String scriptText;
 
-    /** TTS 실제 합성 결과 캐싱 경로 - 공급자 미정으로 현재는 null (스크립트만 제공) */
+    /** 오디(Odii) 공식 콘텐츠일 때만 채워지는 외부 오디오 URL - 자체 합성분은 audioData에 저장하고 이 필드는 null */
     private String audioUrl;
+
+    /** OpenAI TTS로 자체 합성한 오디오 바이트(mp3) - DocentController가 /api/docent/audio/{id}로 스트리밍 */
+    @Lob
+    private byte[] audioData;
 
     @Column(nullable = false)
     private LocalDateTime generatedAt;

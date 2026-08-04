@@ -30,6 +30,10 @@ public class TripRecord {
     @Column(length = 2000)
     private String overallNote;
 
+    /** 여행 전체에 대한 엄지척 평가 - GOOD인 기록만 지역 하이라이트(다른 여행자에게 노출)로 뽑힌다 */
+    @Enumerated(EnumType.STRING)
+    private VisitRating overallRating;
+
     /** 바람개비 트리거로 대안 제안된 횟수 */
     @Builder.Default
     @Column(nullable = false)

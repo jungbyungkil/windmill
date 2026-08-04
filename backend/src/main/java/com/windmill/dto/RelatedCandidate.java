@@ -18,5 +18,16 @@ public class RelatedCandidate {
     private Integer contentTypeId;
     private String thumbnailUrl;   // firstimage - 없으면 null(프론트에서 플레이스홀더 표시)
     private Boolean businessOpen;  // Stage2 결과
+
+    // 아래는 Stage2에서 TourAttractionService.getDetail() 조회 결과로 채워짐 (위치/전화/요금/정기휴무 카드 표시용)
+    private String addr1;
+    private String tel;
+    private String mapX;           // 경도(longitude), WGS84
+    private String mapY;           // 위도(latitude), WGS84
+    private String useFeeText;     // 이용요금 원문 텍스트 (예: "무료", "성인 3,000원")
+    private Boolean isFree;        // useFeeText로 추정한 무료 여부 - 모르면 null
+    private String restDateText;   // 정기휴무 원문 텍스트 (예: "매주 월요일")
+    private Double distanceKm;     // RecommendationPipeline에서 origin이 있을 때만 채워짐
+
     private Double crowdRate;      // Stage3 결과 (원본, 0~100)
 }

@@ -2,6 +2,7 @@ package com.windmill.service.trigger;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
+import com.windmill.dto.FestivalSuggestion;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.TriggerLevel;
@@ -35,21 +36,30 @@ public class TriggerDetectionService {
     private final TriggerScheduler triggerScheduler;
     private final RegionCodeService regionCodeService;
     private final TourAttractionService tourAttractionService;
+    private final FestivalTriggerService festivalTriggerService;
 
-    /** 일정 전체 기준 - 트리거 조건 3종을 항목들에 걸쳐 OR로 판정 */
+    /** 일정 전체 기준 - 트리거 조건 3종을 항목들에 걸쳐 OR로 판정, 축제 제안은 항목 유무와 무관하게 별도로 얹는다 */
     public Mono<TriggerResult> detectForItinerary(Itinerary itinerary) {
-        if (itinerary.getItems().isEmpty()) {
-            return Mono.just(TriggerResult.builder()
-                    .triggerCount(0).level(TriggerLevel.NORMAL).triggerDetails(List.of())
-                    .affectedItemIds(List.of()).build());
-        }
         RegionCode region = regionCodeService.find(itinerary.getSignguFullCode())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + itinerary.getSignguFullCode()));
+        Mono<List<FestivalSuggestion>> festivalsMono = festivalTriggerService
+                .findDuringTrip(region, itinerary.getStartDate(), itinerary.getEndDate())
+                .onErrorReturn(List.of());
+
+        if (itinerary.getItems().isEmpty()) {
+            return festivalsMono.map(festivals -> TriggerResult.builder()
+                    .triggerCount(0).level(TriggerLevel.NORMAL).triggerDetails(List.of())
+                    .affectedItemIds(List.of()).festivalSuggestions(festivals).build());
+        }
         return triggerScheduler.ensureFresh(region)
                 .flatMap(condition -> Flux.fromIterable(itinerary.getItems())
                         .flatMap(item -> detect(item, condition).map(result -> Map.entry(item.getId(), result)))
                         .collectList()
-                        .map(this::aggregate));
+                        .map(this::aggregate))
+                .zipWith(festivalsMono, (result, festivals) -> {
+                    result.setFestivalSuggestions(festivals);
+                    return result;
+                });
     }
 
     /** 단일 일정 항목 기준 트리거 판정 */

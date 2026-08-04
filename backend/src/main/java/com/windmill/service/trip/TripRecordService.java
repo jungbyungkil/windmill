@@ -38,6 +38,7 @@ public class TripRecordService {
                 .sessionUuid(sessionUuid)
                 .itinerary(itinerary)
                 .overallNote(request.getOverallNote())
+                .overallRating(request.getOverallRating())
                 .rerouteCount(request.getRerouteCount())
                 .build();
 
@@ -50,6 +51,13 @@ public class TripRecordService {
     @Transactional(readOnly = true)
     public List<TripRecord> findBySession(String sessionUuid) {
         return tripRecordRepository.findBySessionUuid(sessionUuid);
+    }
+
+    /** 이 지역으로 떠나는 다른 여행자에게 보여줄 "엄지척(GOOD)" 최근 여행 기록 상위 5건 */
+    @Transactional(readOnly = true)
+    public List<TripRecord> findRecentGoodTripsByRegion(String signguFullCode) {
+        return tripRecordRepository.findTop5ByItinerary_SignguFullCodeAndOverallRatingOrderByCompletedAtDesc(
+                signguFullCode, VisitRating.GOOD);
     }
 
     /** 이 세션이 "별로"로 평가한 장소명 - 추천 파이프라인에서 제외 힌트로 사용 (기획안: 기록 → 추천 정확도 개선) */

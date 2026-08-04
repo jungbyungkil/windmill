@@ -7,6 +7,13 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
+
+function formatDateRange(start, end) {
+  if (!start) return null;
+  return start === end ? start : `${start} ~ ${end}`;
+}
+
 export default function CreateTripScreen({ onCreate, loading, error }) {
   const [regions, setRegions] = useState([]);
   const [regionsError, setRegionsError] = useState(null);
@@ -16,6 +23,7 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
   const [endDate, setEndDate] = useState(todayIso());
   const [companionType, setCompanionType] = useState('SOLO');
   const [withPet, setWithPet] = useState(false);
+  const [highlights, setHighlights] = useState([]);
 
   useEffect(() => {
     api.getRegions()
@@ -25,6 +33,18 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
       })
       .catch((e) => setRegionsError(e.message));
   }, []);
+
+  useEffect(() => {
+    if (!signguFullCode) {
+      setHighlights([]);
+      return;
+    }
+    let cancelled = false;
+    api.getRegionTripHighlights(signguFullCode)
+      .then((list) => { if (!cancelled) setHighlights(list); })
+      .catch(() => { if (!cancelled) setHighlights([]); });
+    return () => { cancelled = true; };
+  }, [signguFullCode]);
 
   const selectedSido = regions.find((r) => r.sidoCode === sidoCode);
   const signguOptions = selectedSido?.signgus || [];
@@ -103,6 +123,34 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
 
         {error && <div className="error-msg">❌ {error}</div>}
       </form>
+
+      {highlights.length > 0 && (
+        <div className="region-highlights">
+          <h3 className="region-highlights-title">👍 이 지역에 다녀온 여행자들의 추천</h3>
+          {highlights.map((h, i) => (
+            <div key={i} className="region-highlight-card">
+              {h.thumbnailUrl && (
+                <img className="region-highlight-thumb" src={h.thumbnailUrl} alt="" loading="lazy" />
+              )}
+              <div className="region-highlight-body">
+                <div className="region-highlight-meta">
+                  {formatDateRange(h.startDate, h.endDate) && (
+                    <span className="region-highlight-chip">🗓️ {formatDateRange(h.startDate, h.endDate)}</span>
+                  )}
+                  {h.companionType && COMPANION_LABEL[h.companionType] && (
+                    <span className="region-highlight-chip">{COMPANION_LABEL[h.companionType]}</span>
+                  )}
+                  {h.withPet && <span className="region-highlight-chip">🐾 반려동물 동반</span>}
+                </div>
+                {h.placeNames.length > 0 && (
+                  <p className="region-highlight-places">{h.placeNames.join(' · ')}</p>
+                )}
+                {h.overallNote && <p className="region-highlight-note">"{h.overallNote}"</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <p className="create-trip-hint">
         비가 오거나, 붐비거나, 동선이 꼬이면 바람개비가 알아서 신호를 보내요.

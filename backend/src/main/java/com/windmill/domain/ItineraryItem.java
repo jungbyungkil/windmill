@@ -3,6 +3,7 @@ package com.windmill.domain;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,6 +38,16 @@ public class ItineraryItem {
 
     /** "09:00" 같은 시간 문자열 - 프론트에서 형식 통제 */
     private String scheduledTime;
+
+    /** 일자별 페이지 구분 기준. 담을 때 미지정이면 ItineraryService가 itinerary.startDate로 채운다 */
+    private LocalDate visitDate;
+
+    // 아래 4개는 담는 시점의 RecommendationCandidate 스냅샷 - thumbnailUrl/crowdRate와 같은 패턴(재조회 없이 카드에 표시)
+    private String addr1;
+    private String tel;
+    private String useFeeText;
+    private Boolean isFree;
+    private String restDateText;
 
     // EAGER: open-in-view=false + 트랜잭션 밖 DTO 변환 조합에서 LAZY면 LazyInitializationException 발생 (Itinerary.items 참고)
     @Builder.Default

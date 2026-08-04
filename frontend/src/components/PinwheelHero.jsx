@@ -6,7 +6,7 @@ const LEVEL_META = {
 
 const CAUSE_META = {
   weatherTrigger: { icon: '🌧️', label: '비 소식', avoid: 'WEATHER' },
-  businessTrigger: { icon: '🚧', label: '동선 꼬임', avoid: 'BUSINESS' },
+  businessTrigger: { icon: '🚫', label: '영업종료/휴무', avoid: 'BUSINESS' },
   crowdTrigger: { icon: '👥', label: '혼잡', avoid: 'CROWD' },
 };
 

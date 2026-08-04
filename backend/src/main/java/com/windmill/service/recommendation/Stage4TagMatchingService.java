@@ -109,6 +109,7 @@ public class Stage4TagMatchingService {
     private RecommendationCandidate toCandidate(RelatedCandidate c, List<String> matchedTags, String oneLiner) {
         return RecommendationCandidate.builder()
                 .contentId(c.getContentId())
+                .contentTypeId(c.getContentTypeId())
                 .placeName(c.getPlaceName())
                 .category(c.getCategoryLcls())
                 .thumbnailUrl(c.getThumbnailUrl())
@@ -117,6 +118,12 @@ public class Stage4TagMatchingService {
                 .matchedTags(matchedTags)
                 .oneLiner(oneLiner)
                 .rank(c.getRank())
+                .addr1(c.getAddr1())
+                .tel(c.getTel())
+                .isFree(c.getIsFree())
+                .useFeeText(c.getUseFeeText())
+                .restDateText(c.getRestDateText())
+                .distanceKm(c.getDistanceKm())
                 .build();
     }
 }

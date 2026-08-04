@@ -4,7 +4,10 @@ import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
+import com.windmill.dto.TourAttractionDetail;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.util.GeoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,10 +34,12 @@ public class RecommendationPipeline {
     private final Stage3CrowdRateFilter stage3;
     private final Stage4TagMatchingService stage4;
     private final RegionCodeService regionCodeService;
+    private final TourAttractionService tourAttractionService;
 
     public Mono<List<RecommendationCandidate>> recommend(RecommendationRequest request) {
-        log.info("[Pipeline] 추천 시작 - region={}, seed={}, tags={}, avoid={}",
-                request.getRegionCode(), request.getSeedPlaceName(), request.getTags(), request.getAvoidanceHint());
+        log.info("[Pipeline] 추천 시작 - region={}, seed={}, tags={}, avoid={}, origin={}",
+                request.getRegionCode(), request.getSeedPlaceName(), request.getTags(), request.getAvoidanceHint(),
+                request.getOriginContentId());
 
         RegionCode region = regionCodeService.find(request.getRegionCode())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + request.getRegionCode()));
@@ -46,20 +51,43 @@ public class RecommendationPipeline {
                 ? Set.of()
                 : Set.copyOf(request.getExcludePlaceNames());
 
-        return stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
-                .flatMap(list -> stage1.resolveContentIds(list, region))
-                .map(list -> list.stream()
-                        .filter(c -> !exclude.contains(c.getContentId()))
-                        .collect(Collectors.toList()))
-                .flatMap(stage2::filter)
-                .flatMap(list -> stage3.filter(list, region))
-                .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
-                .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
+        return resolveOrigin(request)
+                .flatMap(origin -> stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
+                        .flatMap(list -> stage1.resolveContentIds(list, region))
+                        .map(list -> list.stream()
+                                .filter(c -> !exclude.contains(c.getContentId()))
+                                .collect(Collectors.toList()))
+                        .flatMap(stage2::filter)
+                        .map(list -> attachDistance(list, origin))
+                        .flatMap(list -> stage3.filter(list, region))
+                        .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
+                        .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery())))
                 .map(list -> list.stream()
                         .filter(c -> !excludeNames.contains(c.getPlaceName()))
                         .collect(Collectors.toList()))
                 .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint()))
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
+    }
+
+    /** origin이 없을 때(또는 조회 실패) 쓰는 빈 상세 - Reactor Mono는 null을 emit할 수 없어 null 대신 빈 객체로 흘린다 */
+    private static final TourAttractionDetail NO_ORIGIN = TourAttractionDetail.builder().build();
+
+    /** originContentId가 있으면 그 장소의 상세(mapX/mapY)를 조회해 거리 계산 기준점으로 삼는다 - 30분 캐시라 저렴 */
+    private Mono<TourAttractionDetail> resolveOrigin(RecommendationRequest request) {
+        if (request.getOriginContentId() == null || request.getOriginContentTypeId() == null) {
+            return Mono.just(NO_ORIGIN);
+        }
+        return tourAttractionService.getDetail(request.getOriginContentId(), request.getOriginContentTypeId())
+                .defaultIfEmpty(NO_ORIGIN)
+                .onErrorReturn(NO_ORIGIN);
+    }
+
+    /** origin의 mapX/mapY가 없으면(또는 조회 실패) distanceKm은 null로 남는다 - 프론트에서 뱃지를 숨긴다 */
+    private List<RelatedCandidate> attachDistance(List<RelatedCandidate> candidates, TourAttractionDetail origin) {
+        for (RelatedCandidate c : candidates) {
+            c.setDistanceKm(GeoUtils.distanceKmSafe(origin.getMapX(), origin.getMapY(), c.getMapX(), c.getMapY()));
+        }
+        return candidates;
     }
 
     /**

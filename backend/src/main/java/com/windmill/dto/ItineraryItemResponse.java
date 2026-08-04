@@ -4,6 +4,7 @@ import com.windmill.domain.ItineraryItem;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -20,6 +21,12 @@ public class ItineraryItemResponse {
     private boolean isPinned;
     private String pinnedReason;
     private int displayOrder;
+    private LocalDate visitDate;
+    private String addr1;
+    private String tel;
+    private String useFeeText;
+    private Boolean isFree;
+    private String restDateText;
 
     public static ItineraryItemResponse from(ItineraryItem item) {
         return ItineraryItemResponse.builder()
@@ -34,6 +41,12 @@ public class ItineraryItemResponse {
                 .isPinned(item.isPinned())
                 .pinnedReason(item.getPinnedReason())
                 .displayOrder(item.getDisplayOrder())
+                .visitDate(item.getVisitDate())
+                .addr1(item.getAddr1())
+                .tel(item.getTel())
+                .useFeeText(item.getUseFeeText())
+                .isFree(item.getIsFree())
+                .restDateText(item.getRestDateText())
                 .build();
     }
 }

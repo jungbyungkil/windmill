@@ -13,11 +13,14 @@ public class DocentAudioResponse {
     private String audioUrl;
 
     public static DocentAudioResponse from(DocentAudio audio) {
+        String audioUrl = audio.getAudioData() != null && audio.getAudioData().length > 0
+                ? "/api/docent/audio/" + audio.getId()
+                : audio.getAudioUrl();
         return DocentAudioResponse.builder()
                 .contentId(audio.getContentId())
                 .language(audio.getLanguage())
                 .scriptText(audio.getScriptText())
-                .audioUrl(audio.getAudioUrl())
+                .audioUrl(audioUrl)
                 .build();
     }
 }

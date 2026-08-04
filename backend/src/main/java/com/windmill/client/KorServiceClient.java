@@ -161,6 +161,36 @@ public class KorServiceClient {
                 .onErrorReturn(List.of());
     }
 
+    /** 기간별 축제/행사 조회 (searchFestival2) - eventStartDate 이후 종료되는 행사만 반환되므로
+     *  호출부에서 실제 일정 기간과 겹치는지(eventStartDate~eventEndDate) 다시 걸러야 한다 */
+    public Mono<List<JsonNode>> searchFestival(String eventStartDateYyyyMMdd, String lDongRegnCd, String lDongSignguCd,
+                                                int numOfRows, int pageNo) {
+        return webClient.get()
+                .uri(uriBuilder -> {
+                    uriBuilder.path("/searchFestival2")
+                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("numOfRows", numOfRows)
+                            .queryParam("pageNo", pageNo)
+                            .queryParam("MobileOS", "ETC")
+                            .queryParam("MobileApp", MOBILE_APP)
+                            .queryParam("_type", "json")
+                            .queryParam("arrange", "C")
+                            .queryParam("eventStartDate", eventStartDateYyyyMMdd);
+                    if (lDongRegnCd != null) {
+                        uriBuilder.queryParam("lDongRegnCd", lDongRegnCd);
+                    }
+                    if (lDongSignguCd != null) {
+                        uriBuilder.queryParam("lDongSignguCd", lDongSignguCd);
+                    }
+                    return uriBuilder.build();
+                })
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(KtoApiResponseParser::parseItems)
+                .doOnError(e -> log.error("searchFestival2 호출 실패: {}", e.getMessage()))
+                .onErrorReturn(List.of());
+    }
+
     /** 법정동 코드 조회 (ldongCode2) - lDongListYn=Y로 시도+시군구 전체 목록 조회 가능 */
     public Mono<List<JsonNode>> ldongCode(String lDongRegnCd, String lDongListYn) {
         return webClient.get()

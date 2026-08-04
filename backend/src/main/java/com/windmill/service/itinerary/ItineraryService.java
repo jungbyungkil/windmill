@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -59,6 +60,8 @@ public class ItineraryService {
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);
         int nextOrder = itinerary.getItems().size();
+        // visitDate 미지정(예: 기존 단일 일자 플로우)이면 여행 시작일로 채운다 - 일자별 페이지 그룹핑 기준
+        LocalDate visitDate = request.getVisitDate() != null ? request.getVisitDate() : itinerary.getStartDate();
         ItineraryItem item = ItineraryItem.builder()
                 .itinerary(itinerary)
                 .contentId(request.getContentId())
@@ -69,6 +72,12 @@ public class ItineraryService {
                 .tags(request.getTags() == null ? List.of() : request.getTags())
                 .crowdRate(request.getCrowdRate())
                 .displayOrder(nextOrder)
+                .visitDate(visitDate)
+                .addr1(request.getAddr1())
+                .tel(request.getTel())
+                .useFeeText(request.getUseFeeText())
+                .isFree(request.getIsFree())
+                .restDateText(request.getRestDateText())
                 .build();
         itinerary.getItems().add(item);
         return itineraryRepository.save(itinerary);
@@ -101,6 +110,18 @@ public class ItineraryService {
     public Itinerary deleteItem(Long itineraryId, Long itemId) {
         Itinerary itinerary = get(itineraryId);
         itinerary.getItems().removeIf(i -> i.getId().equals(itemId));
+        return itineraryRepository.save(itinerary);
+    }
+
+    /** 일자별 페이지 확정/해제 - 프론트가 "다음 날로 이동"을 허용할지 판단하는 기준 */
+    @Transactional
+    public Itinerary confirmDay(Long itineraryId, LocalDate date, boolean confirmed) {
+        Itinerary itinerary = get(itineraryId);
+        if (confirmed) {
+            itinerary.getConfirmedDates().add(date);
+        } else {
+            itinerary.getConfirmedDates().remove(date);
+        }
         return itineraryRepository.save(itinerary);
     }
 }

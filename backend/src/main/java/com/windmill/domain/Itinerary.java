@@ -6,7 +6,9 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "itinerary")
@@ -52,6 +54,13 @@ public class Itinerary {
     @OneToMany(mappedBy = "itinerary", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("displayOrder ASC")
     private List<ItineraryItem> items = new ArrayList<>();
+
+    /** 일자별 페이지 확정 - "확정"된 날짜만 담김. EAGER: Itinerary.items와 동일한 이유(트랜잭션 밖 DTO 변환) */
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "itinerary_confirmed_dates", joinColumns = @JoinColumn(name = "itinerary_id"))
+    @Column(name = "confirmed_date")
+    private Set<LocalDate> confirmedDates = new HashSet<>();
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

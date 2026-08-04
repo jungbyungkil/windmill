@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Data
@@ -22,6 +23,8 @@ public class ItineraryResponse {
     private CompanionType companionType;
     private boolean withPet;
     private List<ItineraryItemResponse> items;
+    /** 확정된 날짜 목록 - 프론트 일자별 페이지 탭에서 체크표시/다음날 이동 가능 여부 판단에 사용 */
+    private Set<LocalDate> confirmedDates;
 
     public static ItineraryResponse from(Itinerary itinerary) {
         return ItineraryResponse.builder()
@@ -37,6 +40,7 @@ public class ItineraryResponse {
                 .items(itinerary.getItems().stream()
                         .map(ItineraryItemResponse::from)
                         .collect(Collectors.toList()))
+                .confirmedDates(itinerary.getConfirmedDates())
                 .build();
     }
 }

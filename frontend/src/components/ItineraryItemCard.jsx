@@ -26,6 +26,15 @@ export default function ItineraryItemCard({ item, onUpdateTime, onTogglePin, onD
           </div>
         )}
 
+        <div className="reco-info">
+          {item.addr1 && <div className="reco-info-row">📍 {item.addr1}</div>}
+          {(item.isFree || item.useFeeText) && (
+            <div className="reco-info-row">🎫 {item.isFree ? '무료' : item.useFeeText}</div>
+          )}
+          {item.tel && <div className="reco-info-row">☎️ {item.tel}</div>}
+          {item.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {item.restDateText}</div>}
+        </div>
+
         {item.crowdRate !== null && item.crowdRate !== undefined && (
           <div className="item-crowd">혼잡도 {Math.round(item.crowdRate)}%</div>
         )}
