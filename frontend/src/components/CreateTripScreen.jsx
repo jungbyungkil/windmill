@@ -56,7 +56,16 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidoCode, regions]);
 
-  const canSubmit = signguFullCode && startDate && endDate && startDate <= endDate;
+  const today = todayIso();
+  const startBeforeToday = startDate && startDate < today;
+  const dateRangeInvalid = startDate && endDate && startDate > endDate;
+  const canSubmit = signguFullCode && startDate && endDate && !startBeforeToday && !dateRangeInvalid;
+
+  function handleStartDateChange(value) {
+    const clamped = value < today ? today : value;
+    setStartDate(clamped);
+    if (endDate && clamped > endDate) setEndDate(clamped);
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -91,10 +100,12 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
         <div className="trip-form-row">
           <label className="trip-form-label">여행 날짜</label>
           <div className="trip-form-date-range">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+            <input type="date" value={startDate} min={today} onChange={(e) => handleStartDateChange(e.target.value)} required />
             <span>~</span>
             <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
           </div>
+          {startBeforeToday && <div className="error-msg">❌ 시작일은 오늘 이후여야 해요</div>}
+          {!startBeforeToday && dateRangeInvalid && <div className="error-msg">❌ 종료일은 시작일 이후여야 해요</div>}
         </div>
 
         <div className="trip-form-row">
