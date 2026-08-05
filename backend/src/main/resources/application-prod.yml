@@ -5,6 +5,11 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+    hikari:
+      # 이전 배포 인스턴스가 남긴 락에 새 인스턴스의 스키마 업데이트(ddl-auto)가 무한 대기하다
+      # Render 포트스캔 타임아웃으로 죽는 것을 방지 - 락을 못 잡으면 빠르게 실패시켜 원인을 로그로 남긴다
+      data-source-properties:
+        options: "-c lock_timeout=15000 -c statement_timeout=60000"
   jpa:
     hibernate:
       ddl-auto: update
