@@ -124,6 +124,7 @@ public class Stage4TagMatchingService {
                 .useFeeText(c.getUseFeeText())
                 .restDateText(c.getRestDateText())
                 .distanceKm(c.getDistanceKm())
+                .businessOpen(c.getBusinessOpen())
                 .build();
     }
 }

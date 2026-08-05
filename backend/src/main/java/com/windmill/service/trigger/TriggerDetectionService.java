@@ -10,6 +10,7 @@ import com.windmill.dto.TriggerResult;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -27,11 +28,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TriggerDetectionService {
-
-    /** 강수확률(%) 임계치 - 이 이상이면 기상 트리거 */
-    private static final double WEATHER_POP_THRESHOLD = 60.0;
-    /** 집중률(%) 임계치 - 여유율 10% 이하(=집중률 90% 이상)면 혼잡도 트리거 */
-    private static final double CROWD_RATE_THRESHOLD = 90.0;
 
     private final TriggerScheduler triggerScheduler;
     private final RegionCodeService regionCodeService;
@@ -65,10 +61,10 @@ public class TriggerDetectionService {
     /** 단일 일정 항목 기준 트리거 판정 */
     public Mono<TriggerResult> detect(ItineraryItem item, RegionCondition condition) {
         boolean weatherTrigger = condition.getCurrentPop() != null
-                && condition.getCurrentPop() >= WEATHER_POP_THRESHOLD;
+                && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
 
         Double crowdRate = condition.getCrowdRate(item.getPlaceName());
-        boolean crowdTrigger = crowdRate != null && crowdRate >= CROWD_RATE_THRESHOLD;
+        boolean crowdTrigger = crowdRate != null && crowdRate >= TriggerThresholds.CROWD_RATE_THRESHOLD;
 
         if (item.getContentId() == null || item.getContentTypeId() == null) {
             return Mono.just(buildResult(weatherTrigger, crowdTrigger, false));

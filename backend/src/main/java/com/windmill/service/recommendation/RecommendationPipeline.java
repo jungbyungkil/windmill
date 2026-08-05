@@ -7,6 +7,8 @@ import com.windmill.dto.RelatedCandidate;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.service.trigger.RegionCondition;
+import com.windmill.service.trigger.TriggerScheduler;
 import com.windmill.util.GeoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,8 @@ public class RecommendationPipeline {
     private final Stage4TagMatchingService stage4;
     private final RegionCodeService regionCodeService;
     private final TourAttractionService tourAttractionService;
+    private final TriggerScheduler triggerScheduler;
+    private final BadgeAssembler badgeAssembler;
 
     public Mono<List<RecommendationCandidate>> recommend(RecommendationRequest request) {
         log.info("[Pipeline] 추천 시작 - region={}, seed={}, tags={}, avoid={}, origin={}",
@@ -51,17 +56,26 @@ public class RecommendationPipeline {
                 ? Set.of()
                 : Set.copyOf(request.getExcludePlaceNames());
 
-        return resolveOrigin(request)
-                .flatMap(origin -> stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
-                        .flatMap(list -> stage1.resolveContentIds(list, region))
-                        .map(list -> list.stream()
-                                .filter(c -> !exclude.contains(c.getContentId()))
-                                .collect(Collectors.toList()))
-                        .flatMap(stage2::filter)
-                        .map(list -> attachDistance(list, origin))
-                        .flatMap(list -> stage3.filter(list, region))
-                        .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
-                        .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery())))
+        return Mono.zip(resolveOrigin(request), resolveCondition(region))
+                .flatMap(tuple -> {
+                    TourAttractionDetail origin = tuple.getT1();
+                    RegionCondition condition = tuple.getT2();
+                    boolean rainAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.WEATHER;
+                    Mono<List<RelatedCandidate>> stage1Result = rainAlternative
+                            ? stage1.fetchIndoor(region)
+                            : stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
+                                    .flatMap(list -> stage1.resolveContentIds(list, region));
+                    return stage1Result
+                            .map(list -> list.stream()
+                                    .filter(c -> !exclude.contains(c.getContentId()))
+                                    .collect(Collectors.toList()))
+                            .flatMap(stage2::filter)
+                            .map(list -> attachDistance(list, origin))
+                            .flatMap(list -> stage3.filter(list, region))
+                            .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
+                            .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
+                            .doOnNext(list -> badgeAssembler.attach(list, condition));
+                })
                 .map(list -> list.stream()
                         .filter(c -> !excludeNames.contains(c.getPlaceName()))
                         .collect(Collectors.toList()))
@@ -71,6 +85,13 @@ public class RecommendationPipeline {
 
     /** origin이 없을 때(또는 조회 실패) 쓰는 빈 상세 - Reactor Mono는 null을 emit할 수 없어 null 대신 빈 객체로 흘린다 */
     private static final TourAttractionDetail NO_ORIGIN = TourAttractionDetail.builder().build();
+    /** 날씨/집중률 조회 실패 시 배지를 그냥 생략하기 위한 빈 상태 - TriggerScheduler와 동일한 no-null 관례 */
+    private static final RegionCondition NO_CONDITION = RegionCondition.builder().crowdRateByPlaceName(Map.of()).build();
+
+    /** 배지 조립용 지역 상태(날씨 POP/관광지별 집중률) - TriggerDetectionService와 동일하게 30분 캐시를 공유한다 */
+    private Mono<RegionCondition> resolveCondition(RegionCode region) {
+        return triggerScheduler.ensureFresh(region).onErrorReturn(NO_CONDITION);
+    }
 
     /** originContentId가 있으면 그 장소의 상세(mapX/mapY)를 조회해 거리 계산 기준점으로 삼는다 - 30분 캐시라 저렴 */
     private Mono<TourAttractionDetail> resolveOrigin(RecommendationRequest request) {

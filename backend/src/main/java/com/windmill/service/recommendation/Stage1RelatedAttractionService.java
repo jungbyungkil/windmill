@@ -31,6 +31,8 @@ public class Stage1RelatedAttractionService {
     private static final int EXTERNAL_CALL_CONCURRENCY = 4;
     /** 후속 단계(이름매칭/영업시간/집중률)로 넘길 후보 상한 - 연관순위(rank) 기준 상위만 사용해 API 쿼터 절약 */
     private static final int MAX_CANDIDATES = 20;
+    /** TourAPI contentTypeId 14 = 문화시설(박물관/미술관/전시관 등) - 우천 시 실내 대체 코스 재검색 기준 */
+    private static final int INDOOR_CONTENT_TYPE_ID = 14;
 
     private final RelatedAttractionClient relatedAttractionClient;
     private final KorServiceClient korServiceClient;
@@ -107,6 +109,38 @@ public class Stage1RelatedAttractionService {
             log.info("[Stage1] 반려동물동반 후보 {}건 확보 (seed={})", result.size(), seedPlaceName);
             return result;
         });
+    }
+
+    /**
+     * 우천 시 실내 대체 코스 - 연관관광지(TarRlteTarService1) 대신 KorService2의 지역기반 목록을
+     * 문화시설(contentTypeId=14)로 필터링해 재검색한다. searchKeyword2는 키워드 필수라 "카테고리만으로
+     * 재검색"에는 맞지 않아, 지역+카테고리 조합 조회가 가능한 areaBasedList2를 대신 사용한다.
+     * 응답에 contentId가 이미 채워져 있어 resolveContentIds(이름매칭 조인)가 필요 없다.
+     */
+    public Mono<List<RelatedCandidate>> fetchIndoor(RegionCode region) {
+        return korServiceClient.areaBasedList(INDOOR_CONTENT_TYPE_ID, region.getLDongRegnCd(), region.getLDongSignguCd(),
+                        MAX_CANDIDATES, 1, "C")
+                .map(items -> {
+                    List<RelatedCandidate> result = new ArrayList<>();
+                    int rank = 1;
+                    for (JsonNode item : items) {
+                        String name = item.path("title").asText(null);
+                        if (name == null || name.isBlank()) {
+                            continue;
+                        }
+                        String thumbnail = item.path("firstimage").asText(null);
+                        result.add(RelatedCandidate.builder()
+                                .placeName(name)
+                                .contentId(item.path("contentid").asText(null))
+                                .contentTypeId(parseContentTypeId(item))
+                                .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
+                                .categoryLcls("실내")
+                                .rank(rank++)
+                                .build());
+                    }
+                    log.info("[Stage1] 우천 대체(실내) 후보 {}건 확보", result.size());
+                    return result;
+                });
     }
 
     private Integer parseContentTypeId(JsonNode item) {

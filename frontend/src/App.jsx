@@ -196,7 +196,7 @@ export default function App() {
     setAltOpen(true);
     setAltLoading(true);
     try {
-      const candidates = await api.getAlternatives(itineraryId, { avoid: avoidHint });
+      const { candidates } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
       setAltCandidates(candidates);
     } catch {
       setAltCandidates([]);
@@ -220,7 +220,8 @@ export default function App() {
     setAutoReplacing(true);
     setAutoReplaceNotice(null);
     try {
-      const candidates = await api.getAlternatives(itineraryId, { avoid: avoidHint });
+      const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
+      const rainNote = reason === 'RAIN_ALTERNATIVE' ? ' (비 예보로 실내 코스를 추천했어요)' : '';
       if (candidates.length === 0) {
         setAutoReplaceNotice('지금은 자동으로 바꿀 대안이 없어요.');
         return;
@@ -248,10 +249,10 @@ export default function App() {
           restDateText: top.restDateText,
         });
         setItinerary(result);
-        setAutoReplaceNotice(`"${affectedItem.placeName}"을(를) "${top.placeName}"(으)로 자동 교체했어요.`);
+        setAutoReplaceNotice(`"${affectedItem.placeName}"을(를) "${top.placeName}"(으)로 자동 교체했어요.${rainNote}`);
       } else {
         await addCandidateToItinerary(top);
-        setAutoReplaceNotice(`"${top.placeName}"을(를) 일정에 자동으로 추가했어요.`);
+        setAutoReplaceNotice(`"${top.placeName}"을(를) 일정에 자동으로 추가했어요.${rainNote}`);
       }
       setRerouteCount((n) => n + 1);
       refreshTrigger();

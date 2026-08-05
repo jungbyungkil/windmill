@@ -12,6 +12,8 @@ import java.util.Map;
 public class RegionCondition {
     Map<String, Double> crowdRateByPlaceName;
     Double currentPop;
+    /** currentPop이 가리키는 예보 시각 - "HHmm" 원문(fcstTime), 예: "1400". 없으면 null */
+    String currentPopFcstTime;
     Instant refreshedAt;
 
     public Double getCrowdRate(String placeName) {

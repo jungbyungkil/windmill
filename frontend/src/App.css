@@ -793,6 +793,66 @@
   color: var(--level-normal);
 }
 
+.reco-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reco-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.reco-badge-info {
+  color: var(--sea-deep);
+  background: color-mix(in srgb, var(--sky) 30%, transparent);
+  border-color: var(--sky);
+}
+
+.reco-badge-warning {
+  color: var(--level-warning);
+  background: color-mix(in srgb, var(--level-warning) 15%, transparent);
+  border-color: var(--level-warning);
+}
+
+.reco-badge-success {
+  color: var(--level-normal);
+  background: color-mix(in srgb, var(--level-normal) 15%, transparent);
+  border-color: var(--level-normal);
+}
+
+.reco-chain {
+  border-top: 1px dashed var(--sky);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reco-chain-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea-deep);
+}
+
+.reco-chain-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reco-chain-item {
+  font-size: 12px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--sky) 20%, transparent);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
 .btn-add {
   align-self: flex-start;
   background: transparent;

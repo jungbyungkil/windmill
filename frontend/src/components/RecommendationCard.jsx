@@ -1,4 +1,6 @@
-export default function RecommendationCard({ candidate, onAdd, adding }) {
+const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
+
+export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [] }) {
   return (
     <div className="reco-card">
       {candidate.thumbnailUrl ? (
@@ -12,6 +14,16 @@ export default function RecommendationCard({ candidate, onAdd, adding }) {
         <span className="reco-name">{candidate.placeName}</span>
         {candidate.category && <span className="reco-category">{candidate.category}</span>}
       </div>
+
+      {candidate.badges?.length > 0 && (
+        <div className="reco-badges">
+          {candidate.badges.map((b, i) => (
+            <span key={i} className={`reco-badge reco-badge-${b.severity?.toLowerCase()}`}>
+              {BADGE_ICON[b.type] || ''} {b.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {candidate.oneLiner && <p className="reco-oneliner">{candidate.oneLiner}</p>}
 
@@ -37,6 +49,20 @@ export default function RecommendationCard({ candidate, onAdd, adding }) {
       <button className="btn-add" onClick={() => onAdd(candidate)} disabled={adding}>
         {adding ? '담는 중...' : '+ 일정에 추가'}
       </button>
+
+      {nextCandidates.length > 0 && (
+        <div className="reco-chain">
+          <span className="reco-chain-label">다음 코스로 어때요</span>
+          <div className="reco-chain-list">
+            {nextCandidates.map((n) => (
+              <span key={n.contentId} className="reco-chain-item">
+                {n.placeName}
+                {n.distanceKm !== null && n.distanceKm !== undefined && ` · ${n.distanceKm.toFixed(1)}km`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

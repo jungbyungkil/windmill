@@ -1,6 +1,7 @@
 package com.windmill.service.trigger;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.windmill.client.CrowdRateClient;
 import com.windmill.client.WeatherClient;
 import com.windmill.dto.RegionCode;
@@ -38,17 +39,20 @@ public class TriggerScheduler {
     }
 
     private Mono<RegionCondition> refresh(RegionCode region) {
-        return Mono.zip(refreshCrowdRates(region), refreshWeather(region).defaultIfEmpty(Double.NaN))
+        return Mono.zip(refreshCrowdRates(region), refreshWeather(region).defaultIfEmpty(EMPTY_POP))
                 .map(tuple -> {
-                    Double pop = Double.isNaN(tuple.getT2()) ? null : tuple.getT2();
+                    JsonNode popItem = tuple.getT2();
+                    Double pop = popItem == EMPTY_POP ? null : popItem.path("fcstValue").asDouble();
+                    String fcstTime = popItem == EMPTY_POP ? null : popItem.path("fcstTime").asText(null);
                     RegionCondition condition = RegionCondition.builder()
                             .crowdRateByPlaceName(tuple.getT1())
                             .currentPop(pop)
+                            .currentPopFcstTime(fcstTime)
                             .refreshedAt(Instant.now())
                             .build();
                     cache.put(region.getSignguFullCode(), condition);
-                    log.info("[TriggerScheduler] {} 캐시 갱신 완료 (집중률 {}건, POP={})",
-                            region.getSignguName(), condition.getCrowdRateByPlaceName().size(), pop);
+                    log.info("[TriggerScheduler] {} 캐시 갱신 완료 (집중률 {}건, POP={} @ {}시)",
+                            region.getSignguName(), condition.getCrowdRateByPlaceName().size(), pop, fcstTime);
                     return condition;
                 });
     }
@@ -72,20 +76,23 @@ public class TriggerScheduler {
                 .onErrorReturn(Map.of());
     }
 
-    private Mono<Double> refreshWeather(RegionCode region) {
+    /** Mono는 null을 emit할 수 없어, 날씨 미조회/미설정 상태를 나타내는 빈 노드 sentinel */
+    private static final JsonNode EMPTY_POP = NullNode.getInstance();
+
+    private Mono<JsonNode> refreshWeather(RegionCode region) {
         if (!weatherClient.isConfigured() || region.getWeatherNx() == null || region.getWeatherNy() == null) {
             return Mono.empty();
         }
         return weatherClient.getVillageForecast(region.getWeatherNx(), region.getWeatherNy())
                 .flatMap(items -> {
-                    Double pop = extractLatestPop(items);
-                    return pop == null ? Mono.empty() : Mono.just(pop);
+                    JsonNode popItem = extractLatestPopItem(items);
+                    return popItem == null ? Mono.empty() : Mono.just(popItem);
                 })
                 .onErrorResume(e -> Mono.empty());
     }
 
-    /** 발표 회차 예보 중 가장 이른(현재에 가장 가까운) 시각의 강수확률(POP)을 사용 */
-    private Double extractLatestPop(List<JsonNode> items) {
+    /** 발표 회차 예보 중 가장 이른(현재에 가장 가까운) 시각의 강수확률(POP) 항목 원본을 사용 */
+    private JsonNode extractLatestPopItem(List<JsonNode> items) {
         return items.stream()
                 .filter(i -> "POP".equals(i.path("category").asText()))
                 .min((a, b) -> {
@@ -93,7 +100,6 @@ public class TriggerScheduler {
                     String tb = b.path("fcstDate").asText("") + b.path("fcstTime").asText("");
                     return ta.compareTo(tb);
                 })
-                .map(i -> i.path("fcstValue").asDouble())
                 .orElse(null);
     }
 }

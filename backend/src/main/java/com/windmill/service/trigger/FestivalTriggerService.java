@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.client.KorServiceClient;
 import com.windmill.dto.FestivalSuggestion;
 import com.windmill.dto.RegionCode;
+import com.windmill.util.SimpleTtlCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -24,8 +26,11 @@ public class FestivalTriggerService {
 
     private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final int MAX_SUGGESTIONS = 3;
+    /** 축제 정보는 정적 데이터에 가까워 짧은 트리거 폴링(1~5분) 주기마다 재조회할 필요가 없다 - 1,000 call/일 한도 보호 */
+    private static final Duration CACHE_TTL = Duration.ofHours(6);
 
     private final KorServiceClient korServiceClient;
+    private final SimpleTtlCache<String, List<FestivalSuggestion>> cache = new SimpleTtlCache<>(CACHE_TTL);
 
     public FestivalTriggerService(KorServiceClient korServiceClient) {
         this.korServiceClient = korServiceClient;
@@ -35,12 +40,20 @@ public class FestivalTriggerService {
         if (tripStart == null || tripEnd == null) {
             return Mono.just(List.of());
         }
+        String cacheKey = region.getSignguFullCode() + ":" + tripStart.format(YYYYMMDD) + ":" + tripEnd.format(YYYYMMDD);
+        List<FestivalSuggestion> cached = cache.get(cacheKey);
+        if (cached != null) {
+            return Mono.just(cached);
+        }
         // searchFestival2는 eventStartDate 이후 "종료"되는 행사까지 폭넓게 주므로, 여행 시작일 기준으로 조회 후
         // 실제 여행 기간(tripStart~tripEnd)과 겹치는 것만 다시 걸러낸다.
         String queryFrom = tripStart.format(YYYYMMDD);
         return korServiceClient.searchFestival(queryFrom, region.getLDongRegnCd(), region.getLDongSignguCd(), 50, 1)
                 .map(items -> filterAndMap(items, tripStart, tripEnd))
-                .doOnNext(list -> log.info("[Festival] 여행기간({}~{}) 겹치는 축제 {}건", tripStart, tripEnd, list.size()));
+                .doOnNext(list -> {
+                    cache.put(cacheKey, list);
+                    log.info("[Festival] 여행기간({}~{}) 겹치는 축제 {}건", tripStart, tripEnd, list.size());
+                });
     }
 
     private List<FestivalSuggestion> filterAndMap(List<JsonNode> items, LocalDate tripStart, LocalDate tripEnd) {

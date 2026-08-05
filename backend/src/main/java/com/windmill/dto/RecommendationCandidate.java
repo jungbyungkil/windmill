@@ -28,4 +28,6 @@ public class RecommendationCandidate {
     private String useFeeText;      // 이용요금 원문 텍스트
     private String restDateText;    // 정기휴무 원문 텍스트
     private Double distanceKm;      // origin(보통 마지막으로 담은 장소) 기준 직선거리, origin 없으면 null
+    private Boolean businessOpen;   // Stage2 결과 - RelatedCandidate에서 그대로 넘어옴, 모르면 null
+    private List<Badge> badges;     // 날씨/혼잡/영업 실시간 상태 배지 - RecommendationPipeline에서 조립
 }

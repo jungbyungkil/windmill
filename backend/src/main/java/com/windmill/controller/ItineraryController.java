@@ -3,6 +3,7 @@ package com.windmill.controller;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryResponse;
@@ -106,13 +107,15 @@ public class ItineraryController {
      * 이미 일정에 담긴 장소(고정 여부 무관)는 excludeContentIds로 자동 제외된다.
      */
     @GetMapping("/{id}/alternatives")
-    public Mono<ResponseEntity<List<RecommendationCandidate>>> alternatives(
+    public Mono<ResponseEntity<AlternativesResponse>> alternatives(
             @PathVariable Long id,
             @RequestParam(required = false) RecommendationRequest.AvoidanceHint avoid,
             @RequestParam(required = false) String seedPlaceName) {
+        String reason = avoid == RecommendationRequest.AvoidanceHint.WEATHER ? "RAIN_ALTERNATIVE" : null;
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> recommendationPipeline.recommend(buildAlternativeRequest(itinerary, avoid, seedPlaceName)))
+                .map(candidates -> AlternativesResponse.builder().candidates(candidates).reason(reason).build())
                 .map(ResponseEntity::ok);
     }
 

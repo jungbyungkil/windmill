@@ -58,12 +58,13 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
           </p>
         ) : (
           <div className="reco-grid">
-            {visibleResults.map((c) => (
+            {visibleResults.map((c, i) => (
               <RecommendationCard
                 key={c.contentId}
                 candidate={c}
                 onAdd={onAdd}
                 adding={addingId === c.contentId}
+                nextCandidates={visibleResults.slice(i + 1, i + 3)}
               />
             ))}
           </div>

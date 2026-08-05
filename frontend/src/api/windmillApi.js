@@ -68,6 +68,7 @@ export function confirmDay(itineraryId, date, confirmed) {
   return request(`/itineraries/${itineraryId}/days/${date}`, { method: 'PATCH', body: { confirmed } });
 }
 
+/** 응답 형태: { candidates: RecommendationCandidate[], reason: "RAIN_ALTERNATIVE" | null } */
 export function getAlternatives(itineraryId, { avoid, seedPlaceName } = {}) {
   return request(`/itineraries/${itineraryId}/alternatives${qs({ avoid, seedPlaceName })}`);
 }
