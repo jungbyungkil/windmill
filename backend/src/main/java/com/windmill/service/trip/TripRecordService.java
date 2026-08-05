@@ -1,6 +1,7 @@
 package com.windmill.service.trip;
 
 import com.windmill.domain.Itinerary;
+import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.TripRecord;
 import com.windmill.domain.VisitFeedback;
 import com.windmill.domain.VisitRating;
@@ -13,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,7 +45,7 @@ public class TripRecordService {
                 .rerouteCount(request.getRerouteCount())
                 .build();
 
-        List<VisitFeedback> feedback = toFeedbackEntities(request.getVisitFeedback(), record);
+        List<VisitFeedback> feedback = toFeedbackEntities(request.getVisitFeedback(), record, itinerary);
         record.setVisitFeedback(feedback);
 
         return tripRecordRepository.save(record);
@@ -70,16 +73,72 @@ public class TripRecordService {
                 .collect(Collectors.toSet());
     }
 
-    private List<VisitFeedback> toFeedbackEntities(List<VisitFeedbackRequest> requests, TripRecord record) {
+    /**
+     * itemId로 원본 ItineraryItem을 찾아 dayNo/timeSlot/category/contentId/isAlternate를 스냅샷한다 -
+     * CommunityScheduleService의 지역별 집계가 나중에 조회하는 필드라 프론트에는 요구하지 않는다.
+     * itinerary가 없거나(itineraryId 미지정) 항목이 이미 삭제됐으면 스냅샷 필드는 기본값(dayNo=1, timeSlot=오전)으로 남는다.
+     */
+    private List<VisitFeedback> toFeedbackEntities(List<VisitFeedbackRequest> requests, TripRecord record, Itinerary itinerary) {
         if (requests == null) {
             return List.of();
         }
-        return requests.stream().map(r -> VisitFeedback.builder()
-                .tripRecord(record)
-                .itemId(r.getItemId())
-                .placeName(r.getPlaceName())
-                .rating(r.getRating())
-                .memo(r.getMemo())
-                .build()).collect(Collectors.toList());
+        Map<Long, ItineraryItem> itemsById = itinerary == null
+                ? Map.of()
+                : itinerary.getItems().stream().collect(Collectors.toMap(ItineraryItem::getId, i -> i));
+
+        return requests.stream().map(r -> {
+            ItineraryItem item = itemsById.get(r.getItemId());
+            VisitFeedback.VisitFeedbackBuilder builder = VisitFeedback.builder()
+                    .tripRecord(record)
+                    .itemId(r.getItemId())
+                    .placeName(r.getPlaceName())
+                    .rating(r.getRating())
+                    .memo(r.getMemo());
+            if (item != null) {
+                builder.contentId(item.getContentId())
+                        .contentTypeId(item.getContentTypeId())
+                        .category(item.getCategory())
+                        .isAlternate(item.isAlternate())
+                        .dayNo(dayNo(itinerary, item))
+                        .timeSlot(timeSlot(item.getScheduledTime()));
+            } else {
+                builder.dayNo(1).timeSlot(TIME_SLOT_MORNING);
+            }
+            return builder.build();
+        }).collect(Collectors.toList());
+    }
+
+    private int dayNo(Itinerary itinerary, ItineraryItem item) {
+        if (itinerary.getStartDate() == null || item.getVisitDate() == null) {
+            return 1;
+        }
+        long diff = item.getVisitDate().toEpochDay() - itinerary.getStartDate().toEpochDay() + 1;
+        return (int) Math.max(1, diff);
+    }
+
+    private static final String TIME_SLOT_MORNING = "오전";
+    private static final String TIME_SLOT_LUNCH = "점심";
+    private static final String TIME_SLOT_AFTERNOON = "오후";
+    private static final String TIME_SLOT_EVENING = "저녁";
+
+    /** "HH:mm" 시각을 4구간으로 버킷팅 - 오전(~10:59)/점심(11~13:59)/오후(14~17:59)/저녁(18~23:59), 파싱 실패 시 오전 */
+    private String timeSlot(String scheduledTime) {
+        if (scheduledTime == null || scheduledTime.isBlank()) {
+            return TIME_SLOT_MORNING;
+        }
+        try {
+            LocalTime time = LocalTime.parse(scheduledTime);
+            int hour = time.getHour();
+            if (hour < 11) {
+                return TIME_SLOT_MORNING;
+            } else if (hour < 14) {
+                return TIME_SLOT_LUNCH;
+            } else if (hour < 18) {
+                return TIME_SLOT_AFTERNOON;
+            }
+            return TIME_SLOT_EVENING;
+        } catch (Exception e) {
+            return TIME_SLOT_MORNING;
+        }
     }
 }

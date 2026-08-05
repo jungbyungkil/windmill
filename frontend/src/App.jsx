@@ -154,7 +154,7 @@ export default function App() {
     }
   }
 
-  async function addCandidateToItinerary(candidate, visitDate = activeDate) {
+  async function addCandidateToItinerary(candidate, visitDate = activeDate, isAlternate = false) {
     const result = await api.addItem(itineraryId, {
       contentId: candidate.contentId,
       contentTypeId: candidate.contentTypeId,
@@ -168,6 +168,8 @@ export default function App() {
       useFeeText: candidate.useFeeText,
       isFree: candidate.isFree,
       restDateText: candidate.restDateText,
+      category: candidate.category,
+      isAlternate,
     });
     setItinerary(result);
     return result;
@@ -208,7 +210,7 @@ export default function App() {
   async function handleAddAlternative(candidate) {
     setAddingContentId(candidate.contentId);
     try {
-      await addCandidateToItinerary(candidate);
+      await addCandidateToItinerary(candidate, activeDate, true);
       setRerouteCount((n) => n + 1);
     } finally {
       setAddingContentId(null);
@@ -247,11 +249,13 @@ export default function App() {
           useFeeText: top.useFeeText,
           isFree: top.isFree,
           restDateText: top.restDateText,
+          category: top.category,
+          isAlternate: true,
         });
         setItinerary(result);
         setAutoReplaceNotice(`"${affectedItem.placeName}"을(를) "${top.placeName}"(으)로 자동 교체했어요.${rainNote}`);
       } else {
-        await addCandidateToItinerary(top);
+        await addCandidateToItinerary(top, activeDate, true);
         setAutoReplaceNotice(`"${top.placeName}"을(를) 일정에 자동으로 추가했어요.${rainNote}`);
       }
       setRerouteCount((n) => n + 1);
@@ -284,6 +288,7 @@ export default function App() {
         useFeeText: candidate.useFeeText,
         isFree: candidate.isFree,
         restDateText: candidate.restDateText,
+        category: candidate.category,
       });
     }
     setItinerary(result);

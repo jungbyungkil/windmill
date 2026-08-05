@@ -78,6 +78,8 @@ public class ItineraryService {
                 .useFeeText(request.getUseFeeText())
                 .isFree(request.getIsFree())
                 .restDateText(request.getRestDateText())
+                .category(request.getCategory())
+                .isAlternate(request.isAlternate())
                 .build();
         itinerary.getItems().add(item);
         return itineraryRepository.save(itinerary);

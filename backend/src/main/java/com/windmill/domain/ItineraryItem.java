@@ -2,6 +2,7 @@ package com.windmill.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -48,6 +49,15 @@ public class ItineraryItem {
     private String useFeeText;
     private Boolean isFree;
     private String restDateText;
+
+    /** RecommendationCandidate.category 스냅샷 - 여행기록 집계(CommunityScheduleService)에서 슬롯별 카테고리 표시에 사용 */
+    private String category;
+    /** "자동 재배치"/"대안 추천" 경로로 담겼는지 - 여행기록에 그대로 스냅샷되어 실시간 대응 사례로 집계됨.
+     *  ColumnDefault: 이미 행이 있는 테이블에 NOT NULL 컬럼을 추가할 때 기존 행을 false로 채우기 위함 */
+    @Builder.Default
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean isAlternate = false;
 
     // EAGER: open-in-view=false + 트랜잭션 밖 DTO 변환 조합에서 LAZY면 LazyInitializationException 발생 (Itinerary.items 참고)
     @Builder.Default

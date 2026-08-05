@@ -24,4 +24,6 @@ public class AddItineraryItemRequest {
     private String useFeeText;
     private Boolean isFree;
     private String restDateText;
+    private String category;
+    private boolean isAlternate;
 }
