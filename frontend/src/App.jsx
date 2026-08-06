@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import useSession from './hooks/useSession';
 import * as api from './api/windmillApi';
 import CreateTripScreen from './components/CreateTripScreen';
+import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import PinwheelHero from './components/PinwheelHero';
 import WeatherBanner from './components/WeatherBanner';
@@ -22,6 +23,8 @@ export default function App() {
   const [itinerary, setItinerary] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
+  /** API 카테고리 추천을 AI 스케줄보다 먼저 노출 */
+  const [showCategoryReco, setShowCategoryReco] = useState(false);
   const [showAutoPlan, setShowAutoPlan] = useState(false);
 
   const [trigger, setTrigger] = useState(null);
@@ -107,7 +110,8 @@ export default function App() {
       const result = await api.createItinerary(sessionId, formData);
       setItinerary(result);
       setItineraryId(result.itineraryId);
-      setShowAutoPlan(true);
+      setShowCategoryReco(true);
+      setShowAutoPlan(false);
     } catch (e) {
       setCreateError(e.message);
     } finally {
@@ -223,7 +227,11 @@ export default function App() {
     setAutoReplaceNotice(null);
     try {
       const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
-      const rainNote = reason === 'RAIN_ALTERNATIVE' ? ' (비 예보로 실내 코스를 추천했어요)' : '';
+      const rainNote = reason === 'RAIN_ALTERNATIVE'
+        ? ' (비 예보로 실내 코스를 추천했어요)'
+        : reason === 'HEAT_ALTERNATIVE'
+          ? ' (폭염으로 실내 코스를 추천했어요)'
+          : '';
       if (candidates.length === 0) {
         setAutoReplaceNotice('지금은 자동으로 바꿀 대안이 없어요.');
         return;
@@ -343,6 +351,29 @@ export default function App() {
 
   if (!itinerary) {
     return <CreateTripScreen onCreate={handleCreate} loading={creating} error={createError} />;
+  }
+
+  if (showCategoryReco) {
+    return (
+      <CategoryRecommendScreen
+        regionCode={itinerary.signguFullCode}
+        excludeContentIds={itinerary.items.map((i) => i.contentId).filter(Boolean)}
+        onAdd={async (place) => {
+          setAddingContentId(place.contentId);
+          try {
+            await addCandidateToItinerary(place);
+          } finally {
+            setAddingContentId(null);
+          }
+        }}
+        addingId={addingContentId}
+        onContinue={() => setShowCategoryReco(false)}
+        onTryAi={() => {
+          setShowCategoryReco(false);
+          setShowAutoPlan(true);
+        }}
+      />
+    );
   }
 
   if (showAutoPlan) {

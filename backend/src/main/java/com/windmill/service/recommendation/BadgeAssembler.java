@@ -31,7 +31,14 @@ public class BadgeAssembler {
     private List<Badge> buildBadges(RecommendationCandidate c, RegionCondition condition, Double regionAverage) {
         List<Badge> badges = new ArrayList<>();
 
-        if (condition != null && condition.getCurrentPop() != null
+        if (condition != null && condition.getCurrentTemp() != null
+                && condition.getCurrentTemp() >= TriggerThresholds.HEAT_TEMP_THRESHOLD) {
+            badges.add(Badge.builder()
+                    .type(Badge.BadgeType.WEATHER)
+                    .label(String.format("폭염 %.0f℃ · 실내 추천", condition.getCurrentTemp()))
+                    .severity(Badge.Severity.DANGER)
+                    .build());
+        } else if (condition != null && condition.getCurrentPop() != null
                 && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD) {
             badges.add(Badge.builder()
                     .type(Badge.BadgeType.WEATHER)

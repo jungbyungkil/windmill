@@ -13,5 +13,5 @@ public class Badge {
 
     public enum BadgeType { WEATHER, CONGESTION, HOURS }
 
-    public enum Severity { INFO, WARNING, SUCCESS }
+    public enum Severity { INFO, WARNING, SUCCESS, DANGER }
 }

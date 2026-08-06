@@ -2,15 +2,22 @@ const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
 export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [] }) {
   return (
-    <div className="reco-card">
-      {candidate.thumbnailUrl ? (
-        <img className="reco-thumb" src={candidate.thumbnailUrl} alt={candidate.placeName} loading="lazy" />
-      ) : (
-        <div className="reco-thumb reco-thumb-placeholder">🌬️</div>
-      )}
+    <article className="reco-card">
+      <div className="reco-media">
+        {candidate.thumbnailUrl ? (
+          <img className="reco-thumb" src={candidate.thumbnailUrl} alt={candidate.placeName} loading="lazy" />
+        ) : (
+          <div className="reco-thumb reco-thumb-placeholder">🌬️</div>
+        )}
+        <div className="reco-media-overlay">
+          <span className="reco-rank">#{candidate.rank}</span>
+          {candidate.crowdRate != null && (
+            <span className="reco-popular-chip">인기 {Math.round(candidate.crowdRate)}</span>
+          )}
+        </div>
+      </div>
 
       <div className="reco-head">
-        <span className="reco-rank">#{candidate.rank}</span>
         <span className="reco-name">{candidate.placeName}</span>
         {candidate.category && <span className="reco-category">{candidate.category}</span>}
       </div>
@@ -63,6 +70,6 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
           </div>
         </div>
       )}
-    </div>
+    </article>
   );
 }

@@ -28,5 +28,5 @@ public class RecommendationRequest {
     private String originContentId;
     private Integer originContentTypeId;
 
-    public enum AvoidanceHint { CROWD, WEATHER, BUSINESS }
+    public enum AvoidanceHint { CROWD, WEATHER, HEAT, BUSINESS }
 }

@@ -61,10 +61,16 @@ public class RecommendationPipeline {
                     TourAttractionDetail origin = tuple.getT1();
                     RegionCondition condition = tuple.getT2();
                     boolean rainAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.WEATHER;
-                    Mono<List<RelatedCandidate>> stage1Result = rainAlternative
-                            ? stage1.fetchIndoor(region)
-                            : stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
-                                    .flatMap(list -> stage1.resolveContentIds(list, region));
+                    boolean heatAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.HEAT;
+                    Mono<List<RelatedCandidate>> stage1Result;
+                    if (heatAlternative) {
+                        stage1Result = stage1.fetchIndoorForHeat(region);
+                    } else if (rainAlternative) {
+                        stage1Result = stage1.fetchIndoor(region);
+                    } else {
+                        stage1Result = stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
+                                .flatMap(list -> stage1.resolveContentIds(list, region));
+                    }
                     return stage1Result
                             .map(list -> list.stream()
                                     .filter(c -> !exclude.contains(c.getContentId()))
@@ -113,11 +119,12 @@ public class RecommendationPipeline {
 
     /**
      * 트리거 우선회피 정렬. 혼잡도 트리거는 Stage3에서 이미 여유율 순으로 정렬되어 있으므로 그대로 두고,
-     * 기상 트리거는 #실내 태그가 매칭된 후보를 앞으로 당긴다.
+     * 비/폭염 트리거는 #실내 태그가 매칭된 후보를 앞으로 당긴다.
      */
     private List<RecommendationCandidate> applyAvoidanceOrdering(List<RecommendationCandidate> candidates,
                                                                    RecommendationRequest.AvoidanceHint hint) {
-        if (hint == RecommendationRequest.AvoidanceHint.WEATHER) {
+        if (hint == RecommendationRequest.AvoidanceHint.WEATHER
+                || hint == RecommendationRequest.AvoidanceHint.HEAT) {
             return candidates.stream()
                     .sorted(Comparator.comparing((RecommendationCandidate c) ->
                             c.getMatchedTags() != null && c.getMatchedTags().contains("#실내") ? 0 : 1))

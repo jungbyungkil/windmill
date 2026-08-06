@@ -5,6 +5,7 @@ const LEVEL_META = {
 };
 
 const CAUSE_META = {
+  heatTrigger: { icon: '🌡️', label: '폭염', avoid: 'HEAT' },
   weatherTrigger: { icon: '🌧️', label: '비 소식', avoid: 'WEATHER' },
   businessTrigger: { icon: '🚫', label: '영업종료/휴무', avoid: 'BUSINESS' },
   crowdTrigger: { icon: '👥', label: '혼잡', avoid: 'CROWD' },
@@ -12,6 +13,7 @@ const CAUSE_META = {
 
 function primaryAvoidHint(trigger) {
   if (!trigger) return undefined;
+  if (trigger.heatTrigger) return 'HEAT';
   if (trigger.weatherTrigger) return 'WEATHER';
   if (trigger.businessTrigger) return 'BUSINESS';
   if (trigger.crowdTrigger) return 'CROWD';
@@ -21,6 +23,7 @@ function primaryAvoidHint(trigger) {
 /**
  * 바람따라의 브랜드 얼굴. trigger가 없으면 정지된 장식용 로고 마크로,
  * 있으면 3단계(NORMAL/WARNING/DANGER) 상태 카드로 렌더링된다.
+ * 폭염+야외 일정이면 DANGER(빨강)로 실내 전환을 알린다.
  */
 export default function PinwheelHero({ trigger, onRequestAlternatives, loading, onAutoReplace, autoLoading }) {
   const level = trigger?.level || 'NORMAL';
@@ -29,6 +32,7 @@ export default function PinwheelHero({ trigger, onRequestAlternatives, loading, 
   const causes = trigger
     ? Object.entries(CAUSE_META).filter(([key]) => trigger[key])
     : [];
+  const heatMode = Boolean(trigger?.heatTrigger);
 
   function handleActivate() {
     if (!interactive || loading) return;
@@ -36,7 +40,7 @@ export default function PinwheelHero({ trigger, onRequestAlternatives, loading, 
   }
 
   return (
-    <div className={`pinwheel-hero level-${level.toLowerCase()} ${interactive ? 'clickable' : ''}`}>
+    <div className={`pinwheel-hero level-${level.toLowerCase()} ${interactive ? 'clickable' : ''} ${heatMode ? 'heat-alert' : ''}`}>
       <div
         className="pinwheel-graphic"
         role={interactive ? 'button' : undefined}
@@ -69,8 +73,12 @@ export default function PinwheelHero({ trigger, onRequestAlternatives, loading, 
 
       {trigger && (
         <div className="pinwheel-status">
-          <div className="pinwheel-caption">{meta.caption}</div>
-          <div className="pinwheel-sub">{meta.sub}</div>
+          <div className="pinwheel-caption">
+            {heatMode ? '폭염이에요 · 실내로 바꾸세요' : meta.caption}
+          </div>
+          <div className="pinwheel-sub">
+            {heatMode ? '야외 일정이 있어요. 실내 활동으로 전환을 권해요.' : meta.sub}
+          </div>
 
           {trigger.triggerDetails?.length > 0 && (
             <ul className="pinwheel-details">
@@ -81,7 +89,7 @@ export default function PinwheelHero({ trigger, onRequestAlternatives, loading, 
           {interactive && (
             <div className="pinwheel-cta-row">
               <button className="btn-pinwheel-cta" onClick={handleActivate} disabled={loading}>
-                {loading ? '새 코스 찾는 중...' : '🌬️ 새 코스 추천받기'}
+                {loading ? '새 코스 찾는 중...' : heatMode ? '🏠 실내 코스 추천받기' : '🌬️ 새 코스 추천받기'}
               </button>
               <button
                 className="btn-pinwheel-cta secondary"

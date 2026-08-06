@@ -1,41 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
 :root {
-  --sea: #0f6e8c;
-  --sea-deep: #0a4f66;
-  --sky: #4fb3d9;
-  --sand: #faf5ea;
+  --sea: #0c6b86;
+  --sea-deep: #084d63;
+  --sky: #3aa8d0;
+  --breeze: #7ec8e3;
+  --sand: #eef6f9;
   --sand-card: #ffffff;
-  --sand-border: #e7ddc9;
-  --ink: #1c2b33;
-  --muted: #5b6b73;
-  --shadow: 0 10px 24px -12px rgba(15, 60, 80, 0.25), 0 2px 6px -2px rgba(15, 60, 80, 0.12);
+  --sand-border: #d3e4ec;
+  --ink: #132832;
+  --muted: #5a717c;
+  --shadow: 0 14px 32px -18px rgba(8, 70, 90, 0.35), 0 4px 10px -4px rgba(8, 70, 90, 0.12);
+  --radius-lg: 18px;
+  --radius-md: 14px;
 
   --level-normal: #12a594;
   --level-warning: #f59e0b;
   --level-danger: #e0483f;
 
-  --sans: 'Noto Sans KR', system-ui, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: light dark;
+  --display: 'Outfit', 'Noto Sans KR', sans-serif;
+  --sans: 'Noto Sans KR', system-ui, sans-serif;
+  color-scheme: light;
   font-family: var(--sans);
   color: var(--ink);
-  background: var(--sand);
+  background:
+    radial-gradient(1200px 480px at 10% -10%, rgba(62, 180, 214, 0.18), transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, rgba(18, 165, 148, 0.1), transparent 50%),
+    var(--sand);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --sea: #4fb3d9;
-    --sea-deep: #2c86ab;
-    --sky: #6fc6e6;
-    --sand: #0b141b;
-    --sand-card: #121e27;
-    --sand-border: #223441;
-    --ink: #e8f0f4;
-    --muted: #93a7b0;
-    --shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
-  }
 }
 
 * {
@@ -48,9 +43,10 @@ body {
 }
 
 h1, h2, h3 {
-  font-family: var(--sans);
+  font-family: var(--display);
   color: var(--ink);
   margin: 0 0 8px;
+  letter-spacing: -0.02em;
 }
 
 p {

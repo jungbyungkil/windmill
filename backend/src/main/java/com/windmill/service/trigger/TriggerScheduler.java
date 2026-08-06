@@ -39,20 +39,20 @@ public class TriggerScheduler {
     }
 
     private Mono<RegionCondition> refresh(RegionCode region) {
-        return Mono.zip(refreshCrowdRates(region), refreshWeather(region).defaultIfEmpty(EMPTY_POP))
+        return Mono.zip(refreshCrowdRates(region), refreshWeatherSnapshot(region).defaultIfEmpty(EMPTY_WEATHER))
                 .map(tuple -> {
-                    JsonNode popItem = tuple.getT2();
-                    Double pop = popItem == EMPTY_POP ? null : popItem.path("fcstValue").asDouble();
-                    String fcstTime = popItem == EMPTY_POP ? null : popItem.path("fcstTime").asText(null);
+                    WeatherSnapshot weather = tuple.getT2() == EMPTY_WEATHER ? WeatherSnapshot.EMPTY : tuple.getT2();
                     RegionCondition condition = RegionCondition.builder()
                             .crowdRateByPlaceName(tuple.getT1())
-                            .currentPop(pop)
-                            .currentPopFcstTime(fcstTime)
+                            .currentPop(weather.pop)
+                            .currentPopFcstTime(weather.popFcstTime)
+                            .currentTemp(weather.temp)
                             .refreshedAt(Instant.now())
                             .build();
                     cache.put(region.getSignguFullCode(), condition);
-                    log.info("[TriggerScheduler] {} 캐시 갱신 완료 (집중률 {}건, POP={} @ {}시)",
-                            region.getSignguName(), condition.getCrowdRateByPlaceName().size(), pop, fcstTime);
+                    log.info("[TriggerScheduler] {} 캐시 갱신 완료 (집중률 {}건, POP={} @ {}시, TMP={}℃)",
+                            region.getSignguName(), condition.getCrowdRateByPlaceName().size(),
+                            weather.pop, weather.popFcstTime, weather.temp);
                     return condition;
                 });
     }
@@ -76,30 +76,47 @@ public class TriggerScheduler {
                 .onErrorReturn(Map.of());
     }
 
-    /** Mono는 null을 emit할 수 없어, 날씨 미조회/미설정 상태를 나타내는 빈 노드 sentinel */
-    private static final JsonNode EMPTY_POP = NullNode.getInstance();
+    private static final WeatherSnapshot EMPTY_WEATHER = WeatherSnapshot.EMPTY;
 
-    private Mono<JsonNode> refreshWeather(RegionCode region) {
+    private Mono<WeatherSnapshot> refreshWeatherSnapshot(RegionCode region) {
         if (!weatherClient.isConfigured() || region.getWeatherNx() == null || region.getWeatherNy() == null) {
             return Mono.empty();
         }
         return weatherClient.getVillageForecast(region.getWeatherNx(), region.getWeatherNy())
-                .flatMap(items -> {
-                    JsonNode popItem = extractLatestPopItem(items);
-                    return popItem == null ? Mono.empty() : Mono.just(popItem);
-                })
+                .map(this::extractWeatherSnapshot)
+                .filter(snapshot -> snapshot.pop != null || snapshot.temp != null)
                 .onErrorResume(e -> Mono.empty());
     }
 
-    /** 발표 회차 예보 중 가장 이른(현재에 가장 가까운) 시각의 강수확률(POP) 항목 원본을 사용 */
-    private JsonNode extractLatestPopItem(List<JsonNode> items) {
+    private WeatherSnapshot extractWeatherSnapshot(List<JsonNode> items) {
+        JsonNode popItem = earliestByCategory(items, "POP");
+        JsonNode tmpItem = earliestByCategory(items, "TMP");
+        Double pop = popItem == null ? null : popItem.path("fcstValue").asDouble();
+        String popTime = popItem == null ? null : popItem.path("fcstTime").asText(null);
+        Double temp = tmpItem == null ? null : tmpItem.path("fcstValue").asDouble();
+        // 일최고기온(TMX)이 있으면 폭염 판정에 더 적합하므로 더 높은 값 사용
+        JsonNode tmxItem = earliestByCategory(items, "TMX");
+        if (tmxItem != null) {
+            double tmx = tmxItem.path("fcstValue").asDouble();
+            if (temp == null || tmx > temp) {
+                temp = tmx;
+            }
+        }
+        return new WeatherSnapshot(pop, popTime, temp);
+    }
+
+    private JsonNode earliestByCategory(List<JsonNode> items, String category) {
         return items.stream()
-                .filter(i -> "POP".equals(i.path("category").asText()))
+                .filter(i -> category.equals(i.path("category").asText()))
                 .min((a, b) -> {
                     String ta = a.path("fcstDate").asText("") + a.path("fcstTime").asText("");
                     String tb = b.path("fcstDate").asText("") + b.path("fcstTime").asText("");
                     return ta.compareTo(tb);
                 })
                 .orElse(null);
+    }
+
+    private record WeatherSnapshot(Double pop, String popFcstTime, Double temp) {
+        static final WeatherSnapshot EMPTY = new WeatherSnapshot(null, null, null);
     }
 }

@@ -38,10 +38,10 @@ export default function WeatherBanner({ items }) {
   if (!weather) return null;
 
   return (
-    <div className={`weather-banner ${weather.rainy ? 'rainy' : ''}`}>
-      <span className="weather-icon">{weather.icon}</span>
+    <div className={`weather-banner ${weather.rainy ? 'rainy' : ''} ${weather.temp >= 33 ? 'heat' : ''}`}>
+      <span className="weather-icon">{weather.temp >= 33 ? '🌡️' : weather.icon}</span>
       <div className="weather-info">
-        <span className="weather-condition">{weather.condition}</span>
+        <span className="weather-condition">{weather.temp >= 33 ? '폭염 주의' : weather.condition}</span>
         {weather.temp !== null && <span className="weather-temp">{weather.temp}°C</span>}
         {weather.pop !== null && <span className="weather-pop">강수확률 {weather.pop}%</span>}
         {weather.humidity !== null && <span className="weather-humidity">습도 {weather.humidity}%</span>}

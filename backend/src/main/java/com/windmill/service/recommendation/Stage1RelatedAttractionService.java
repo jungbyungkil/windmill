@@ -120,27 +120,59 @@ public class Stage1RelatedAttractionService {
     public Mono<List<RelatedCandidate>> fetchIndoor(RegionCode region) {
         return korServiceClient.areaBasedList(INDOOR_CONTENT_TYPE_ID, region.getLDongRegnCd(), region.getLDongSignguCd(),
                         MAX_CANDIDATES, 1, "C")
-                .map(items -> {
-                    List<RelatedCandidate> result = new ArrayList<>();
-                    int rank = 1;
-                    for (JsonNode item : items) {
-                        String name = item.path("title").asText(null);
-                        if (name == null || name.isBlank()) {
-                            continue;
+                .map(items -> mapKorItems(items, "실내"));
+    }
+
+    /**
+     * 폭염 시 실내 대체 - 문화시설 + 카페를 함께 모아 야외 일정을 대체할 실내 후보를 넓힌다.
+     */
+    public Mono<List<RelatedCandidate>> fetchIndoorForHeat(RegionCode region) {
+        Mono<List<RelatedCandidate>> culture = fetchIndoor(region);
+        Mono<List<RelatedCandidate>> cafes = korServiceClient
+                .searchKeyword("카페", 39, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                .map(items -> mapKorItems(items, "실내"));
+        return Mono.zip(culture, cafes)
+                .map(tuple -> {
+                    Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
+                    for (RelatedCandidate c : tuple.getT1()) {
+                        if (c.getContentId() != null) {
+                            byId.put(c.getContentId(), c);
                         }
-                        String thumbnail = item.path("firstimage").asText(null);
-                        result.add(RelatedCandidate.builder()
-                                .placeName(name)
-                                .contentId(item.path("contentid").asText(null))
-                                .contentTypeId(parseContentTypeId(item))
-                                .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
-                                .categoryLcls("실내")
-                                .rank(rank++)
-                                .build());
                     }
-                    log.info("[Stage1] 우천 대체(실내) 후보 {}건 확보", result.size());
+                    for (RelatedCandidate c : tuple.getT2()) {
+                        if (c.getContentId() != null) {
+                            byId.putIfAbsent(c.getContentId(), c);
+                        }
+                    }
+                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
+                    if (result.size() > MAX_CANDIDATES) {
+                        result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
+                    }
+                    log.info("[Stage1] 폭염 대체(실내) 후보 {}건 확보", result.size());
                     return result;
                 });
+    }
+
+    private List<RelatedCandidate> mapKorItems(List<JsonNode> items, String categoryLcls) {
+        List<RelatedCandidate> result = new ArrayList<>();
+        int rank = 1;
+        for (JsonNode item : items) {
+            String name = item.path("title").asText(null);
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            String thumbnail = item.path("firstimage").asText(null);
+            result.add(RelatedCandidate.builder()
+                    .placeName(name)
+                    .contentId(item.path("contentid").asText(null))
+                    .contentTypeId(parseContentTypeId(item))
+                    .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
+                    .categoryLcls(categoryLcls)
+                    .rank(rank++)
+                    .build());
+        }
+        log.info("[Stage1] {} 후보 {}건 확보", categoryLcls, result.size());
+        return result;
     }
 
     private Integer parseContentTypeId(JsonNode item) {

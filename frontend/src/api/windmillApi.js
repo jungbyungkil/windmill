@@ -81,6 +81,11 @@ export function getRecommendations({ regionCode, withPet, companionType, seedPla
   return request(`/recommendations${qs({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
+/** 카테고리별 장소 추천 (식당/박물관/키즈카페/카페) - 방문자(집중률) 우선 */
+export function getCategoryRecommendations({ regionCode, excludeContentIds } = {}) {
+  return request(`/recommendations/by-category${qs({ regionCode, excludeContentIds })}`);
+}
+
 export function getWeather(nx, ny) {
   return request(`/weather${qs({ nx, ny })}`);
 }
