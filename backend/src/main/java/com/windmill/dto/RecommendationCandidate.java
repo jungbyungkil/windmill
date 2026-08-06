@@ -30,6 +30,7 @@ public class RecommendationCandidate {
     private Double distanceKm;      // 이전 장소와의 구간 거리(스마트 플랜) 또는 origin 기준 거리
     private String mapX;            // 경도 - 동선 최적화용
     private String mapY;            // 위도 - 동선 최적화용
+    private String visitDate;       // 스마트 플랜 다일 배정용 "YYYY-MM-DD"
     private Boolean businessOpen;   // Stage2 결과 - RelatedCandidate에서 그대로 넘어옴, 모르면 null
     private List<Badge> badges;     // 날씨/혼잡/영업 실시간 상태 배지 - RecommendationPipeline에서 조립
 }

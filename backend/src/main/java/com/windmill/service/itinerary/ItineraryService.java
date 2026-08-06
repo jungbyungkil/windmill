@@ -110,6 +110,9 @@ public class ItineraryService {
         if (request.getScheduledTime() != null) {
             item.setScheduledTime(request.getScheduledTime());
         }
+        if (request.getVisitDate() != null && !request.getVisitDate().isBlank()) {
+            item.setVisitDate(LocalDate.parse(request.getVisitDate()));
+        }
         return itineraryRepository.save(itinerary);
     }
 

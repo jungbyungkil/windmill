@@ -77,9 +77,9 @@ export function getAutoPlan(itineraryId, { tags, query, placeCount } = {}) {
   return request(`/itineraries/${itineraryId}/auto-plan${qs({ tags, query, placeCount })}`);
 }
 
-/** 혼잡↓ · 날씨 · 동선 최적화 스마트 일정 (핵심 플로우) */
-export function getSmartPlan(itineraryId, { placeCount } = {}) {
-  return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount })}`);
+/** 혼잡↓ · 날씨 · 동선 최적화 스마트 일정 (핵심 플로우). date면 해당 일자만 */
+export function getSmartPlan(itineraryId, { placeCount, date } = {}) {
+  return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date })}`);
 }
 
 export function getRecommendations({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {

@@ -8,4 +8,6 @@ public class UpdateItineraryItemRequest {
     private String pinnedReason;
     private Integer displayOrder;
     private String scheduledTime;
+    /** 다른 날로 옮기기 - "YYYY-MM-DD" */
+    private String visitDate;
 }

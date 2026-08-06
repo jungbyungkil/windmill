@@ -73,10 +73,10 @@ export default function TripStoryFeed() {
     <section className="trip-story-feed" aria-label="다른 여행자들의 기록">
       <div className="trip-story-feed-head">
         <h2 className="trip-story-feed-title">바람따라 여행 기록</h2>
-        <p className="trip-story-feed-sub">좋아요·관심 많은 여행 스토리 Top 5</p>
+        <p className="trip-story-feed-sub">좋아요·관심 많은 여행 스토리 Top 5 · 옆으로 넘겨 보세요</p>
       </div>
 
-      <div className="trip-story-list">
+      <div className="trip-story-list" role="list">
         {stories.map((story, index) => {
           const expanded = expandedId === story.id;
           const liked = likedIds.has(story.id);

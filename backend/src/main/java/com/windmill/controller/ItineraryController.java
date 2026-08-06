@@ -133,10 +133,11 @@ public class ItineraryController {
     @GetMapping("/{id}/smart-plan")
     public Mono<ResponseEntity<SmartPlanResponse>> smartPlan(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "5") int placeCount) {
+            @RequestParam(defaultValue = "0") int placeCount,
+            @RequestParam(required = false) LocalDate date) {
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(itinerary -> smartPlanService.build(itinerary, placeCount))
+                .flatMap(itinerary -> smartPlanService.build(itinerary, placeCount, date))
                 .map(ResponseEntity::ok);
     }
 

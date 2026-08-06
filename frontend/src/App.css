@@ -1435,14 +1435,33 @@
 
 .trip-story-list {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 4px;
+  padding: 4px 4px 12px;
+  margin: 0 -4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.trip-story-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.trip-story-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--sea) 35%, transparent);
+  border-radius: 999px;
 }
 
 .trip-story-card {
-  display: grid;
-  grid-template-columns: 112px 1fr;
-  gap: 0;
+  flex: 0 0 min(78vw, 280px);
+  width: min(78vw, 280px);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
   background: var(--sand-card);
   border: 1px solid var(--sand-border);
   border-radius: var(--radius-lg);
@@ -1460,7 +1479,8 @@
 
 .trip-story-media {
   position: relative;
-  min-height: 112px;
+  height: 140px;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #cfe8f2, #9fd0e2);
 }
 
@@ -1468,7 +1488,6 @@
 .trip-story-placeholder {
   width: 100%;
   height: 100%;
-  min-height: 112px;
   object-fit: cover;
   display: block;
 }
@@ -1562,12 +1581,6 @@
   color: var(--muted);
 }
 
-@media (max-width: 420px) {
-  .trip-story-card {
-    grid-template-columns: 96px 1fr;
-  }
-}
-
 /* ---------- Skeletons ---------- */
 
 .skeleton-list {
@@ -1642,33 +1655,58 @@
 .day-tabs {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: var(--sand-card);
+  gap: 12px;
+  background: linear-gradient(180deg, #fff 0%, var(--sand-card) 100%);
   border: 1px solid var(--sand-border);
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+.day-tabs-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.day-tabs-summary strong {
+  font-size: 15px;
+  color: var(--ink);
 }
 
 .day-tabs-row {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
 }
 
 .day-tab {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  min-width: 72px;
+  scroll-snap-align: start;
   background: var(--sand);
   border: 1.5px solid var(--sand-border);
-  border-radius: 999px;
-  padding: 7px 14px;
+  border-radius: 14px;
+  padding: 10px 12px;
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
-  white-space: nowrap;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.day-tab:hover {
+  transform: translateY(-1px);
 }
 
 .day-tab.active {
@@ -1678,15 +1716,38 @@
 }
 
 .day-tab.confirmed {
-  color: var(--level-normal);
+  border-color: color-mix(in srgb, var(--level-normal) 50%, var(--sand-border));
 }
 
-.day-tab.active.confirmed {
-  color: var(--sea-deep);
+.day-tab.empty .day-tab-count.zero {
+  opacity: 0.45;
 }
 
-.day-tab-check {
+.day-tab-no {
+  font-size: 14px;
+  font-weight: 800;
+  color: inherit;
+}
+
+.day-tab-md {
   font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.day-tab-count {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--sea) 12%, transparent);
+  color: var(--sea-deep);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.day-tab.active .day-tab-count {
+  background: var(--sea);
+  color: #fff;
 }
 
 .day-tabs-actions {
@@ -1697,6 +1758,7 @@
 
 .btn-day-confirm {
   flex: 1;
+  min-width: 100px;
   background: transparent;
   border: 1.5px solid var(--level-normal);
   color: var(--level-normal);
@@ -1715,6 +1777,29 @@
   opacity: 0.6;
 }
 
+.btn-day-nav,
+.btn-day-plan {
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1.5px solid var(--sand-border);
+  background: var(--sand);
+  color: var(--ink);
+}
+
+.btn-day-nav.primary {
+  border-color: var(--sea);
+  color: var(--sea-deep);
+  background: color-mix(in srgb, var(--sea) 12%, transparent);
+}
+
+.btn-day-plan {
+  border-color: var(--sea);
+  color: #fff;
+  background: var(--sea);
+}
+
 .btn-day-next {
   flex: 1;
   background: var(--sea);
@@ -1730,6 +1815,66 @@
   background: var(--sand);
   color: var(--muted);
   cursor: not-allowed;
+}
+
+.itinerary-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.itinerary-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sea-deep);
+  background: color-mix(in srgb, var(--sea) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.itinerary-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 20px 16px;
+  border: 1.5px dashed var(--sand-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--sand) 60%, white);
+}
+
+.itinerary-empty .empty-state {
+  margin: 0;
+  text-align: center;
+}
+
+.itinerary-empty-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.item-move-day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.item-move-day select {
+  flex: 1;
+  border: 1px solid var(--sand-border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: var(--sand);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 /* ---------- Smart plan (core flow) ---------- */
@@ -1793,6 +1938,42 @@
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   box-shadow: var(--shadow);
+}
+
+.smart-plan-day {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+  border-top: 1px solid var(--sand-border);
+}
+
+.smart-plan-day:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.smart-plan-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.smart-plan-day-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.smart-plan-day-km {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.empty-state.compact {
+  padding: 12px;
+  font-size: 13px;
 }
 
 .smart-plan-strategy-label {
