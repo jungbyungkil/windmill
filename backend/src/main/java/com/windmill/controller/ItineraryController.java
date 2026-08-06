@@ -111,12 +111,11 @@ public class ItineraryController {
             @PathVariable Long id,
             @RequestParam(required = false) RecommendationRequest.AvoidanceHint avoid,
             @RequestParam(required = false) String seedPlaceName) {
-        String reason = null;
-        if (avoid == RecommendationRequest.AvoidanceHint.WEATHER) {
-            reason = "RAIN_ALTERNATIVE";
-        } else if (avoid == RecommendationRequest.AvoidanceHint.HEAT) {
-            reason = "HEAT_ALTERNATIVE";
-        }
+        final String reason = avoid == RecommendationRequest.AvoidanceHint.WEATHER
+                ? "RAIN_ALTERNATIVE"
+                : avoid == RecommendationRequest.AvoidanceHint.HEAT
+                        ? "HEAT_ALTERNATIVE"
+                        : null;
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> recommendationPipeline.recommend(buildAlternativeRequest(itinerary, avoid, seedPlaceName)))
