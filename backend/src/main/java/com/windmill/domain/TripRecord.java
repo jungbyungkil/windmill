@@ -2,6 +2,7 @@ package com.windmill.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,6 +39,18 @@ public class TripRecord {
     @Builder.Default
     @Column(nullable = false)
     private int rerouteCount = 0;
+
+    /** 첫 화면 피드 정렬용 - 다른 여행자의 좋아요 수 */
+    @Builder.Default
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private int likeCount = 0;
+
+    /** 첫 화면 피드 정렬용 - 카드 클릭(조회) 수 */
+    @Builder.Default
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private int clickCount = 0;
 
     // EAGER: open-in-view=false + 트랜잭션 밖 DTO 변환 조합에서 LAZY면 LazyInitializationException 발생 (Itinerary.items 참고)
     @Builder.Default

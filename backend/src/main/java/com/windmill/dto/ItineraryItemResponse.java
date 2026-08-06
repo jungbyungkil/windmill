@@ -27,6 +27,8 @@ public class ItineraryItemResponse {
     private String useFeeText;
     private Boolean isFree;
     private String restDateText;
+    private String mapX;
+    private String mapY;
 
     public static ItineraryItemResponse from(ItineraryItem item) {
         return ItineraryItemResponse.builder()
@@ -47,6 +49,8 @@ public class ItineraryItemResponse {
                 .useFeeText(item.getUseFeeText())
                 .isFree(item.getIsFree())
                 .restDateText(item.getRestDateText())
+                .mapX(item.getMapX())
+                .mapY(item.getMapY())
                 .build();
     }
 }

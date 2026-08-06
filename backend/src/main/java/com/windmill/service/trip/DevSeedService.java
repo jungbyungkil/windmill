@@ -45,7 +45,8 @@ public class DevSeedService {
     }
 
     private record TripSpec(String uuid, LocalDate start, LocalDate end, CompanionType companionType,
-                             boolean withPet, LocalDateTime completedAt, List<ItemSpec> items) {
+                             boolean withPet, LocalDateTime completedAt, String note,
+                             int likeCount, int clickCount, List<ItemSpec> items) {
     }
 
     /** @return 실제로 시드했으면 true, 이미 충분한 기록이 있어 건너뛰었으면 false */
@@ -101,7 +102,10 @@ public class DevSeedService {
                 .sessionUuid(spec.uuid())
                 .itinerary(itinerary)
                 .overallRating(VisitRating.GOOD)
+                .overallNote(spec.note())
                 .rerouteCount(rerouteCount)
+                .likeCount(spec.likeCount())
+                .clickCount(spec.clickCount())
                 .completedAt(spec.completedAt())
                 .build();
 
@@ -142,6 +146,8 @@ public class DevSeedService {
                 new TripSpec("uuid-sokcho-0001",
                         LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 12),
                         CompanionType.SOLO, false, LocalDateTime.of(2026, 7, 12, 20, 15),
+                        "혼자 속초 바람 맞으며 힐링했어요. 해수욕장이 최고!",
+                        12, 34,
                         List.of(
                                 new ItemSpec(1, "오전", "속초해수욕장", "C0001", "해변", VisitRating.GOOD, false),
                                 new ItemSpec(1, "점심", "중앙시장 닭강정 골목", "C0002", "맛집", VisitRating.GOOD, false),
@@ -151,6 +157,8 @@ public class DevSeedService {
                 new TripSpec("uuid-sokcho-0002",
                         LocalDate.of(2026, 7, 18), LocalDate.of(2026, 7, 19),
                         CompanionType.COUPLE, false, LocalDateTime.of(2026, 7, 19, 19, 40),
+                        "연인과 짧은 1박2일, 동해가 예뻤어요.",
+                        9, 21,
                         List.of(
                                 new ItemSpec(1, "오전", "속초해수욕장", "C0001", "해변", VisitRating.GOOD, false),
                                 new ItemSpec(1, "점심", "중앙시장 닭강정 골목", "C0002", "맛집", VisitRating.GOOD, false),
@@ -159,6 +167,8 @@ public class DevSeedService {
                 new TripSpec("uuid-sokcho-0003",
                         LocalDate.of(2026, 7, 25), LocalDate.of(2026, 7, 27),
                         CompanionType.FAMILY_4, false, LocalDateTime.of(2026, 7, 27, 21, 5),
+                        "아이들과 함께라 동선이 바뀌었는데 바람개비가 잘 도와줬어요.",
+                        18, 47,
                         List.of(
                                 new ItemSpec(1, "오전", "속초해수욕장", "C0001", "해변", VisitRating.GOOD, false),
                                 new ItemSpec(1, "점심", "중앙시장 닭강정 골목", "C0002", "맛집", VisitRating.GOOD, false),
@@ -168,6 +178,8 @@ public class DevSeedService {
                 new TripSpec("uuid-sokcho-0004",
                         LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2),
                         CompanionType.SOLO, true, LocalDateTime.of(2026, 8, 2, 18, 50),
+                        "반려견이랑도 편하게 다닐 수 있는 코스였어요.",
+                        7, 15,
                         List.of(
                                 new ItemSpec(1, "오전", "속초해수욕장", "C0001", "해변", VisitRating.GOOD, false),
                                 new ItemSpec(1, "오후", "속초 아바이마을", "C0003", "관광지", VisitRating.GOOD, false),
@@ -175,6 +187,8 @@ public class DevSeedService {
                 new TripSpec("uuid-sokcho-0005",
                         LocalDate.of(2026, 8, 8), LocalDate.of(2026, 8, 10),
                         CompanionType.EXTENDED_FAMILY, false, LocalDateTime.of(2026, 8, 10, 20, 30),
+                        "대가족이 함께해도 식사·동선이 잘 맞았어요.",
+                        5, 11,
                         List.of(
                                 new ItemSpec(1, "오전", "속초해수욕장", "C0001", "해변", VisitRating.GOOD, false),
                                 new ItemSpec(1, "점심", "대포항 회센터", "C0005", "맛집", VisitRating.GOOD, false),

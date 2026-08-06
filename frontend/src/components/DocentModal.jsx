@@ -1,13 +1,53 @@
-export default function DocentModal({ open, placeName, script, audioUrl, loading, error, onClose }) {
+const LANGS = [
+  { value: 'ko', label: '한국어' },
+  { value: 'en', label: 'English' },
+  { value: 'ja', label: '日本語' },
+  { value: 'zh', label: '中文' },
+];
+
+/**
+ * 케이팝 콘셉트 도슨트 - 외국어 선택 시 K-pop 브이로그 톤 + 밝은 TTS 보이스.
+ */
+export default function DocentModal({
+  open,
+  placeName,
+  script,
+  audioUrl,
+  loading,
+  error,
+  language,
+  onLanguageChange,
+  onClose,
+}) {
   if (!open) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel docent-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>🎧 바람이의 도슨트</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+          <h3>🎧 바람이 Docent</h3>
+          <button className="icon-btn" type="button" onClick={onClose}>✕</button>
         </div>
+
+        <div className="docent-lang-row" role="group" aria-label="Language">
+          {LANGS.map((l) => (
+            <button
+              key={l.value}
+              type="button"
+              className={`docent-lang-btn ${language === l.value ? 'selected' : ''}`}
+              onClick={() => onLanguageChange?.(l.value)}
+              disabled={loading}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="modal-desc docent-concept">
+          {language === 'ko'
+            ? 'K-pop 브이로그 톤으로 안내해요.'
+            : 'K-pop style travel buddy — bright, short, and fun for visitors.'}
+        </p>
 
         <div className="docent-card">
           <div className="docent-avatar">🌬️</div>
@@ -24,7 +64,7 @@ export default function DocentModal({ open, placeName, script, audioUrl, loading
           {!loading && error && <p className="error-msg">❌ {error}</p>}
 
           {!loading && !error && audioUrl && (
-            <audio className="docent-audio" controls src={audioUrl}>
+            <audio className="docent-audio" controls autoPlay src={audioUrl}>
               브라우저가 오디오 재생을 지원하지 않아요.
             </audio>
           )}

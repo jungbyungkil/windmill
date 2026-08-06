@@ -9,11 +9,13 @@ import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
+import com.windmill.dto.SmartPlanResponse;
 import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.ItineraryService;
 import com.windmill.service.recommendation.InitialPlanService;
 import com.windmill.service.recommendation.RecommendationPipeline;
+import com.windmill.service.recommendation.SmartPlanService;
 import com.windmill.service.trigger.TriggerDetectionService;
 import com.windmill.service.trip.TripRecordService;
 import jakarta.validation.Valid;
@@ -37,6 +39,7 @@ public class ItineraryController {
     private final TriggerDetectionService triggerDetectionService;
     private final RecommendationPipeline recommendationPipeline;
     private final InitialPlanService initialPlanService;
+    private final SmartPlanService smartPlanService;
     private final TripRecordService tripRecordService;
 
     @PostMapping
@@ -120,6 +123,39 @@ public class ItineraryController {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> recommendationPipeline.recommend(buildAlternativeRequest(itinerary, avoid, seedPlaceName)))
                 .map(candidates -> AlternativesResponse.builder().candidates(candidates).reason(reason).build())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 핵심 스마트 일정: TourAPI 후보 → 혼잡↓ 필터 → 날씨 실내 전환 → 동선 최적화 → 시각 배정.
+     * AI가 장소를 만들지 않으며, 검증된 API 데이터만 사용한다.
+     */
+    @GetMapping("/{id}/smart-plan")
+    public Mono<ResponseEntity<SmartPlanResponse>> smartPlan(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "5") int placeCount) {
+        return Mono.fromCallable(() -> itineraryService.get(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(itinerary -> smartPlanService.build(itinerary, placeCount))
+                .map(ResponseEntity::ok);
+    }
+
+    /** 동선 꼬임 자동 재배치 - 해당 일자 순서를 최적화하고 시각을 다시 붙인다 */
+    @PostMapping("/{id}/optimize-route")
+    public Mono<ResponseEntity<ItineraryResponse>> optimizeRoute(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date) {
+        return Mono.fromCallable(() -> itineraryService.optimizeRoute(id, date))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ItineraryResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
+    /** 완성 일정 공유 토큰 발급 */
+    @PostMapping("/{id}/share")
+    public Mono<ResponseEntity<com.windmill.dto.SharedItineraryResponse>> share(@PathVariable Long id) {
+        return Mono.fromCallable(() -> itineraryService.createShare(id))
+                .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
     }
 

@@ -45,7 +45,7 @@ public class OpenAiTtsProvider implements TtsProvider {
         }
         Map<String, Object> body = Map.of(
                 "model", model,
-                "voice", voice,
+                "voice", pickVoice(language),
                 "input", scriptText,
                 "response_format", "mp3");
 
@@ -60,5 +60,13 @@ public class OpenAiTtsProvider implements TtsProvider {
                     log.error("OpenAI TTS 합성 실패: {}", e.getMessage());
                     return Mono.empty();
                 });
+    }
+
+    /** 외국어는 밝은 톤(nova/shimmer), 한국어는 설정된 기본 보이스 */
+    private String pickVoice(String language) {
+        if (language == null || language.equalsIgnoreCase("ko")) {
+            return voice;
+        }
+        return "nova";
     }
 }

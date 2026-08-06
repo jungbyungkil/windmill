@@ -26,4 +26,6 @@ public class AddItineraryItemRequest {
     private String restDateText;
     private String category;
     private boolean isAlternate;
+    private String mapX;
+    private String mapY;
 }

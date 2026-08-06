@@ -5,6 +5,7 @@ import com.windmill.dto.CreateTripRecordRequest;
 import com.windmill.dto.RecommendedScheduleResponse;
 import com.windmill.dto.RegionTripHighlightResponse;
 import com.windmill.dto.TripRecordResponse;
+import com.windmill.dto.TripStoryFeedResponse;
 import com.windmill.service.trip.CommunityScheduleService;
 import com.windmill.service.trip.TripRecordService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,28 @@ public class TripRecordController {
         return Mono.fromCallable(() -> tripRecordService.create(sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(TripRecordResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
+    /** 첫 화면 인기 여행 기록 피드 - 좋아요·클릭 순 상위 5건 */
+    @GetMapping("/feed")
+    public Mono<ResponseEntity<List<TripStoryFeedResponse>>> feed() {
+        return Mono.fromCallable(tripRecordService::findPopularStories)
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    @PostMapping("/{id}/like")
+    public Mono<ResponseEntity<TripStoryFeedResponse>> like(@PathVariable Long id) {
+        return Mono.fromCallable(() -> tripRecordService.incrementLike(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    @PostMapping("/{id}/click")
+    public Mono<ResponseEntity<TripStoryFeedResponse>> click(@PathVariable Long id) {
+        return Mono.fromCallable(() -> tripRecordService.incrementClick(id))
+                .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
     }
 

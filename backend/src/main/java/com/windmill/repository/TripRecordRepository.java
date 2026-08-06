@@ -18,4 +18,7 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, Long> {
 
     List<TripRecord> findTop200ByItinerary_SignguFullCodeAndItinerary_CompanionTypeOrderByCompletedAtDesc(
             String signguFullCode, CompanionType companionType);
+
+    /** 첫 화면 피드 - 좋아요 → 클릭 → 최근 완료 순 상위 5건 */
+    List<TripRecord> findTop5ByOrderByLikeCountDescClickCountDescCompletedAtDesc();
 }

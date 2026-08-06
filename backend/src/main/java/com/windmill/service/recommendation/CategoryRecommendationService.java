@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 /**
  * DB 없이 TourAPI + 집중률(방문자 추이) API로 카테고리별 장소를 구성한다.
- * 정렬 우선순위: 방문자(집중률) 높은 순 → 썸네일 있는 곳 → 이름.
+ * 정렬 우선순위: 혼잡도(집중률) 낮은 순(여유로운 곳) → 썸네일 있는 곳 → 이름.
  */
 @Slf4j
 @Service
@@ -214,20 +214,19 @@ public class CategoryRecommendationService {
     }
 
     private String oneLiner(PlaceCategory category, String placeName, Double crowdRate) {
-        if (crowdRate != null && crowdRate >= 70) {
-            return placeName + " · 방문자 많은 인기 " + category.getLabel();
+        if (crowdRate != null && crowdRate < 50) {
+            return placeName + " · 지금 여유로워요 (혼잡 " + Math.round(crowdRate) + "%)";
         }
         if (crowdRate != null) {
-            return placeName + " · 여유롭게 즐기기 좋은 " + category.getSubLabel();
+            return placeName + " · 여유율 " + Math.round(100 - crowdRate) + "% " + category.getSubLabel();
         }
         return category.getSubLabel() + "으로 추천하는 " + placeName;
     }
 
-    /** 방문자(집중률) 높은 순 → 썸네일 있는 곳 → 이름 */
+    /** 방문자(집중률) 낮은 순 = 여유로운 곳 우선 → 썸네일 있는 곳 → 이름 */
     private Comparator<RecommendationCandidate> visitorPriorityComparator() {
         return Comparator
-                .comparing((RecommendationCandidate c) -> c.getCrowdRate() == null ? Double.NEGATIVE_INFINITY : c.getCrowdRate(),
-                        Comparator.reverseOrder())
+                .comparing((RecommendationCandidate c) -> c.getCrowdRate() == null ? Double.POSITIVE_INFINITY : c.getCrowdRate())
                 .thenComparing(c -> c.getThumbnailUrl() == null || c.getThumbnailUrl().isBlank() ? 1 : 0)
                 .thenComparing(c -> c.getPlaceName() == null ? "" : c.getPlaceName());
     }

@@ -37,6 +37,10 @@ public class ItineraryItem {
     /** firstimage - 없으면 null(프론트에서 플레이스홀더 표시) */
     private String thumbnailUrl;
 
+    /** TourAPI mapx/mapy - 동선 꼬임 감지·자동 재배치에 사용 */
+    private String mapX;
+    private String mapY;
+
     /** "09:00" 같은 시간 문자열 - 프론트에서 형식 통제 */
     private String scheduledTime;
 

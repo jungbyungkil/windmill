@@ -6,6 +6,7 @@ import com.windmill.domain.TripRecord;
 import com.windmill.domain.VisitFeedback;
 import com.windmill.domain.VisitRating;
 import com.windmill.dto.CreateTripRecordRequest;
+import com.windmill.dto.TripStoryFeedResponse;
 import com.windmill.dto.VisitFeedbackRequest;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
@@ -61,6 +62,33 @@ public class TripRecordService {
     public List<TripRecord> findRecentGoodTripsByRegion(String signguFullCode) {
         return tripRecordRepository.findTop5ByItinerary_SignguFullCodeAndOverallRatingOrderByCompletedAtDesc(
                 signguFullCode, VisitRating.GOOD);
+    }
+
+    /**
+     * 첫 화면 인기 여행 기록 피드.
+     * 트랜잭션 안에서 DTO로 변환해 Itinerary LAZY 로딩을 안전하게 처리한다.
+     */
+    @Transactional(readOnly = true)
+    public List<TripStoryFeedResponse> findPopularStories() {
+        return tripRecordRepository.findTop5ByOrderByLikeCountDescClickCountDescCompletedAtDesc().stream()
+                .map(TripStoryFeedResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public TripStoryFeedResponse incrementLike(Long id) {
+        TripRecord record = tripRecordRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("여행 기록을 찾을 수 없습니다: " + id));
+        record.setLikeCount(record.getLikeCount() + 1);
+        return TripStoryFeedResponse.from(record);
+    }
+
+    @Transactional
+    public TripStoryFeedResponse incrementClick(Long id) {
+        TripRecord record = tripRecordRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("여행 기록을 찾을 수 없습니다: " + id));
+        record.setClickCount(record.getClickCount() + 1);
+        return TripStoryFeedResponse.from(record);
     }
 
     /** 이 세션이 "별로"로 평가한 장소명 - 추천 파이프라인에서 제외 힌트로 사용 (기획안: 기록 → 추천 정확도 개선) */

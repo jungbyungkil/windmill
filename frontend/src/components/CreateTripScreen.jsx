@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import PinwheelHero from './PinwheelHero';
+import TripStoryFeed from './TripStoryFeed';
+import SituationBanner, { loadSituationByGeolocation, maybeNotifySituation } from './SituationBanner';
 import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS } from '../constants';
 
@@ -24,6 +26,9 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
   const [companionType, setCompanionType] = useState('SOLO');
   const [withPet, setWithPet] = useState(false);
   const [highlights, setHighlights] = useState([]);
+  const [situation, setSituation] = useState(null);
+  const [situationLoading, setSituationLoading] = useState(true);
+  const [situationDismissed, setSituationDismissed] = useState(false);
 
   useEffect(() => {
     api.getRegions()
@@ -32,6 +37,25 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
         if (list.length > 0) setSidoCode(list[0].sidoCode);
       })
       .catch((e) => setRegionsError(e.message));
+  }, []);
+
+  // 앱 실행 시 현재 위치 기반 상황 요약 + (주의 시) Notification
+  useEffect(() => {
+    let cancelled = false;
+    setSituationLoading(true);
+    loadSituationByGeolocation((lat, lon) => api.getSituationByLocation(lat, lon))
+      .then((res) => {
+        if (cancelled) return;
+        setSituation(res);
+        if (res) maybeNotifySituation(res);
+      })
+      .catch(() => {
+        if (!cancelled) setSituation(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSituationLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -77,7 +101,17 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
     <div className="create-trip-screen">
       <PinwheelHero />
       <h1 className="brand-title">바람따라</h1>
-      <p className="brand-tagline">바람이 알려주는 실시간 여행, 어디로 떠나볼까요?</p>
+      <p className="brand-tagline">혼잡·날씨·동선 꼬임에 실시간으로 대응하는 여행 가이드</p>
+
+      {!situationDismissed && (
+        <SituationBanner
+          situation={situation}
+          loading={situationLoading}
+          onDismiss={() => setSituationDismissed(true)}
+        />
+      )}
+
+      <TripStoryFeed />
 
       <form className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">

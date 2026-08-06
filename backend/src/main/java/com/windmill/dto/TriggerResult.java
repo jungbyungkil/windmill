@@ -13,6 +13,9 @@ public class TriggerResult {
     private boolean heatTrigger;
     private boolean crowdTrigger;
     private boolean businessTrigger;
+    /** 동선 꼬임(비효율 경로) - 자동 재배치 제안 */
+    private boolean routeTangleTrigger;
+    private RouteTangleResult routeTangle;
     private int triggerCount;
     private TriggerLevel level;
     private List<String> triggerDetails;

@@ -49,9 +49,9 @@ export default function CategoryRecommendScreen({
     <div className="category-reco-screen">
       <header className="category-reco-hero">
         <div className="category-reco-brand">바람따라</div>
-        <h1 className="category-reco-title">이 지역, 사람들이 많이 찾는 곳</h1>
+        <h1 className="category-reco-title">여유로운 장소 둘러보기</h1>
         <p className="category-reco-sub">
-          방문자·관광 데이터로 골라본 추천이에요. AI 일정은 나중에 쓸 수 있어요.
+          혼잡도가 낮은 곳부터 보여드려요. 스마트 동선 추천을 먼저 받아보셨다면, 여기서 더 골라보세요.
         </p>
       </header>
 
@@ -85,7 +85,7 @@ export default function CategoryRecommendScreen({
             <section className="category-section">
               <div className="category-section-head">
                 <h2>{activeGroup.label}</h2>
-                <span className="category-count">{activeGroup.places?.length || 0}곳 · 방문자순</span>
+                <span className="category-count">{activeGroup.places?.length || 0}곳 · 여유로운 순</span>
               </div>
 
               {(activeGroup.places?.length || 0) === 0 ? (
@@ -104,7 +104,7 @@ export default function CategoryRecommendScreen({
                           )}
                           <span className="category-place-rank">#{place.rank}</span>
                           {place.crowdRate != null && (
-                            <span className="category-place-popular">인기 {Math.round(place.crowdRate)}</span>
+                            <span className="category-place-popular">여유 {Math.round(100 - place.crowdRate)}%</span>
                           )}
                         </div>
                         <div className="category-place-body">

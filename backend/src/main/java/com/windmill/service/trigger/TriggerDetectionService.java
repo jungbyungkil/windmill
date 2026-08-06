@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 /**
  * 바람개비 실시간 변수 감지 - 기상(비)/폭염/혼잡도/영업상태.
- * "감지된 트리거 수"는 개별 일정 항목이 아니라 조건 타입 중 몇 개가 걸렸는지를 센다.
+ * 비·폭염은 야외 일정에 걸릴 때 빨강(DANGER)으로 올려 실내 대체 일정을 유도한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -52,34 +52,59 @@ public class TriggerDetectionService {
                 .flatMap(condition -> Flux.fromIterable(itinerary.getItems())
                         .flatMap(item -> detect(item, condition).map(result -> Map.entry(item.getId(), result)))
                         .collectList()
-                        .map(this::aggregate))
+                        .map(perItem -> {
+                            TriggerResult result = aggregate(perItem);
+                            attachRouteTangle(result, itinerary);
+                            return result;
+                        }))
                 .zipWith(festivalsMono, (result, festivals) -> {
                     result.setFestivalSuggestions(festivals);
                     return result;
                 });
     }
 
+    private void attachRouteTangle(TriggerResult result, Itinerary itinerary) {
+        var tangle = com.windmill.service.itinerary.RouteTangleDetector.detect(itinerary.getItems());
+        result.setRouteTangle(tangle);
+        result.setRouteTangleTrigger(tangle.isTangled());
+        if (tangle.isTangled()) {
+            result.setTriggerCount(result.getTriggerCount() + 1);
+            List<String> details = new java.util.ArrayList<>(
+                    result.getTriggerDetails() == null ? List.of() : result.getTriggerDetails());
+            details.add(tangle.getMessage());
+            result.setTriggerDetails(details);
+            if (result.getLevel() == TriggerLevel.NORMAL) {
+                result.setLevel(TriggerLevel.WARNING);
+            } else if (result.getLevel() == TriggerLevel.WARNING
+                    && (result.isWeatherTrigger() || result.isHeatTrigger() || result.getTriggerCount() >= 2)) {
+                result.setLevel(TriggerLevel.DANGER);
+            }
+        }
+    }
+
     /** 단일 일정 항목 기준 트리거 판정 */
     public Mono<TriggerResult> detect(ItineraryItem item, RegionCondition condition) {
-        boolean rainTrigger = condition.getCurrentPop() != null
+        boolean rainWave = condition.getCurrentPop() != null
                 && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
-
         boolean heatWave = condition.getCurrentTemp() != null
                 && condition.getCurrentTemp() >= TriggerThresholds.HEAT_TEMP_THRESHOLD;
         boolean outdoor = OutdoorActivityClassifier.isOutdoor(item);
+
+        // 비/폭염은 야외 일정에만 걸려야 대체 추천 대상이 명확해진다
+        boolean weatherTrigger = rainWave && outdoor;
         boolean heatTrigger = heatWave && outdoor;
 
         Double crowdRate = condition.getCrowdRate(item.getPlaceName());
         boolean crowdTrigger = crowdRate != null && crowdRate >= TriggerThresholds.CROWD_RATE_THRESHOLD;
 
         if (item.getContentId() == null || item.getContentTypeId() == null) {
-            return Mono.just(buildResult(rainTrigger, heatTrigger, crowdTrigger, false));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, crowdTrigger, false));
         }
         return tourAttractionService.getDetail(item.getContentId(), item.getContentTypeId())
                 .map(TourAttractionDetail::getIntroFields)
                 .map(BusinessHoursEvaluator::isCurrentlyOpen)
-                .map(open -> buildResult(rainTrigger, heatTrigger, crowdTrigger, !open))
-                .defaultIfEmpty(buildResult(rainTrigger, heatTrigger, crowdTrigger, false));
+                .map(open -> buildResult(weatherTrigger, heatTrigger, crowdTrigger, !open))
+                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, crowdTrigger, false));
     }
 
     private TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem) {
@@ -104,10 +129,10 @@ public class TriggerDetectionService {
         int count = (weather ? 1 : 0) + (heat ? 1 : 0) + (crowd ? 1 : 0) + (business ? 1 : 0);
         List<String> details = new ArrayList<>();
         if (weather) {
-            details.add("강수확률이 높아요. 실내 일정을 고려해보세요.");
+            details.add("비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요.");
         }
         if (heat) {
-            details.add("폭염이에요. 야외 활동을 실내 코스로 바꿔보세요.");
+            details.add("폭염 소식이에요. 야외 활동을 실내 코스로 바꿔보세요.");
         }
         if (crowd) {
             details.add("혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?");
@@ -115,11 +140,11 @@ public class TriggerDetectionService {
         if (business) {
             details.add("영업시간이 아니거나 휴무일 수 있어요.");
         }
-        // 폭염+야외는 시각적으로 강하게(빨강) 보이도록 단독이어도 DANGER
+        // 비·폭염은 단독이어도 빨강(DANGER) — 사용자가 바로 대체 일정을 보게 한다
         TriggerLevel level;
         if (count == 0) {
             level = TriggerLevel.NORMAL;
-        } else if (heat || count >= 2) {
+        } else if (weather || heat || count >= 2) {
             level = TriggerLevel.DANGER;
         } else {
             level = TriggerLevel.WARNING;

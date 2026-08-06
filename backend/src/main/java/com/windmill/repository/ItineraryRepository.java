@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface ItineraryRepository extends JpaRepository<Itinerary, Long> {
     List<Itinerary> findBySessionUuid(String sessionUuid);
+
+    java.util.Optional<Itinerary> findByShareToken(String shareToken);
 }

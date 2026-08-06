@@ -65,6 +65,10 @@ public class Itinerary {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 일정 공유용 공개 토큰 - 생성 전까지 null */
+    @Column(unique = true, length = 64)
+    private String shareToken;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {

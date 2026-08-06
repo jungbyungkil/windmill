@@ -1,6 +1,6 @@
-export default function ItineraryItemCard({ item, onUpdateTime, onTogglePin, onDelete, onOpenDocent }) {
+export default function ItineraryItemCard({ item, alerted = false, onUpdateTime, onTogglePin, onDelete, onOpenDocent }) {
   return (
-    <div className={`item-card ${item.pinned ? 'pinned' : ''}`}>
+    <div className={`item-card ${item.pinned ? 'pinned' : ''} ${alerted ? 'weather-affected' : ''}`}>
       {item.thumbnailUrl ? (
         <img className="item-thumb" src={item.thumbnailUrl} alt={item.placeName} loading="lazy" />
       ) : (
@@ -17,6 +17,7 @@ export default function ItineraryItemCard({ item, onUpdateTime, onTogglePin, onD
       <div className="item-body">
         <div className="item-head">
           <span className="item-name">{item.placeName}</span>
+          {alerted && <span className="weather-affected-badge" title="비·폭염 영향">⚠️ 야외</span>}
           {item.pinned && <span className="pin-badge" title={item.pinnedReason || '고정됨'}>📌</span>}
         </div>
 

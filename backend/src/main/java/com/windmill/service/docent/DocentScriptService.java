@@ -93,23 +93,48 @@ public class DocentScriptService {
     }
 
     private String buildPrompt(TourAttractionDetail detail, String language) {
+        String langName = switch (language == null ? "ko" : language.toLowerCase()) {
+            case "en" -> "English";
+            case "ja" -> "Japanese";
+            case "zh" -> "Simplified Chinese";
+            default -> "한국어";
+        };
+        boolean foreign = language != null && !language.equalsIgnoreCase("ko");
+        String style = foreign
+                ? """
+                You are "Barami", a cheerful K-pop idol-style travel buddy (do NOT imitate any real idol).
+                Speak in a bright vlog tone with short energetic sentences, light Korean vibe words
+                (like "daebak", "fighting") sparingly mixed into %s.
+                Keep it friendly for foreign travelers visiting Korea.
+                Write the entire script in %s.
+                """
+                : """
+                너는 "바람이"라는 팀 오리지널 캐릭터야 (특정 아이돌 모사 금지).
+                K-pop 브이로그처럼 밝고 빠른 템포의 친근한 반말체로 설명해.
+                언어: %s
+                """;
+        String styleBlock = foreign
+                ? String.format(style, langName, langName)
+                : String.format(style, langName);
         return String.format("""
-                너는 "바람이"라는 팀 오리지널 캐릭터야 (특정 아이돌 모사 금지). K-pop 브이로그 톤의 친근한 반말체로
-                외국인 관광객에게 아래 장소를 소개하는 도슨트 스크립트를 작성해줘. 언어: %s
+                %s
 
                 장소명: %s
                 개요(원본 데이터): %s
 
-                아래 순서로 자연스럽게 이어지는 스크립트를 작성해줘 (섹션 제목 없이 하나의 문단처럼):
-                1. 페르소나 인사
+                아래 순서로 자연스럽게 이어지는 스크립트를 작성해 (섹션 제목 없이):
+                1. 페르소나 인사 (케이팝 콘셉트)
                 2. 장소명 유래
-                3. 역사적 배경
-                4. 독특한 특징 1가지
-                5. 먹거리/팁 (선택)
-                6. 마무리 멘트
+                3. 역사/배경 한 스푼
+                4. 독특한 포인트 1가지
+                5. 인증샷/팁
+                6. 응원 마무리
 
-                다른 설명 없이 스크립트 본문만 반환해줘.
-                """, language, detail.getTitle(), detail.getOverview() == null ? "정보 없음" : detail.getOverview());
+                다른 설명 없이 스크립트 본문만 반환해.
+                """,
+                styleBlock,
+                detail.getTitle(),
+                detail.getOverview() == null ? "정보 없음" : detail.getOverview());
     }
 
     private String fallbackScript(TourAttractionDetail detail) {

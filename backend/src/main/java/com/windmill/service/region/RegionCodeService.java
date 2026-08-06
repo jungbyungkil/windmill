@@ -70,6 +70,10 @@ public class RegionCodeService {
         return Optional.ofNullable(bySignguFullCode.get(signguFullCode));
     }
 
+    public List<RegionCode> all() {
+        return List.copyOf(bySignguFullCode.values());
+    }
+
     public boolean exists(String signguFullCode) {
         return bySignguFullCode.containsKey(signguFullCode);
     }

@@ -5,6 +5,7 @@ import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.RegionCode;
+import com.windmill.dto.SharedItineraryResponse;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.service.region.RegionCodeService;
@@ -15,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 일정 CRUD - 회원가입 없이 클라이언트가 매 요청 헤더(X-Session-Id)로 보내는 익명 UUID로만 스코핑한다.
@@ -80,6 +83,8 @@ public class ItineraryService {
                 .restDateText(request.getRestDateText())
                 .category(request.getCategory())
                 .isAlternate(request.isAlternate())
+                .mapX(request.getMapX())
+                .mapY(request.getMapY())
                 .build();
         itinerary.getItems().add(item);
         return itineraryRepository.save(itinerary);
@@ -125,5 +130,96 @@ public class ItineraryService {
             itinerary.getConfirmedDates().remove(date);
         }
         return itineraryRepository.save(itinerary);
+    }
+
+    /** 공유 토큰 발급(또는 기존 토큰 재사용) */
+    @Transactional
+    public SharedItineraryResponse createShare(Long itineraryId) {
+        Itinerary itinerary = get(itineraryId);
+        if (itinerary.getShareToken() == null || itinerary.getShareToken().isBlank()) {
+            itinerary.setShareToken(UUID.randomUUID().toString().replace("-", ""));
+            itinerary = itineraryRepository.save(itinerary);
+        }
+        return toShared(itinerary);
+    }
+
+    @Transactional(readOnly = true)
+    public SharedItineraryResponse getShared(String token) {
+        Itinerary itinerary = itineraryRepository.findByShareToken(token)
+                .orElseThrow(() -> new EntityNotFoundException("공유 일정을 찾을 수 없습니다"));
+        return toShared(itinerary);
+    }
+
+    /**
+     * 동선 꼬임 자동 재배치 - 해당 일자(또는 전체) 항목을 최근접 순서로 재정렬하고
+     * 방문 시각을 09:00부터 75분 간격으로 다시 붙인다. 고정(pin) 항목은 상대 시각을 유지하려 시도한다.
+     */
+    @Transactional
+    public Itinerary optimizeRoute(Long itineraryId, LocalDate date) {
+        Itinerary itinerary = get(itineraryId);
+        List<ItineraryItem> targets = itinerary.getItems().stream()
+                .filter(i -> date == null || date.equals(i.getVisitDate()) || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
+                .collect(Collectors.toList());
+        if (targets.size() < 2) {
+            return itinerary;
+        }
+
+        List<ItineraryItem> movable = targets.stream().filter(i -> !i.isPinned()).toList();
+        List<ItineraryItem> orderedMovable = RouteTangleDetector.optimizeOrder(movable);
+
+        // pin은 원래 displayOrder 위치에 최대한 유지, movable만 최적화 순으로 채움
+        List<ItineraryItem> finalOrder = new java.util.ArrayList<>();
+        int mi = 0;
+        for (ItineraryItem original : targets.stream()
+                .sorted(java.util.Comparator.comparingInt(ItineraryItem::getDisplayOrder))
+                .toList()) {
+            if (original.isPinned()) {
+                finalOrder.add(original);
+            } else if (mi < orderedMovable.size()) {
+                finalOrder.add(orderedMovable.get(mi++));
+            }
+        }
+        while (mi < orderedMovable.size()) {
+            finalOrder.add(orderedMovable.get(mi++));
+        }
+
+        java.time.LocalTime cursor = java.time.LocalTime.of(9, 0);
+        int orderBase = itinerary.getItems().stream()
+                .filter(i -> !targets.contains(i))
+                .mapToInt(ItineraryItem::getDisplayOrder)
+                .max()
+                .orElse(-1) + 1;
+        for (int i = 0; i < finalOrder.size(); i++) {
+            ItineraryItem item = finalOrder.get(i);
+            item.setDisplayOrder(orderBase + i);
+            if (!item.isPinned() || item.getScheduledTime() == null || item.getScheduledTime().isBlank()) {
+                item.setScheduledTime(cursor.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+            }
+            cursor = cursor.plusMinutes(75);
+        }
+        return itineraryRepository.save(itinerary);
+    }
+
+    private SharedItineraryResponse toShared(Itinerary itinerary) {
+        return SharedItineraryResponse.builder()
+                .shareToken(itinerary.getShareToken())
+                .regionDisplayName(itinerary.getRegionDisplayName())
+                .startDate(itinerary.getStartDate() == null ? null : itinerary.getStartDate().toString())
+                .endDate(itinerary.getEndDate() == null ? null : itinerary.getEndDate().toString())
+                .companionType(itinerary.getCompanionType() == null ? null : itinerary.getCompanionType().name())
+                .withPet(itinerary.isWithPet())
+                .shareUrlPath("/#/share/" + itinerary.getShareToken())
+                .items(itinerary.getItems().stream()
+                        .sorted(java.util.Comparator.comparingInt(ItineraryItem::getDisplayOrder))
+                        .map(i -> SharedItineraryResponse.SharedItem.builder()
+                                .placeName(i.getPlaceName())
+                                .scheduledTime(i.getScheduledTime())
+                                .visitDate(i.getVisitDate() == null ? null : i.getVisitDate().toString())
+                                .thumbnailUrl(i.getThumbnailUrl())
+                                .category(i.getCategory())
+                                .tags(i.getTags())
+                                .build())
+                        .collect(Collectors.toList()))
+                .build();
     }
 }
