@@ -712,12 +712,6 @@ export default function App() {
 
         <WeatherBanner items={weatherItems} />
 
-        <FestivalBanner
-          festivals={trigger?.festivalSuggestions}
-          onAdd={handleAddFestival}
-          addingId={addingFestivalId}
-        />
-
         <DayTabs
           startDate={itinerary.startDate}
           endDate={itinerary.endDate}
@@ -750,6 +744,12 @@ export default function App() {
           results={recoResults}
           loading={recoLoading}
           addingId={addingContentId}
+        />
+
+        <FestivalBanner
+          festivals={trigger?.festivalSuggestions}
+          onAdd={handleAddFestival}
+          addingId={addingFestivalId}
         />
       </main>
 

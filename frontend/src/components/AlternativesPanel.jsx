@@ -2,12 +2,12 @@ import RecommendationCard from './RecommendationCard';
 
 const REASON_COPY = {
   RAIN_ALTERNATIVE: {
-    title: '🌧️ 비 소식 · 실내 대안 코스',
-    desc: '야외 일정 대신 실내 장소를 골라보세요. 담으면 일정에 추가돼요.',
+    title: '🌧️ 변수: 비 소식 · 실내 대안',
+    desc: '야외 대신 실내 장소를 골라보세요. 담으면 일정에 반영되고 다른 여행자 참고 데이터로도 남아요.',
   },
   HEAT_ALTERNATIVE: {
-    title: '🌡️ 폭염 소식 · 실내 대안 코스',
-    desc: '더위를 피하는 실내 코스예요. 담으면 일정에 추가돼요.',
+    title: '🌡️ 변수: 폭염 · 실내 대안',
+    desc: '더위를 피하는 실내 코스예요. 담으면 일정에 반영되고 다른 여행자 참고 데이터로도 남아요.',
   },
 };
 
@@ -25,8 +25,8 @@ export default function AlternativesPanel({
   if (!open) return null;
 
   const copy = REASON_COPY[reason] || {
-    title: '🌬️ 바람이 알려준 대안 코스',
-    desc: '실시간 변수에 맞춘 대체 장소예요.',
+    title: '🌬️ 변수 대응 · 대안 코스',
+    desc: '감지된 변수에 맞춘 대체 장소예요. 고르면 일정에 반영되고, 기록으로 쌓여 다른 여행자도 참고할 수 있어요.',
   };
 
   return (

@@ -101,7 +101,7 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
     <div className="create-trip-screen">
       <PinwheelHero />
       <h1 className="brand-title">바람따라</h1>
-      <p className="brand-tagline">혼잡·날씨·동선 꼬임에 실시간으로 대응하는 여행 가이드</p>
+      <p className="brand-tagline">날씨·혼잡·동선 꼬임을 미리 알려주고, 대안을 쌓아 모두가 참고하는 여행 가이드</p>
 
       {!situationDismissed && (
         <SituationBanner

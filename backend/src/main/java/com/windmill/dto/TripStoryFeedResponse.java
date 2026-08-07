@@ -27,21 +27,25 @@ public class TripStoryFeedResponse {
     private boolean withPet;
     private int likeCount;
     private int clickCount;
+    /** 여행 중 변수(날씨·혼잡·동선 등)에 대응해 일정을 바꾼 횟수 */
+    private int rerouteCount;
+    /** 대안(대체)으로 담은 장소 수 - 다른 여행자 참고용 */
+    private int alternatePlaceCount;
     private String completedAt;
 
     public static TripStoryFeedResponse from(TripRecord record) {
-        List<String> placeNames = record.getItinerary() == null
+        List<ItineraryItem> items = record.getItinerary() == null
                 ? List.of()
-                : record.getItinerary().getItems().stream()
-                        .map(ItineraryItem::getPlaceName)
-                        .collect(Collectors.toList());
-        String thumbnailUrl = record.getItinerary() == null
-                ? null
-                : record.getItinerary().getItems().stream()
-                        .map(ItineraryItem::getThumbnailUrl)
-                        .filter(url -> url != null && !url.isBlank())
-                        .findFirst()
-                        .orElse(null);
+                : record.getItinerary().getItems();
+        List<String> placeNames = items.stream()
+                .map(ItineraryItem::getPlaceName)
+                .collect(Collectors.toList());
+        String thumbnailUrl = items.stream()
+                .map(ItineraryItem::getThumbnailUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .findFirst()
+                .orElse(null);
+        int alternateCount = (int) items.stream().filter(ItineraryItem::isAlternate).count();
         return TripStoryFeedResponse.builder()
                 .id(record.getId())
                 .regionDisplayName(record.getItinerary() == null ? null : record.getItinerary().getRegionDisplayName())
@@ -58,6 +62,8 @@ public class TripStoryFeedResponse {
                 .withPet(record.getItinerary() != null && record.getItinerary().isWithPet())
                 .likeCount(record.getLikeCount())
                 .clickCount(record.getClickCount())
+                .rerouteCount(record.getRerouteCount())
+                .alternatePlaceCount(alternateCount)
                 .completedAt(record.getCompletedAt() == null ? null : record.getCompletedAt().toString())
                 .build();
     }

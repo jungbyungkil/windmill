@@ -72,14 +72,15 @@ export default function TripStoryFeed() {
   return (
     <section className="trip-story-feed" aria-label="다른 여행자들의 기록">
       <div className="trip-story-feed-head">
-        <h2 className="trip-story-feed-title">바람따라 여행 기록</h2>
-        <p className="trip-story-feed-sub">좋아요·관심 많은 여행 스토리 Top 5 · 옆으로 넘겨 보세요</p>
+        <h2 className="trip-story-feed-title">변수에 대응한 여행 기록</h2>
+        <p className="trip-story-feed-sub">날씨·혼잡·동선을 바꾼 여행자들의 참고 Top 5 · 옆으로 넘겨 보세요</p>
       </div>
 
       <div className="trip-story-list" role="list">
         {stories.map((story, index) => {
           const expanded = expandedId === story.id;
           const liked = likedIds.has(story.id);
+          const adapted = (story.rerouteCount || 0) > 0 || (story.alternatePlaceCount || 0) > 0;
           return (
             <article
               key={story.id}
@@ -93,6 +94,11 @@ export default function TripStoryFeed() {
                   <div className="trip-story-placeholder">🌬️</div>
                 )}
                 <span className="trip-story-rank">#{index + 1}</span>
+                {adapted && (
+                  <span className="trip-story-adapt" title="변수에 대응해 일정을 바꿨어요">
+                    변수 대응 {story.rerouteCount || story.alternatePlaceCount}
+                  </span>
+                )}
               </div>
 
               <div className="trip-story-body">
@@ -105,6 +111,9 @@ export default function TripStoryFeed() {
                   )}
                   {story.companionType && COMPANION_LABEL[story.companionType] && (
                     <span className="trip-story-chip">{COMPANION_LABEL[story.companionType]}</span>
+                  )}
+                  {adapted && (
+                    <span className="trip-story-chip adapt">대안 {story.alternatePlaceCount || 0}곳</span>
                   )}
                 </div>
 

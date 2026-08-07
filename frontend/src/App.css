@@ -483,6 +483,18 @@
   max-width: 340px;
 }
 
+.pinwheel-eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--sea);
+  background: color-mix(in srgb, var(--sea) 12%, transparent);
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin-bottom: 6px;
+}
+
 .pinwheel-caption {
   font-size: 18px;
   font-weight: 800;
@@ -493,6 +505,30 @@
   font-size: 13px;
   color: var(--muted);
   margin-top: 2px;
+}
+
+.pinwheel-cause-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cause-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-radius: 999px;
+  padding: 4px 9px;
+}
+
+.pinwheel-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .pinwheel-details {
@@ -581,7 +617,7 @@
   color: var(--ink);
 }
 
-/* ---------- Festival banner ---------- */
+/* ---------- Festival banner (하단 참고) ---------- */
 
 .festival-banner {
   background: var(--sand-card);
@@ -591,10 +627,44 @@
   box-shadow: var(--shadow);
 }
 
+.festival-banner.festival-ref {
+  margin-top: 8px;
+  background: color-mix(in srgb, var(--sand) 55%, white);
+  box-shadow: none;
+  border-style: dashed;
+  opacity: 0.98;
+}
+
+.festival-banner-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.festival-ref-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: var(--sand);
+  border: 1px solid var(--sand-border);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
 .festival-banner-title {
   font-size: 13px;
   font-weight: 700;
-  margin-bottom: 10px;
+  margin: 0;
+}
+
+.festival-banner-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .festival-card-list {
@@ -1509,6 +1579,24 @@
   font-weight: 700;
   border-radius: 999px;
   padding: 3px 7px;
+}
+
+.trip-story-adapt {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(20, 40, 50, 0.82);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.trip-story-chip.adapt {
+  color: var(--sea-deep);
+  background: color-mix(in srgb, var(--sea) 14%, transparent);
+  font-weight: 700;
 }
 
 .trip-story-body {

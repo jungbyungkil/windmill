@@ -1,7 +1,7 @@
 const LEVEL_META = {
-  NORMAL: { caption: '순항 중', sub: '지금 이 순간, 계획대로 좋아요' },
-  WARNING: { caption: '바람이 심상치 않아요', sub: '변수가 하나 감지됐어요' },
-  DANGER: { caption: '코스를 바꿀 시간이에요', sub: '변수가 일정에 영향을 주고 있어요' },
+  NORMAL: { caption: '변수 없음 · 순항 중', sub: '날씨·혼잡·동선이 바뀌면 여기서 미리 알려드려요' },
+  WARNING: { caption: '변수 감지 · 미리 알려드려요', sub: '일정을 조금 바꾸면 더 편해질 수 있어요' },
+  DANGER: { caption: '변수 주의 · 대안이 필요해요', sub: '지금 코스를 바꾸면 낭비를 줄일 수 있어요' },
 };
 
 const CAUSE_META = {
@@ -116,8 +116,17 @@ export default function PinwheelHero({
 
       {trigger && (
         <div className="pinwheel-status">
+          <div className="pinwheel-eyebrow">실시간 변수</div>
           <div className="pinwheel-caption">{caption()}</div>
           <div className="pinwheel-sub">{sub()}</div>
+
+          {causes.length > 0 && (
+            <div className="pinwheel-cause-labels">
+              {causes.map(([key, c]) => (
+                <span key={key} className="cause-label">{c.icon} {c.label}</span>
+              ))}
+            </div>
+          )}
 
           {trigger.triggerDetails?.length > 0 && (
             <ul className="pinwheel-details">
@@ -142,7 +151,7 @@ export default function PinwheelHero({
                   onClick={() => onRerouteSchedule?.(primaryAvoidHint(trigger))}
                   disabled={rerouteLoading}
                 >
-                  {rerouteLoading ? '실내 일정 짜는 중...' : '🏠 다른 일정 추천받기'}
+                  {rerouteLoading ? '대안 짜는 중...' : '🏠 대안 일정 추천받기'}
                 </button>
               )}
               {!tangleMode && (
@@ -151,7 +160,7 @@ export default function PinwheelHero({
                   onClick={handleActivate}
                   disabled={loading}
                 >
-                  {loading ? '새 코스 찾는 중...' : weatherAlert ? '후보만 보기' : '🌬️ 새 코스 추천받기'}
+                  {loading ? '대안 찾는 중...' : weatherAlert ? '대안 후보만 보기' : '🌬️ 대안 코스 추천받기'}
                 </button>
               )}
               {!tangleMode && (
@@ -161,10 +170,14 @@ export default function PinwheelHero({
                   disabled={autoLoading}
                   title="영향 받은 첫 장소를 바로 교체해요"
                 >
-                  {autoLoading ? '자동 교체 중...' : '⚡ 한 곳만 바꾸기'}
+                  {autoLoading ? '교체 중...' : '⚡ 한 곳만 바꾸기'}
                 </button>
               )}
             </div>
+          )}
+
+          {!interactive && level === 'NORMAL' && (
+            <p className="pinwheel-hint">대응한 일정은 기록으로 남아 다른 여행자에게도 참고가 돼요.</p>
           )}
         </div>
       )}
