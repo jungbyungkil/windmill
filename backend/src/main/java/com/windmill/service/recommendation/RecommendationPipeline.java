@@ -5,6 +5,7 @@ import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
 import com.windmill.dto.TourAttractionDetail;
+import com.windmill.domain.RecommendThemeTag;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.service.trigger.RegionCondition;
@@ -63,14 +64,15 @@ public class RecommendationPipeline {
                     boolean rainAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.WEATHER;
                     boolean heatAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.HEAT;
                     String seed = firstNonBlank(request.getSeedPlaceName(), request.getNaturalLanguageQuery());
+                    List<RecommendThemeTag> themes = RecommendThemeTag.resolve(request.getTags(), seed);
                     Mono<List<RelatedCandidate>> stage1Result;
                     if (heatAlternative) {
                         stage1Result = stage1.fetchIndoorForHeat(region);
                     } else if (rainAlternative) {
                         stage1Result = stage1.fetchIndoor(region);
-                    } else if (isFoodIntent(request.getTags(), seed)) {
-                        // #맛집 / 식당·레스토랑 검색은 연관관광지가 아니라 TourAPI 음식점(39)으로 조회
-                        stage1Result = stage1.fetchFood(region, seed);
+                    } else if (!themes.isEmpty()) {
+                        // UI 해시태그는 TourAPI(KorService2) 테마 조회로 최소 후보를 확보
+                        stage1Result = stage1.fetchByThemes(region, request.getTags(), seed);
                     } else {
                         stage1Result = stage1.fetch(region, seed, request.isWithPet())
                                 .flatMap(list -> stage1.resolveContentIds(list, region));
@@ -84,7 +86,7 @@ public class RecommendationPipeline {
                             .flatMap(list -> stage3.filter(list, region))
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
                             .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
-                            .map(list -> enrichFoodTags(list, request.getTags(), seed))
+                            .map(list -> enrichThemeTags(list, themes))
                             .doOnNext(list -> badgeAssembler.attach(list, condition));
                 })
                 .map(list -> list.stream()
@@ -140,19 +142,7 @@ public class RecommendationPipeline {
 
     /** #맛집 태그 또는 식당/맛집/레스토랑 등 검색어면 음식점 전용 Stage1 경로 */
     static boolean isFoodIntent(List<String> tags, String query) {
-        if (tags != null) {
-            for (String tag : tags) {
-                if (tag != null && (tag.contains("맛집") || tag.contains("식당") || tag.contains("카페"))) {
-                    return true;
-                }
-            }
-        }
-        if (query == null || query.isBlank()) {
-            return false;
-        }
-        String q = query.toLowerCase();
-        return q.contains("식당") || q.contains("맛집") || q.contains("레스토랑")
-                || q.contains("음식") || q.contains("밥집") || q.contains("카페") || q.contains("커피");
+        return RecommendThemeTag.resolve(tags, query).contains(RecommendThemeTag.FOOD);
     }
 
     private static String firstNonBlank(String a, String b) {
@@ -165,22 +155,24 @@ public class RecommendationPipeline {
         return null;
     }
 
-    /** 맛집 경로에서 LLM 태그가 비어도 #맛집이 보이도록 보정 */
-    private List<RecommendationCandidate> enrichFoodTags(List<RecommendationCandidate> candidates,
-                                                         List<String> tags, String query) {
-        if (!isFoodIntent(tags, query)) {
+    /** 테마 Stage1 경로에서 LLM 태그가 비어도 선택한 해시태그가 보이도록 보정 */
+    private List<RecommendationCandidate> enrichThemeTags(List<RecommendationCandidate> candidates,
+                                                          List<RecommendThemeTag> themes) {
+        if (themes == null || themes.isEmpty()) {
             return candidates;
         }
         for (RecommendationCandidate c : candidates) {
             List<String> matched = c.getMatchedTags() == null
                     ? new java.util.ArrayList<>()
                     : new java.util.ArrayList<>(c.getMatchedTags());
-            if (!matched.contains("#맛집")) {
-                matched.add(0, "#맛집");
-                c.setMatchedTags(matched);
+            for (RecommendThemeTag theme : themes) {
+                if (!matched.contains(theme.getTag())) {
+                    matched.add(theme.getTag());
+                }
             }
-            if (c.getCategory() == null || c.getCategory().isBlank()) {
-                c.setCategory("맛집");
+            c.setMatchedTags(matched);
+            if ((c.getCategory() == null || c.getCategory().isBlank()) && themes.size() == 1) {
+                c.setCategory(themes.get(0).getLabel());
             }
         }
         return candidates;

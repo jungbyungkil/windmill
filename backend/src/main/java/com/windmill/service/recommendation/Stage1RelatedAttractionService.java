@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.client.KorServiceClient;
 import com.windmill.client.PetFriendlyAttractionClient;
 import com.windmill.client.RelatedAttractionClient;
+import com.windmill.domain.RecommendThemeTag;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
 import lombok.RequiredArgsConstructor;
@@ -149,6 +150,108 @@ public class Stage1RelatedAttractionService {
                         result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
                     }
                     log.info("[Stage1] 폭염 대체(실내) 후보 {}건 확보", result.size());
+                    return result;
+                });
+    }
+
+    /**
+     * UI 해시태그(#자연 #실내 #맛집 #아이동반 #액티비티 #역사) 전용 Stage1.
+     * 테마마다 KorService2 contentType + 키워드로 모아 최소 후보를 확보한다.
+     */
+    public Mono<List<RelatedCandidate>> fetchByThemes(RegionCode region, List<String> tags, String query) {
+        List<RecommendThemeTag> themes = RecommendThemeTag.resolve(tags, query);
+        if (themes.isEmpty()) {
+            return Mono.just(List.of());
+        }
+        // 맛집만이면 기존 카페 필터 로직 재사용
+        if (themes.size() == 1 && themes.get(0) == RecommendThemeTag.FOOD) {
+            return fetchFood(region, query);
+        }
+        return Flux.fromIterable(themes)
+                .concatMap(theme -> fetchOneTheme(region, theme, query))
+                .collectList()
+                .map(batches -> {
+                    Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
+                    for (List<RelatedCandidate> batch : batches) {
+                        for (RelatedCandidate c : batch) {
+                            if (c.getContentId() != null) {
+                                byId.putIfAbsent(c.getContentId(), c);
+                            }
+                        }
+                    }
+                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
+                    if (result.size() > MAX_CANDIDATES) {
+                        result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
+                    }
+                    log.info("[Stage1] 테마 태그 후보 {}건 확보 (themes={})", result.size(),
+                            themes.stream().map(RecommendThemeTag::getTag).toList());
+                    return result;
+                });
+    }
+
+    private Mono<List<RelatedCandidate>> fetchOneTheme(RegionCode region, RecommendThemeTag theme, String query) {
+        List<Mono<List<RelatedCandidate>>> calls = new ArrayList<>();
+        for (int typeId : theme.getContentTypeIds()) {
+            calls.add(korServiceClient
+                    .areaBasedList(typeId, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                    .map(items -> mapKorItems(items, theme.getLabel()))
+                    .onErrorReturn(List.of()));
+        }
+        // 키워드 검색: 사용자 검색어 우선, 없으면 테마 기본 키워드 상위 3개
+        List<String> searchWords = new ArrayList<>();
+        if (query != null && !query.isBlank()) {
+            searchWords.add(query.trim());
+        }
+        for (String keyword : theme.getKeywords()) {
+            if (searchWords.size() >= 3) {
+                break;
+            }
+            if (!searchWords.contains(keyword)) {
+                searchWords.add(keyword);
+            }
+        }
+        Integer primaryType = theme.getContentTypeIds().length > 0 ? theme.getContentTypeIds()[0] : null;
+        for (String word : searchWords) {
+            calls.add(korServiceClient
+                    .searchKeyword(word, primaryType, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                    .map(items -> mapKorItems(items, theme.getLabel()))
+                    .onErrorReturn(List.of()));
+            // contentType 없이 한 번 더 (지역 타입이 비는 경우 대비)
+            calls.add(korServiceClient
+                    .searchKeyword(word, null, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                    .map(items -> mapKorItems(items, theme.getLabel()))
+                    .onErrorReturn(List.of()));
+        }
+
+        return Flux.fromIterable(calls)
+                .concatMap(mono -> mono)
+                .collectList()
+                .map(batches -> {
+                    Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
+                    for (List<RelatedCandidate> batch : batches) {
+                        for (RelatedCandidate c : batch) {
+                            if (c.getContentId() == null || c.getPlaceName() == null) {
+                                continue;
+                            }
+                            if (theme == RecommendThemeTag.FOOD
+                                    && containsAny(c.getPlaceName(), "카페", "커피", "디저트", "베이커리")) {
+                                continue;
+                            }
+                            byId.putIfAbsent(c.getContentId(), c);
+                        }
+                    }
+                    // 카페 필터로 맛집이 비면 필터 해제
+                    if (theme == RecommendThemeTag.FOOD && byId.isEmpty()) {
+                        for (List<RelatedCandidate> batch : batches) {
+                            for (RelatedCandidate c : batch) {
+                                if (c.getContentId() != null) {
+                                    byId.putIfAbsent(c.getContentId(), c);
+                                }
+                            }
+                        }
+                    }
+                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
+                    log.info("[Stage1] 테마 {} 후보 {}건", theme.getTag(), result.size());
                     return result;
                 });
     }

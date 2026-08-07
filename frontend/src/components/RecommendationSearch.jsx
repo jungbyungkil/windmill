@@ -56,7 +56,7 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
           <p className="empty-state">
             {freeOnly
               ? '무료 장소가 없어요. 필터를 해제해보세요.'
-              : '조건에 맞는 추천 결과가 없어요. #맛집·식당은 TourAPI 음식점 데이터로 다시 찾아보세요.'}
+              : '조건에 맞는 추천 결과가 없어요. 태그(#자연·#실내·#맛집·#아이동반·#액티비티·#역사)로 다시 찾아보세요.'}
           </p>
         ) : (
           <div className="reco-grid">
