@@ -14,7 +14,9 @@ public final class MidTermRegionMapper {
 
     public static MidRegs resolve(String sidoCode, String sidoName, String signguName) {
         String sido = sidoCode == null ? "" : sidoCode;
-        String name = (sidoName == null ? "") + " " + (signguName == null ? "");
+        String sidoPart = sidoName == null ? "" : sidoName;
+        String signguPart = signguName == null ? "" : signguName;
+        String name = sidoPart + " " + signguPart;
 
         // 강원: 영동/영서 구분
         if ("42".equals(sido) || "51".equals(sido) || name.contains("강원")) {

@@ -22,6 +22,9 @@ backend/src/main/resources/static/index.html
 backend/src/main/resources/static/favicon.svg
 backend/src/main/resources/static/icons.svg
 
+# Local toolchains (portable JDK/Maven)
+.tools/
+
 # Env
 .env
 *.env.local
