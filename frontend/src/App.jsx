@@ -10,7 +10,6 @@ import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
-import DayTabs from './components/DayTabs';
 import RecommendationSearch from './components/RecommendationSearch';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
@@ -25,31 +24,11 @@ function readShareTokenFromHash() {
   return m ? m[1] : null;
 }
 
-function toLocalYmd(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function enumerateTripDates(startDate, endDate) {
-  if (!startDate) return [];
-  const dates = [];
-  const cursor = new Date(startDate + 'T00:00:00');
-  const last = new Date((endDate || startDate) + 'T00:00:00');
-  while (cursor <= last) {
-    dates.push(toLocalYmd(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return dates;
-}
-
-function dayLabelFor(dateStr, tripDates) {
-  if (!dateStr || !tripDates?.length) return null;
-  const idx = tripDates.indexOf(dateStr);
-  if (idx < 0) return dateStr;
+function formatTripDate(dateStr) {
+  if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
-  return `${idx + 1}일차 (${d.getMonth() + 1}/${d.getDate()})`;
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  return `${d.getMonth() + 1}/${d.getDate()} (${weekday})`;
 }
 
 export default function App() {
@@ -59,7 +38,7 @@ export default function App() {
   const [itinerary, setItinerary] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
-  /** 핵심: 혼잡↓·동선최적화 스마트 일정 우선 노출. null이면 전체 기간, 문자열이면 해당 일자만 */
+  /** 핵심: 혼잡↓·동선최적화 스마트 일정 우선 노출 */
   const [showSmartPlan, setShowSmartPlan] = useState(false);
   const [smartPlanDate, setSmartPlanDate] = useState(null);
   const [showCategoryReco, setShowCategoryReco] = useState(false);
@@ -100,7 +79,6 @@ export default function App() {
   const autoOptimizedRef = useRef(false);
 
   const [activeDate, setActiveDate] = useState(null);
-  const [confirmingDay, setConfirmingDay] = useState(false);
 
   useEffect(() => {
     function onHash() {
@@ -145,35 +123,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itinerary?.startDate]);
 
-  // 아직 담기지 않았거나(day 미지정 레거시) 활성 날짜와 다른 항목은 다른 날 페이지에 숨긴다
-  const tripDates = itinerary ? enumerateTripDates(itinerary.startDate, itinerary.endDate) : [];
+  // 당일치기: 해당 날짜 일정만 표시
+  const tripDate = itinerary?.startDate || null;
   const visibleItems = itinerary
-    ? itinerary.items.filter((i) => (i.visitDate || itinerary.startDate) === activeDate)
+    ? itinerary.items.filter((i) => (i.visitDate || itinerary.startDate) === (activeDate || tripDate))
     : [];
-  const itemCounts = {};
-  if (itinerary) {
-    tripDates.forEach((d) => { itemCounts[d] = 0; });
-    itinerary.items.forEach((i) => {
-      const d = i.visitDate || itinerary.startDate;
-      if (d) itemCounts[d] = (itemCounts[d] || 0) + 1;
-    });
-  }
-  const activeDayLabel = dayLabelFor(activeDate, tripDates);
-
   function openSmartPlanForDate(date) {
-    setSmartPlanDate(date || null);
+    setSmartPlanDate(date || itinerary?.startDate || null);
     setShowSmartPlan(true);
     setShowCategoryReco(false);
     setShowAutoPlan(false);
-  }
-  async function handleToggleConfirmDay(date, confirmed) {
-    setConfirmingDay(true);
-    try {
-      const result = await api.confirmDay(itineraryId, date, confirmed);
-      setItinerary(result);
-    } finally {
-      setConfirmingDay(false);
-    }
   }
 
   const refreshTrigger = useCallback(() => {
@@ -198,11 +157,14 @@ export default function App() {
     setCreating(true);
     setCreateError(null);
     try {
-      const result = await api.createItinerary(sessionId, formData);
+      const result = await api.createItinerary(sessionId, {
+        ...formData,
+        endDate: formData.startDate, // 당일치기 고정
+      });
       setItinerary(result);
       setItineraryId(result.itineraryId);
       setActiveDate(result.startDate);
-      setSmartPlanDate(null); // 전체 기간 스마트 일정
+      setSmartPlanDate(result.startDate);
       setShowSmartPlan(true);
       setShowCategoryReco(false);
       setShowAutoPlan(false);
@@ -215,11 +177,6 @@ export default function App() {
 
   async function handleUpdateTime(itemId, scheduledTime) {
     const result = await api.updateItem(itineraryId, itemId, { scheduledTime });
-    setItinerary(result);
-  }
-
-  async function handleMoveDay(itemId, visitDate) {
-    const result = await api.updateItem(itineraryId, itemId, { visitDate });
     setItinerary(result);
   }
 
@@ -458,10 +415,10 @@ export default function App() {
   }
 
   function handleGenerateSmartPlan() {
-    // 특정 일자만 짜기면 date 전달, 여행 생성 직후면 전체 기간
+    const date = smartPlanDate || itinerary?.startDate;
     return api.getSmartPlan(itineraryId, {
-      placeCount: smartPlanDate ? 5 : 0,
-      date: smartPlanDate || undefined,
+      placeCount: 5,
+      date,
     });
   }
 
@@ -491,7 +448,6 @@ export default function App() {
     setItinerary(result);
     setShowSmartPlan(false);
     setSmartPlanDate(null);
-    // 다일 담기 후 1일차로 이동해 바로 관리
     if (result?.startDate) setActiveDate(result.startDate);
   }
 
@@ -662,8 +618,8 @@ export default function App() {
   if (showSmartPlan) {
     return (
       <SmartPlanScreen
-        key={smartPlanDate || 'all-days'}
-        dayLabel={smartPlanDate ? dayLabelFor(smartPlanDate, tripDates) : null}
+        key={smartPlanDate || itinerary.startDate || 'day-trip'}
+        dayLabel={null}
         onGenerate={handleGenerateSmartPlan}
         onConfirm={handleConfirmSmartPlan}
         onBrowseCategories={() => {
@@ -746,30 +702,22 @@ export default function App() {
         <WeatherBanner items={weatherItems} />
         <MidWeatherBanner forecast={midWeather} />
 
-        <DayTabs
-          startDate={itinerary.startDate}
-          endDate={itinerary.endDate}
-          activeDate={activeDate}
-          confirmedDates={itinerary.confirmedDates}
-          itemCounts={itemCounts}
-          onSelectDate={setActiveDate}
-          onToggleConfirm={handleToggleConfirmDay}
-          confirming={confirmingDay}
-          onPlanDay={openSmartPlanForDate}
-        />
+        <div className="daytrip-chip-row">
+          <span className="daytrip-chip">당일치기</span>
+          {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
+          <span className="daytrip-count">{visibleItems.length}곳</span>
+        </div>
 
         <ItineraryList
           items={visibleItems}
           affectedItemIds={trigger?.affectedItemIds}
           weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
-          dayLabel={activeDayLabel}
-          tripDates={tripDates}
+          dayLabel="오늘"
           onUpdateTime={handleUpdateTime}
           onTogglePin={handleTogglePin}
           onDelete={handleDeleteItem}
           onOpenDocent={handleOpenDocent}
-          onMoveDay={handleMoveDay}
-          onPlanDay={() => openSmartPlanForDate(activeDate)}
+          onPlanDay={() => openSmartPlanForDate(tripDate)}
         />
 
         <RecommendationSearch

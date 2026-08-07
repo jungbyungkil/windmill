@@ -1,21 +1,11 @@
-function formatDayOption(dateStr, index) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return `${index + 1}일차 (${d.getMonth() + 1}/${d.getDate()})`;
-}
-
 export default function ItineraryItemCard({
   item,
   alerted = false,
-  tripDates = [],
   onUpdateTime,
   onTogglePin,
   onDelete,
   onOpenDocent,
-  onMoveDay,
 }) {
-  const multiDay = tripDates.length > 1;
-  const currentDate = item.visitDate || tripDates[0];
-
   return (
     <div className={`item-card ${item.pinned ? 'pinned' : ''} ${alerted ? 'weather-affected' : ''}`}>
       {item.thumbnailUrl ? (
@@ -71,21 +61,6 @@ export default function ItineraryItemCard({
 
         {item.crowdRate !== null && item.crowdRate !== undefined && (
           <div className="item-crowd">혼잡도 {Math.round(item.crowdRate)}%</div>
-        )}
-
-        {multiDay && onMoveDay && (
-          <label className="item-move-day">
-            <span>일차</span>
-            <select
-              value={currentDate || ''}
-              onChange={(e) => onMoveDay(item.itemId, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {tripDates.map((date, i) => (
-                <option key={date} value={date}>{formatDayOption(date, i)}</option>
-              ))}
-            </select>
-          </label>
         )}
       </div>
 

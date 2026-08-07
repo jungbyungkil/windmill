@@ -6,7 +6,11 @@ import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS } from '../constants';
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
@@ -21,8 +25,7 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
   const [regionsError, setRegionsError] = useState(null);
   const [sidoCode, setSidoCode] = useState('');
   const [signguFullCode, setSignguFullCode] = useState('');
-  const [startDate, setStartDate] = useState(todayIso());
-  const [endDate, setEndDate] = useState(todayIso());
+  const [tripDate, setTripDate] = useState(todayIso());
   const [companionType, setCompanionType] = useState('SOLO');
   const [withPet, setWithPet] = useState(false);
   const [highlights, setHighlights] = useState([]);
@@ -81,27 +84,25 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
   }, [sidoCode, regions]);
 
   const today = todayIso();
-  const startBeforeToday = startDate && startDate < today;
-  const dateRangeInvalid = startDate && endDate && startDate > endDate;
-  const canSubmit = signguFullCode && startDate && endDate && !startBeforeToday && !dateRangeInvalid;
+  const dateBeforeToday = tripDate && tripDate < today;
+  const canSubmit = signguFullCode && tripDate && !dateBeforeToday;
 
-  function handleStartDateChange(value) {
-    const clamped = value < today ? today : value;
-    setStartDate(clamped);
-    if (endDate && clamped > endDate) setEndDate(clamped);
+  function handleDateChange(value) {
+    setTripDate(value < today ? today : value);
   }
 
   function handleSubmit(e) {
     e.preventDefault();
     if (!canSubmit) return;
-    onCreate({ signguFullCode, startDate, endDate, companionType, withPet });
+    // 당일치기: startDate === endDate
+    onCreate({ signguFullCode, startDate: tripDate, endDate: tripDate, companionType, withPet });
   }
 
   return (
     <div className="create-trip-screen">
       <PinwheelHero />
       <h1 className="brand-title">바람따라</h1>
-      <p className="brand-tagline">날씨·혼잡·동선 꼬임을 미리 알려주고, 대안을 쌓아 모두가 참고하는 여행 가이드</p>
+      <p className="brand-tagline">당일치기 여행의 날씨·혼잡·동선 변수를 미리 알려주고, 대안을 쌓아 모두가 참고하는 가이드</p>
 
       {!situationDismissed && (
         <SituationBanner
@@ -144,14 +145,16 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
         </div>
 
         <div className="trip-form-row">
-          <label className="trip-form-label">여행 날짜</label>
-          <div className="trip-form-date-range">
-            <input type="date" value={startDate} min={today} onChange={(e) => handleStartDateChange(e.target.value)} required />
-            <span>~</span>
-            <input type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
-          </div>
-          {startBeforeToday && <div className="error-msg">❌ 시작일은 오늘 이후여야 해요</div>}
-          {!startBeforeToday && dateRangeInvalid && <div className="error-msg">❌ 종료일은 시작일 이후여야 해요</div>}
+          <label className="trip-form-label">여행 날짜 <span className="trip-form-hint-inline">당일치기</span></label>
+          <input
+            type="date"
+            className="trip-form-date-single"
+            value={tripDate}
+            min={today}
+            onChange={(e) => handleDateChange(e.target.value)}
+            required
+          />
+          {dateBeforeToday && <div className="error-msg">❌ 여행일은 오늘 이후여야 해요</div>}
         </div>
 
         <div className="trip-form-row">
@@ -175,7 +178,7 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
         </div>
 
         <button className="btn-primary btn-start" type="submit" disabled={loading || !canSubmit}>
-          {loading ? '여행 준비 중...' : '🌬️ 여행 시작하기'}
+          {loading ? '일정 준비 중...' : '🌬️ 당일치기 시작하기'}
         </button>
 
         {error && <div className="error-msg">❌ {error}</div>}
@@ -210,7 +213,7 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
       )}
 
       <p className="create-trip-hint">
-        핵심은 변수예요. 날씨·혼잡·동선이 바뀌면 미리 알려주고, 대안을 고르면 그 기록이 다른 여행자 참고가 됩니다.
+        당일치기 중심으로, 날씨·혼잡·동선 변수를 미리 알려주고 대안을 고르면 그 기록이 다른 여행자 참고가 됩니다.
       </p>
     </div>
   );

@@ -41,7 +41,7 @@ public class ItineraryService {
                 .weatherNx(region.getWeatherNx())
                 .weatherNy(region.getWeatherNy())
                 .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
+                .endDate(request.getStartDate()) // 당일치기: 종료일 = 시작일
                 .companionType(request.getCompanionType())
                 .withPet(request.isWithPet())
                 .build();

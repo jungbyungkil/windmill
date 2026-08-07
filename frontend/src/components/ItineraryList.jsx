@@ -5,12 +5,10 @@ export default function ItineraryList({
   affectedItemIds = [],
   weatherAlert = false,
   dayLabel,
-  tripDates = [],
   onUpdateTime,
   onTogglePin,
   onDelete,
   onOpenDocent,
-  onMoveDay,
   onPlanDay,
 }) {
   const affected = new Set((affectedItemIds || []).map(Number));
@@ -30,10 +28,10 @@ export default function ItineraryList({
       )}
       {items.length === 0 ? (
         <div className="itinerary-empty">
-          <p className="empty-state">이 날 일정이 비어 있어요.</p>
+          <p className="empty-state">아직 담은 장소가 없어요.</p>
           {onPlanDay && (
             <button type="button" className="btn-primary" onClick={onPlanDay}>
-              🌬️ 이 날 스마트 일정 짜기
+              🌬️ 스마트 일정 짜기
             </button>
           )}
           <p className="itinerary-empty-hint">아래에서 장소를 검색해 직접 담을 수도 있어요.</p>
@@ -45,12 +43,10 @@ export default function ItineraryList({
               key={item.itemId}
               item={item}
               alerted={affected.has(Number(item.itemId))}
-              tripDates={tripDates}
               onUpdateTime={onUpdateTime}
               onTogglePin={onTogglePin}
               onDelete={onDelete}
               onOpenDocent={onOpenDocent}
-              onMoveDay={onMoveDay}
             />
           ))}
         </div>
