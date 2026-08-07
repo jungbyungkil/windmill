@@ -1356,6 +1356,25 @@
   margin-top: 8px;
 }
 
+.docent-speech-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.docent-speak-btn {
+  min-width: 160px;
+}
+
+.docent-speech-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .docent-script {
   margin: 10px 0 0;
   font-size: 14px;
