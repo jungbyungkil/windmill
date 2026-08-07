@@ -835,11 +835,15 @@
 .item-time {
   border: 1px solid var(--sand-border);
   border-radius: 8px;
-  padding: 5px 6px;
+  padding: 6px 8px;
   font-size: 13px;
-  width: 92px;
-  background: var(--sand);
-  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  width: 64px;
+  text-align: center;
+  background: color-mix(in srgb, var(--sea) 10%, white);
+  color: var(--sea-deep);
+  letter-spacing: 0.02em;
 }
 
 .item-body {

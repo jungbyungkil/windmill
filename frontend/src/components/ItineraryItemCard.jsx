@@ -25,10 +25,26 @@ export default function ItineraryItemCard({
       )}
 
       <input
-        type="time"
+        type="text"
         className="item-time"
+        inputMode="numeric"
+        placeholder="09:00"
+        aria-label="방문 시각"
+        maxLength={5}
         value={item.scheduledTime || ''}
-        onChange={(e) => onUpdateTime(item.itemId, e.target.value)}
+        onChange={(e) => {
+          const next = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
+          onUpdateTime(item.itemId, next);
+        }}
+        onBlur={(e) => {
+          const raw = (e.target.value || '').trim();
+          if (!raw) return;
+          const m = raw.match(/^(\d{1,2}):?(\d{0,2})$/);
+          if (!m) return;
+          const hh = Math.min(23, Number(m[1]));
+          const mm = Math.min(59, Number(m[2] || '0'));
+          onUpdateTime(item.itemId, `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+        }}
       />
 
       <div className="item-body">
