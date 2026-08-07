@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -57,22 +59,32 @@ public class TripRecordService {
         return tripRecordRepository.findBySessionUuid(sessionUuid);
     }
 
-    /** 이 지역으로 떠나는 다른 여행자에게 보여줄 "엄지척(GOOD)" 최근 여행 기록 상위 5건 */
+    /** 이 지역 당일치기 "엄지척(GOOD)" 최근 기록 상위 5건 */
     @Transactional(readOnly = true)
     public List<TripRecord> findRecentGoodTripsByRegion(String signguFullCode) {
-        return tripRecordRepository.findTop5ByItinerary_SignguFullCodeAndOverallRatingOrderByCompletedAtDesc(
-                signguFullCode, VisitRating.GOOD);
+        return tripRecordRepository.findDayTripHighlights(
+                signguFullCode, VisitRating.GOOD, PageRequest.of(0, 5));
     }
 
     /**
-     * 첫 화면 인기 여행 기록 피드.
-     * 트랜잭션 안에서 DTO로 변환해 Itinerary LAZY 로딩을 안전하게 처리한다.
+     * 첫 화면 인기 여행 기록 피드 - 당일치기만.
      */
     @Transactional(readOnly = true)
     public List<TripStoryFeedResponse> findPopularStories() {
-        return tripRecordRepository.findTop5ByOrderByLikeCountDescClickCountDescCompletedAtDesc().stream()
+        return tripRecordRepository.findDayTripStories(PageRequest.of(0, 5)).stream()
                 .map(TripStoryFeedResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    /** 다일/잘못된 기간 기록을 제거해 대시보드를 당일치기 이력만 남긴다 */
+    @Transactional
+    public int clearMultiDayRecords() {
+        List<TripRecord> multi = tripRecordRepository.findMultiDayOrInvalidRecords();
+        int count = multi.size();
+        if (count > 0) {
+            tripRecordRepository.deleteAll(multi);
+        }
+        return count;
     }
 
     @Transactional

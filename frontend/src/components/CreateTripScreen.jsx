@@ -186,7 +186,7 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
 
       {highlights.length > 0 && (
         <div className="region-highlights">
-          <h3 className="region-highlights-title">👍 이 지역에 다녀온 여행자들의 추천</h3>
+          <h3 className="region-highlights-title">👍 이 지역 당일치기 추천</h3>
           {highlights.map((h, i) => (
             <div key={i} className="region-highlight-card">
               {h.thumbnailUrl && (

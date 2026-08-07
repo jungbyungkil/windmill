@@ -24,8 +24,8 @@ function formatDateRange(start, end) {
 }
 
 /**
- * 첫 화면 인기 여행 기록 피드.
- * 좋아요 → 클릭 순으로 최대 5건을 보여 흥미를 유도한다.
+ * 첫 화면 당일치기 추천 기록 피드.
+ * 좋아요 → 클릭 순으로 최대 5건.
  */
 export default function TripStoryFeed() {
   const [stories, setStories] = useState([]);
@@ -70,10 +70,10 @@ export default function TripStoryFeed() {
   }
 
   return (
-    <section className="trip-story-feed" aria-label="다른 여행자들의 기록">
+    <section className="trip-story-feed" aria-label="당일치기 추천 기록">
       <div className="trip-story-feed-head">
-        <h2 className="trip-story-feed-title">변수에 대응한 여행 기록</h2>
-        <p className="trip-story-feed-sub">날씨·혼잡·동선을 바꾼 여행자들의 참고 Top 5 · 옆으로 넘겨 보세요</p>
+        <h2 className="trip-story-feed-title">당일치기 추천 기록</h2>
+        <p className="trip-story-feed-sub">하루 일정으로 다녀온 여행자들의 참고 Top 5 · 옆으로 넘겨 보세요</p>
       </div>
 
       <div className="trip-story-list" role="list">
