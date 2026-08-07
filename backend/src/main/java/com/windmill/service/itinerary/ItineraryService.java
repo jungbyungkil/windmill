@@ -32,6 +32,13 @@ public class ItineraryService {
 
     @Transactional
     public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
+        if (request.getStartDate() == null || request.getEndDate() == null
+                || !request.getStartDate().equals(request.getEndDate())) {
+            throw new IllegalArgumentException("당일치기만 가능합니다. 여행 날짜는 하루만 선택해 주세요.");
+        }
+        if (request.getStartDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("여행일은 오늘 이후여야 합니다.");
+        }
         RegionCode region = regionCodeService.find(request.getSignguFullCode())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + request.getSignguFullCode()));
         Itinerary itinerary = Itinerary.builder()

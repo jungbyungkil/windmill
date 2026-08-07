@@ -310,6 +310,31 @@
   padding: 2px 8px;
 }
 
+.trip-form-date-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.trip-form-date-single.invalid,
+.trip-form input[type='date'].invalid {
+  border-color: #c0392b;
+  outline-color: #c0392b;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .daytrip-chip-row {
   display: flex;
   align-items: center;

@@ -26,6 +26,7 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
   const [sidoCode, setSidoCode] = useState('');
   const [signguFullCode, setSignguFullCode] = useState('');
   const [tripDate, setTripDate] = useState(todayIso());
+  const [dateTouched, setDateTouched] = useState(false);
   const [companionType, setCompanionType] = useState('SOLO');
   const [withPet, setWithPet] = useState(false);
   const [highlights, setHighlights] = useState([]);
@@ -84,18 +85,32 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
   }, [sidoCode, regions]);
 
   const today = todayIso();
-  const dateBeforeToday = tripDate && tripDate < today;
-  const canSubmit = signguFullCode && tripDate && !dateBeforeToday;
+  const dateBeforeToday = Boolean(tripDate && tripDate < today);
+  const dateInvalid = !tripDate || dateBeforeToday;
+  const canSubmit = Boolean(signguFullCode && tripDate && !dateBeforeToday);
 
   function handleDateChange(value) {
+    setDateTouched(true);
+    if (!value) {
+      setTripDate('');
+      return;
+    }
+    // 당일치기: 하루 날짜만 허용 (과거면 오늘로 보정)
     setTripDate(value < today ? today : value);
   }
 
   function handleSubmit(e) {
     e.preventDefault();
+    setDateTouched(true);
     if (!canSubmit) return;
-    // 당일치기: startDate === endDate
-    onCreate({ signguFullCode, startDate: tripDate, endDate: tripDate, companionType, withPet });
+    // 당일치기 강제: startDate === endDate
+    onCreate({
+      signguFullCode,
+      startDate: tripDate,
+      endDate: tripDate,
+      companionType,
+      withPet,
+    });
   }
 
   return (
@@ -145,16 +160,29 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
         </div>
 
         <div className="trip-form-row">
-          <label className="trip-form-label">여행 날짜 <span className="trip-form-hint-inline">당일치기</span></label>
+          <label className="trip-form-label" htmlFor="trip-date">
+            여행 날짜 <span className="trip-form-hint-inline">하루만 선택</span>
+          </label>
+          <p className="trip-form-date-help">당일치기만 지원해요. 시작~종료 기간은 선택할 수 없습니다.</p>
           <input
+            id="trip-date"
             type="date"
-            className="trip-form-date-single"
+            className={`trip-form-date-single ${dateTouched && dateInvalid ? 'invalid' : ''}`}
             value={tripDate}
             min={today}
             onChange={(e) => handleDateChange(e.target.value)}
+            onBlur={() => setDateTouched(true)}
             required
+            aria-invalid={dateTouched && dateInvalid}
+            aria-describedby="trip-date-help"
           />
-          {dateBeforeToday && <div className="error-msg">❌ 여행일은 오늘 이후여야 해요</div>}
+          <span id="trip-date-help" className="sr-only">하루 날짜만 선택하세요</span>
+          {dateTouched && !tripDate && (
+            <div className="error-msg">❌ 여행 날짜를 선택해 주세요</div>
+          )}
+          {dateBeforeToday && (
+            <div className="error-msg">❌ 여행일은 오늘 이후여야 해요</div>
+          )}
         </div>
 
         <div className="trip-form-row">
