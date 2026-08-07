@@ -95,6 +95,11 @@ export function getWeather(nx, ny) {
   return request(`/weather${qs({ nx, ny })}`);
 }
 
+/** 중기예보 3~10일 전망 */
+export function getMidWeather(signguFullCode) {
+  return request(`/weather/mid${qs({ signguFullCode })}`);
+}
+
 export function getDocent(contentId, contentTypeId, lang = 'ko') {
   return request(`/docent/${contentId}${qs({ contentTypeId, lang })}`);
 }

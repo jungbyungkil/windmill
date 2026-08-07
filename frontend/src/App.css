@@ -662,6 +662,113 @@
   color: var(--ink);
 }
 
+/* ---------- Mid-term weather (3~10일 참고) ---------- */
+
+.mid-weather-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--sand-border);
+  background: color-mix(in srgb, var(--sand) 50%, white);
+}
+
+.mid-weather-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.mid-weather-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  border: 1px solid var(--sand-border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--sand);
+}
+
+.mid-weather-head strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.mid-weather-head p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.mid-weather-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mid-weather-card {
+  flex: 0 0 88px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+  text-align: center;
+}
+
+.mid-weather-card.rain {
+  border-color: color-mix(in srgb, var(--sky) 45%, var(--sand-border));
+}
+
+.mid-weather-card.heat {
+  border-color: color-mix(in srgb, var(--level-danger) 40%, var(--sand-border));
+}
+
+.mid-weather-date {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.mid-weather-wd {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.mid-weather-icon {
+  font-size: 22px;
+}
+
+.mid-weather-wf {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+  min-height: 2.5em;
+}
+
+.mid-weather-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Festival banner (하단 참고) ---------- */
 
 .festival-banner {

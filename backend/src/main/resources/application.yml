@@ -39,6 +39,8 @@ tourapi:
 weather:
   api:
     base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0
+  mid:
+    base-url: https://apis.data.go.kr/1360000/MidFcstInfoService
 
 logging:
   level:

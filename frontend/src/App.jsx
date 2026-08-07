@@ -7,6 +7,7 @@ import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import PinwheelHero from './components/PinwheelHero';
 import WeatherBanner from './components/WeatherBanner';
+import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
 import DayTabs from './components/DayTabs';
@@ -66,6 +67,7 @@ export default function App() {
 
   const [trigger, setTrigger] = useState(null);
   const [weatherItems, setWeatherItems] = useState(null);
+  const [midWeather, setMidWeather] = useState(null);
 
   const [recoResults, setRecoResults] = useState(null);
   const [recoLoading, setRecoLoading] = useState(false);
@@ -113,6 +115,8 @@ export default function App() {
     if (!itineraryId) {
       setItinerary(null);
       setTrigger(null);
+      setWeatherItems(null);
+      setMidWeather(null);
       setShowSmartPlan(false);
       setShowCategoryReco(false);
       setShowAutoPlan(false);
@@ -183,9 +187,12 @@ export default function App() {
     if (itinerary?.weatherNx && itinerary?.weatherNy) {
       api.getWeather(itinerary.weatherNx, itinerary.weatherNy).then(setWeatherItems).catch(() => setWeatherItems(null));
     }
+    if (itinerary?.signguFullCode) {
+      api.getMidWeather(itinerary.signguFullCode).then(setMidWeather).catch(() => setMidWeather(null));
+    }
     const id = setInterval(refreshTrigger, TRIGGER_POLL_MS);
     return () => clearInterval(id);
-  }, [itineraryId, itinerary?.weatherNx, itinerary?.weatherNy, refreshTrigger]);
+  }, [itineraryId, itinerary?.weatherNx, itinerary?.weatherNy, itinerary?.signguFullCode, refreshTrigger]);
 
   async function handleCreate(formData) {
     setCreating(true);
@@ -737,6 +744,7 @@ export default function App() {
         {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
 
         <WeatherBanner items={weatherItems} />
+        <MidWeatherBanner forecast={midWeather} />
 
         <DayTabs
           startDate={itinerary.startDate}
