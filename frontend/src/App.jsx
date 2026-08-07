@@ -52,7 +52,7 @@ function dayLabelFor(dateStr, tripDates) {
 }
 
 export default function App() {
-  const { sessionId, itineraryId, setItineraryId } = useSession();
+  const { sessionId, itineraryId, setItineraryId, draftItineraryId, leaveItineraryView, resumeDraftItinerary } = useSession();
 
   const [shareToken, setShareToken] = useState(() => readShareTokenFromHash());
   const [itinerary, setItinerary] = useState(null);
@@ -108,14 +108,30 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // 새로고침 시 저장된 itineraryId로 일정 복원
+  // 사용자가 일정을 연 경우에만 로드. 새로고침/재방문 시 메인 대시보드를 유지한다.
   useEffect(() => {
-    if (!itineraryId) return;
+    if (!itineraryId) {
+      setItinerary(null);
+      setTrigger(null);
+      setShowSmartPlan(false);
+      setShowCategoryReco(false);
+      setShowAutoPlan(false);
+      setActiveDate(null);
+      return;
+    }
     api.getItinerary(itineraryId)
       .then(setItinerary)
       .catch(() => setItineraryId(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itineraryId]);
+
+  function handleGoHome() {
+    leaveItineraryView();
+  }
+
+  function handleResumeDraft() {
+    resumeDraftItinerary();
+  }
 
   // 일정이 새로 로드되면 여행 시작일을 기본 활성 날짜로
   useEffect(() => {
@@ -625,7 +641,15 @@ export default function App() {
   }
 
   if (!itinerary) {
-    return <CreateTripScreen onCreate={handleCreate} loading={creating} error={createError} />;
+    return (
+      <CreateTripScreen
+        onCreate={handleCreate}
+        loading={creating}
+        error={createError}
+        draftItineraryId={draftItineraryId}
+        onResumeDraft={handleResumeDraft}
+      />
+    );
   }
 
   if (showSmartPlan) {
@@ -685,7 +709,9 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-inner">
-          <span className="logo">🌬️ 바람따라</span>
+          <button type="button" className="logo logo-btn" onClick={handleGoHome} title="메인으로">
+            🌬️ 바람따라
+          </button>
           <div className="header-actions">
             <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
               {shareBusy ? '링크 준비 중...' : '🔗 일정 공유'}

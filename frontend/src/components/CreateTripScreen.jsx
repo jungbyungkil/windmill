@@ -16,7 +16,7 @@ function formatDateRange(start, end) {
   return start === end ? start : `${start} ~ ${end}`;
 }
 
-export default function CreateTripScreen({ onCreate, loading, error }) {
+export default function CreateTripScreen({ onCreate, loading, error, draftItineraryId, onResumeDraft }) {
   const [regions, setRegions] = useState([]);
   const [regionsError, setRegionsError] = useState(null);
   const [sidoCode, setSidoCode] = useState('');
@@ -112,6 +112,18 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
       )}
 
       <TripStoryFeed />
+
+      {draftItineraryId && onResumeDraft && (
+        <div className="draft-resume-banner">
+          <div>
+            <strong>진행 중인 여행이 있어요</strong>
+            <p>이어서 일정을 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
+          </div>
+          <button type="button" className="btn-primary" onClick={onResumeDraft}>
+            이어하기
+          </button>
+        </div>
+      )}
 
       <form className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">
