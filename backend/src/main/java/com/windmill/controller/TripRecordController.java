@@ -37,10 +37,11 @@ public class TripRecordController {
                 .map(ResponseEntity::ok);
     }
 
-    /** 첫 화면 인기 여행 기록 피드 - 좋아요·클릭 순 상위 5건 */
+    /** 첫 화면 인기 여행 기록 피드 - 선택 지역 우선, 평점·좋아요·클릭 순 상위 5건 */
     @GetMapping("/feed")
-    public Mono<ResponseEntity<List<TripStoryFeedResponse>>> feed() {
-        return Mono.fromCallable(tripRecordService::findPopularStories)
+    public Mono<ResponseEntity<List<TripStoryFeedResponse>>> feed(
+            @RequestParam(required = false) String signguFullCode) {
+        return Mono.fromCallable(() -> tripRecordService.findPopularStories(signguFullCode))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
     }

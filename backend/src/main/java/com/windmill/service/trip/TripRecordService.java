@@ -68,12 +68,32 @@ public class TripRecordService {
 
     /**
      * 첫 화면 인기 여행 기록 피드 - 당일치기만.
+     * signguFullCode가 있으면 해당 지역을 평점·좋아요·클릭 순으로 우선 노출하고,
+     * 5건이 안 되면 다른 지역 인기 기록으로 채운다(선택 지역이 항상 앞순위).
      */
     @Transactional(readOnly = true)
-    public List<TripStoryFeedResponse> findPopularStories() {
-        return tripRecordRepository.findDayTripStories(PageRequest.of(0, 5)).stream()
-                .map(TripStoryFeedResponse::from)
-                .collect(Collectors.toList());
+    public List<TripStoryFeedResponse> findPopularStories(String signguFullCode) {
+        final int limit = 5;
+        if (signguFullCode == null || signguFullCode.isBlank()) {
+            return tripRecordRepository.findDayTripStories(PageRequest.of(0, limit)).stream()
+                    .map(TripStoryFeedResponse::from)
+                    .collect(Collectors.toList());
+        }
+
+        List<TripRecord> regionFirst = new java.util.ArrayList<>(
+                tripRecordRepository.findDayTripStoriesByRegion(signguFullCode, PageRequest.of(0, limit)));
+        if (regionFirst.size() >= limit) {
+            return regionFirst.stream().map(TripStoryFeedResponse::from).collect(Collectors.toList());
+        }
+
+        java.util.Set<Long> seen = regionFirst.stream().map(TripRecord::getId).collect(Collectors.toSet());
+        for (TripRecord other : tripRecordRepository.findDayTripStories(PageRequest.of(0, limit * 3))) {
+            if (regionFirst.size() >= limit) break;
+            if (seen.add(other.getId())) {
+                regionFirst.add(other);
+            }
+        }
+        return regionFirst.stream().map(TripStoryFeedResponse::from).collect(Collectors.toList());
     }
 
     /** 다일/잘못된 기간 기록을 제거해 대시보드를 당일치기 이력만 남긴다 */

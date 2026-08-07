@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 @Builder
 public class TripStoryFeedResponse {
     private Long id;
+    private String signguFullCode;
     private String regionDisplayName;
     private String overallNote;
     private String overallRating;
@@ -48,6 +49,7 @@ public class TripStoryFeedResponse {
         int alternateCount = (int) items.stream().filter(ItineraryItem::isAlternate).count();
         return TripStoryFeedResponse.builder()
                 .id(record.getId())
+                .signguFullCode(record.getItinerary() == null ? null : record.getItinerary().getSignguFullCode())
                 .regionDisplayName(record.getItinerary() == null ? null : record.getItinerary().getRegionDisplayName())
                 .overallNote(record.getOverallNote())
                 .overallRating(record.getOverallRating() == null ? null : record.getOverallRating().name())

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PinwheelHero from './PinwheelHero';
 import TripStoryFeed from './TripStoryFeed';
 import SituationBanner, { loadSituationByGeolocation, maybeNotifySituation } from './SituationBanner';
@@ -13,13 +13,6 @@ function todayIso() {
   return `${y}-${m}-${day}`;
 }
 
-const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
-
-function formatDateRange(start, end) {
-  if (!start) return null;
-  return start === end ? start : `${start} ~ ${end}`;
-}
-
 export default function CreateTripScreen({ onCreate, loading, error, draftItineraryId, onResumeDraft }) {
   const [regions, setRegions] = useState([]);
   const [regionsError, setRegionsError] = useState(null);
@@ -29,7 +22,6 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
   const [dateTouched, setDateTouched] = useState(false);
   const [companionType, setCompanionType] = useState('SOLO');
   const [withPet, setWithPet] = useState(false);
-  const [highlights, setHighlights] = useState([]);
   const [situation, setSituation] = useState(null);
   const [situationLoading, setSituationLoading] = useState(true);
   const [situationDismissed, setSituationDismissed] = useState(false);
@@ -62,18 +54,6 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    if (!signguFullCode) {
-      setHighlights([]);
-      return;
-    }
-    let cancelled = false;
-    api.getRegionTripHighlights(signguFullCode)
-      .then((list) => { if (!cancelled) setHighlights(list); })
-      .catch(() => { if (!cancelled) setHighlights([]); });
-    return () => { cancelled = true; };
-  }, [signguFullCode]);
-
   const selectedSido = regions.find((r) => r.sidoCode === sidoCode);
   const signguOptions = selectedSido?.signgus || [];
 
@@ -83,6 +63,13 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidoCode, regions]);
+
+  const regionLabel = useMemo(() => {
+    if (!selectedSido || !signguFullCode) return '';
+    const signgu = signguOptions.find((s) => s.signguFullCode === signguFullCode);
+    if (!signgu) return selectedSido.sidoName || '';
+    return `${selectedSido.sidoName} ${signgu.signguName}`;
+  }, [selectedSido, signguOptions, signguFullCode]);
 
   const today = todayIso();
   const dateBeforeToday = Boolean(tripDate && tripDate < today);
@@ -127,8 +114,6 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
         />
       )}
 
-      <TripStoryFeed />
-
       {draftItineraryId && onResumeDraft && (
         <div className="draft-resume-banner">
           <div>
@@ -158,6 +143,9 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
             </select>
           </div>
         </div>
+
+        {/* 지역 선택 직후: 해당 지역 우선 · 평점/좋아요/클릭 순 Top 추천 */}
+        <TripStoryFeed signguFullCode={signguFullCode} regionLabel={regionLabel} />
 
         <div className="trip-form-row">
           <label className="trip-form-label" htmlFor="trip-date">
@@ -211,34 +199,6 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
 
         {error && <div className="error-msg">❌ {error}</div>}
       </form>
-
-      {highlights.length > 0 && (
-        <div className="region-highlights">
-          <h3 className="region-highlights-title">👍 이 지역 당일치기 추천</h3>
-          {highlights.map((h, i) => (
-            <div key={i} className="region-highlight-card">
-              {h.thumbnailUrl && (
-                <img className="region-highlight-thumb" src={h.thumbnailUrl} alt="" loading="lazy" />
-              )}
-              <div className="region-highlight-body">
-                <div className="region-highlight-meta">
-                  {formatDateRange(h.startDate, h.endDate) && (
-                    <span className="region-highlight-chip">🗓️ {formatDateRange(h.startDate, h.endDate)}</span>
-                  )}
-                  {h.companionType && COMPANION_LABEL[h.companionType] && (
-                    <span className="region-highlight-chip">{COMPANION_LABEL[h.companionType]}</span>
-                  )}
-                  {h.withPet && <span className="region-highlight-chip">🐾 반려동물 동반</span>}
-                </div>
-                {h.placeNames.length > 0 && (
-                  <p className="region-highlight-places">{h.placeNames.join(' · ')}</p>
-                )}
-                {h.overallNote && <p className="region-highlight-note">"{h.overallNote}"</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       <p className="create-trip-hint">
         당일치기 중심으로, 날씨·혼잡·동선 변수를 미리 알려주고 대안을 고르면 그 기록이 다른 여행자 참고가 됩니다.

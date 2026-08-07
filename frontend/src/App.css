@@ -1743,6 +1743,32 @@
 
 .trip-story-feed-sub {
   font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.trip-story-loading {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.trip-story-card.region-match {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sea) 35%, transparent);
+}
+
+.trip-story-region-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--sea);
+  border-radius: 999px;
+  padding: 3px 8px;
 }
 
 .trip-story-list {

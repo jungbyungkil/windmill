@@ -22,18 +22,50 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, Long> {
     List<TripRecord> findTop200ByItinerary_SignguFullCodeAndItinerary_CompanionTypeOrderByCompletedAtDesc(
             String signguFullCode, CompanionType companionType);
 
-    /** 첫 화면 피드 - 당일치기만 (startDate = endDate) */
+    /** 첫 화면 피드 - 당일치기만 (평점↑ · 좋아요↑ · 클릭↑) */
     @Query("""
             SELECT t FROM TripRecord t
             JOIN t.itinerary i
             WHERE i.startDate IS NOT NULL
               AND i.endDate IS NOT NULL
               AND i.startDate = i.endDate
-            ORDER BY t.likeCount DESC, t.clickCount DESC, t.completedAt DESC
+            ORDER BY
+              CASE t.overallRating
+                WHEN com.windmill.domain.VisitRating.GOOD THEN 0
+                WHEN com.windmill.domain.VisitRating.NEUTRAL THEN 1
+                WHEN com.windmill.domain.VisitRating.BAD THEN 2
+                ELSE 3
+              END,
+              t.likeCount DESC,
+              t.clickCount DESC,
+              t.completedAt DESC
             """)
     List<TripRecord> findDayTripStories(Pageable pageable);
 
-    /** 지역별 당일치기 GOOD 추천 */
+    /** 선택 지역 당일치기 피드 - 해당 지역만, 평점·좋아요·클릭 우선 */
+    @Query("""
+            SELECT t FROM TripRecord t
+            JOIN t.itinerary i
+            WHERE i.signguFullCode = :signguFullCode
+              AND i.startDate IS NOT NULL
+              AND i.endDate IS NOT NULL
+              AND i.startDate = i.endDate
+            ORDER BY
+              CASE t.overallRating
+                WHEN com.windmill.domain.VisitRating.GOOD THEN 0
+                WHEN com.windmill.domain.VisitRating.NEUTRAL THEN 1
+                WHEN com.windmill.domain.VisitRating.BAD THEN 2
+                ELSE 3
+              END,
+              t.likeCount DESC,
+              t.clickCount DESC,
+              t.completedAt DESC
+            """)
+    List<TripRecord> findDayTripStoriesByRegion(
+            @Param("signguFullCode") String signguFullCode,
+            Pageable pageable);
+
+    /** 지역별 당일치기 GOOD 추천 - 인기순 */
     @Query("""
             SELECT t FROM TripRecord t
             JOIN t.itinerary i
@@ -42,7 +74,7 @@ public interface TripRecordRepository extends JpaRepository<TripRecord, Long> {
               AND i.startDate IS NOT NULL
               AND i.endDate IS NOT NULL
               AND i.startDate = i.endDate
-            ORDER BY t.completedAt DESC
+            ORDER BY t.likeCount DESC, t.clickCount DESC, t.completedAt DESC
             """)
     List<TripRecord> findDayTripHighlights(
             @Param("signguFullCode") String signguFullCode,

@@ -137,8 +137,8 @@ export function getRegionTripHighlights(signguFullCode) {
 }
 
 /** 첫 화면 인기 여행 기록 피드 (좋아요·클릭 순 상위 5건) */
-export function getTripStoryFeed() {
-  return request('/trip-records/feed');
+export function getTripStoryFeed(signguFullCode) {
+  return request(`/trip-records/feed${qs({ signguFullCode })}`);
 }
 
 export function likeTripStory(id) {
