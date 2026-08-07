@@ -198,7 +198,7 @@ export default function CreateTripScreen({ onCreate, loading, error }) {
       )}
 
       <p className="create-trip-hint">
-        비가 오거나, 붐비거나, 동선이 꼬이면 바람개비가 알아서 신호를 보내요.
+        핵심은 변수예요. 날씨·혼잡·동선이 바뀌면 미리 알려주고, 대안을 고르면 그 기록이 다른 여행자 참고가 됩니다.
       </p>
     </div>
   );
