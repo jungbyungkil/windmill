@@ -153,6 +153,81 @@ public class Stage1RelatedAttractionService {
                 });
     }
 
+    /**
+     * 식당/맛집 추천 - 연관관광지(TarRlteTarService1)에는 음식점이 거의 없어
+     * KorService2 음식점(contentTypeId=39) 지역목록 + 키워드 검색으로 후보를 모은다.
+     */
+    public Mono<List<RelatedCandidate>> fetchFood(RegionCode region, String query) {
+        String keyword = (query == null || query.isBlank()) ? "맛집" : query.trim();
+        boolean preferRestaurant = !containsAny(keyword, "카페", "커피", "디저트");
+
+        Mono<List<RelatedCandidate>> byType = korServiceClient
+                .areaBasedList(39, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                .map(items -> mapKorItems(items, "맛집"))
+                .onErrorReturn(List.of());
+
+        Mono<List<RelatedCandidate>> byKeyword = korServiceClient
+                .searchKeyword(keyword, 39, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                .map(items -> mapKorItems(items, "맛집"))
+                .onErrorReturn(List.of());
+
+        // 보조: contentType 없이 키워드만 (지역 음식점 타입이 비는 경우)
+        Mono<List<RelatedCandidate>> byKeywordAny = preferRestaurant
+                ? korServiceClient
+                    .searchKeyword(keyword, null, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                    .map(items -> mapKorItems(items, "맛집"))
+                    .onErrorReturn(List.of())
+                : Mono.just(List.of());
+
+        return Mono.zip(byType, byKeyword, byKeywordAny)
+                .map(tuple -> {
+                    Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
+                    List<RelatedCandidate> all = new ArrayList<>();
+                    all.addAll(tuple.getT1());
+                    all.addAll(tuple.getT2());
+                    all.addAll(tuple.getT3());
+                    for (RelatedCandidate c : all) {
+                        putFoodCandidate(byId, c, preferRestaurant);
+                    }
+                    // 카페만 걸러 결과가 비면 음식점 타입(39) 전체를 다시 채운다
+                    if (byId.isEmpty()) {
+                        for (RelatedCandidate c : all) {
+                            putFoodCandidate(byId, c, false);
+                        }
+                    }
+                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
+                    if (result.size() > MAX_CANDIDATES) {
+                        result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
+                    }
+                    log.info("[Stage1] 맛집/식당 후보 {}건 확보 (keyword={})", result.size(), keyword);
+                    return result;
+                });
+    }
+
+    private void putFoodCandidate(Map<String, RelatedCandidate> byId, RelatedCandidate c, boolean preferRestaurant) {
+        if (c.getContentId() == null || c.getPlaceName() == null) {
+            return;
+        }
+        if (preferRestaurant && containsAny(c.getPlaceName(), "카페", "커피", "디저트", "베이커리")) {
+            // 순수 카페는 식당 검색에서 뒤로 밀되, 결과가 비면 아래에서 다시 허용할 수 있게 일단 제외
+            return;
+        }
+        byId.putIfAbsent(c.getContentId(), c);
+    }
+
+    private static boolean containsAny(String text, String... keywords) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String lower = text.toLowerCase();
+        for (String keyword : keywords) {
+            if (lower.contains(keyword.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private List<RelatedCandidate> mapKorItems(List<JsonNode> items, String categoryLcls) {
         List<RelatedCandidate> result = new ArrayList<>();
         int rank = 1;

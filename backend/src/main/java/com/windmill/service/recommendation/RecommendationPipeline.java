@@ -62,13 +62,17 @@ public class RecommendationPipeline {
                     RegionCondition condition = tuple.getT2();
                     boolean rainAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.WEATHER;
                     boolean heatAlternative = request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.HEAT;
+                    String seed = firstNonBlank(request.getSeedPlaceName(), request.getNaturalLanguageQuery());
                     Mono<List<RelatedCandidate>> stage1Result;
                     if (heatAlternative) {
                         stage1Result = stage1.fetchIndoorForHeat(region);
                     } else if (rainAlternative) {
                         stage1Result = stage1.fetchIndoor(region);
+                    } else if (isFoodIntent(request.getTags(), seed)) {
+                        // #맛집 / 식당·레스토랑 검색은 연관관광지가 아니라 TourAPI 음식점(39)으로 조회
+                        stage1Result = stage1.fetchFood(region, seed);
                     } else {
-                        stage1Result = stage1.fetch(region, request.getSeedPlaceName(), request.isWithPet())
+                        stage1Result = stage1.fetch(region, seed, request.isWithPet())
                                 .flatMap(list -> stage1.resolveContentIds(list, region));
                     }
                     return stage1Result
@@ -80,6 +84,7 @@ public class RecommendationPipeline {
                             .flatMap(list -> stage3.filter(list, region))
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
                             .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
+                            .map(list -> enrichFoodTags(list, request.getTags(), seed))
                             .doOnNext(list -> badgeAssembler.attach(list, condition));
                 })
                 .map(list -> list.stream()
@@ -129,6 +134,54 @@ public class RecommendationPipeline {
                     .sorted(Comparator.comparing((RecommendationCandidate c) ->
                             c.getMatchedTags() != null && c.getMatchedTags().contains("#실내") ? 0 : 1))
                     .collect(Collectors.toList());
+        }
+        return candidates;
+    }
+
+    /** #맛집 태그 또는 식당/맛집/레스토랑 등 검색어면 음식점 전용 Stage1 경로 */
+    static boolean isFoodIntent(List<String> tags, String query) {
+        if (tags != null) {
+            for (String tag : tags) {
+                if (tag != null && (tag.contains("맛집") || tag.contains("식당") || tag.contains("카페"))) {
+                    return true;
+                }
+            }
+        }
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        String q = query.toLowerCase();
+        return q.contains("식당") || q.contains("맛집") || q.contains("레스토랑")
+                || q.contains("음식") || q.contains("밥집") || q.contains("카페") || q.contains("커피");
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) {
+            return a.trim();
+        }
+        if (b != null && !b.isBlank()) {
+            return b.trim();
+        }
+        return null;
+    }
+
+    /** 맛집 경로에서 LLM 태그가 비어도 #맛집이 보이도록 보정 */
+    private List<RecommendationCandidate> enrichFoodTags(List<RecommendationCandidate> candidates,
+                                                         List<String> tags, String query) {
+        if (!isFoodIntent(tags, query)) {
+            return candidates;
+        }
+        for (RecommendationCandidate c : candidates) {
+            List<String> matched = c.getMatchedTags() == null
+                    ? new java.util.ArrayList<>()
+                    : new java.util.ArrayList<>(c.getMatchedTags());
+            if (!matched.contains("#맛집")) {
+                matched.add(0, "#맛집");
+                c.setMatchedTags(matched);
+            }
+            if (c.getCategory() == null || c.getCategory().isBlank()) {
+                c.setCategory("맛집");
+            }
         }
         return candidates;
     }
