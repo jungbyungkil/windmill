@@ -2,12 +2,14 @@ package com.windmill.service.itinerary;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
+import com.windmill.domain.TripRecord;
 import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SharedItineraryResponse;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.repository.ItineraryRepository;
+import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,6 +32,7 @@ import java.util.stream.Collectors;
 public class ItineraryService {
 
     private final ItineraryRepository itineraryRepository;
+    private final TripRecordRepository tripRecordRepository;
     private final RegionCodeService regionCodeService;
 
     @Transactional
@@ -53,6 +58,77 @@ public class ItineraryService {
                 .withPet(request.isWithPet())
                 .build();
         return itineraryRepository.save(itinerary);
+    }
+
+    /**
+     * 추천 여행 기록의 원본 일정을 그대로 복제해 새 당일치기를 만든다.
+     * 지역·동행·장소·시간·태그는 원본을 유지하고, 여행일만 startDate로 바꾼다.
+     */
+    @Transactional
+    public Itinerary createFromTripRecord(String sessionUuid, Long tripRecordId, LocalDate startDate) {
+        if (startDate == null) {
+            throw new IllegalArgumentException("여행 날짜를 선택해 주세요.");
+        }
+        if (startDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("여행일은 오늘 이후여야 합니다.");
+        }
+        TripRecord record = tripRecordRepository.findById(tripRecordId)
+                .orElseThrow(() -> new EntityNotFoundException("여행 기록을 찾을 수 없습니다: " + tripRecordId));
+        Itinerary source = record.getItinerary();
+        if (source == null) {
+            throw new IllegalArgumentException("이 기록에는 복제할 일정이 없습니다.");
+        }
+        if (source.getItems() == null || source.getItems().isEmpty()) {
+            throw new IllegalArgumentException("이 기록에는 장소가 없어 그대로 시작할 수 없습니다.");
+        }
+
+        record.setClickCount(record.getClickCount() + 1);
+
+        Itinerary clone = Itinerary.builder()
+                .sessionUuid(sessionUuid)
+                .signguFullCode(source.getSignguFullCode())
+                .regionDisplayName(source.getRegionDisplayName())
+                .weatherNx(source.getWeatherNx())
+                .weatherNy(source.getWeatherNy())
+                .startDate(startDate)
+                .endDate(startDate)
+                .companionType(source.getCompanionType())
+                .withPet(source.isWithPet())
+                .build();
+
+        List<ItineraryItem> ordered = source.getItems().stream()
+                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
+                .toList();
+        int order = 0;
+        for (ItineraryItem src : ordered) {
+            List<String> tags = src.getTags() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(src.getTags());
+            ItineraryItem item = ItineraryItem.builder()
+                    .itinerary(clone)
+                    .contentId(src.getContentId())
+                    .contentTypeId(src.getContentTypeId())
+                    .placeName(src.getPlaceName())
+                    .thumbnailUrl(src.getThumbnailUrl())
+                    .scheduledTime(src.getScheduledTime())
+                    .tags(tags)
+                    .crowdRate(src.getCrowdRate())
+                    .displayOrder(order++)
+                    .visitDate(startDate)
+                    .addr1(src.getAddr1())
+                    .tel(src.getTel())
+                    .useFeeText(src.getUseFeeText())
+                    .isFree(src.getIsFree())
+                    .restDateText(src.getRestDateText())
+                    .category(src.getCategory())
+                    .isAlternate(src.isAlternate())
+                    .mapX(src.getMapX())
+                    .mapY(src.getMapY())
+                    .isPinned(false)
+                    .build();
+            clone.getItems().add(item);
+        }
+        return itineraryRepository.save(clone);
     }
 
     @Transactional(readOnly = true)

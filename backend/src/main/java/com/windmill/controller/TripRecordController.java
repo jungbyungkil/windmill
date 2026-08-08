@@ -2,12 +2,16 @@ package com.windmill.controller;
 
 import com.windmill.domain.CompanionType;
 import com.windmill.dto.CreateTripRecordRequest;
+import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.RecommendedScheduleResponse;
 import com.windmill.dto.RegionTripHighlightResponse;
+import com.windmill.dto.StartFromTripRecordRequest;
 import com.windmill.dto.TripRecordResponse;
 import com.windmill.dto.TripStoryFeedResponse;
+import com.windmill.service.itinerary.ItineraryService;
 import com.windmill.service.trip.CommunityScheduleService;
 import com.windmill.service.trip.TripRecordService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +30,7 @@ public class TripRecordController {
 
     private final TripRecordService tripRecordService;
     private final CommunityScheduleService communityScheduleService;
+    private final ItineraryService itineraryService;
 
     @PostMapping
     public Mono<ResponseEntity<TripRecordResponse>> create(
@@ -57,6 +62,18 @@ public class TripRecordController {
     public Mono<ResponseEntity<TripStoryFeedResponse>> click(@PathVariable Long id) {
         return Mono.fromCallable(() -> tripRecordService.incrementClick(id))
                 .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /** 추천 기록의 일정을 그대로 복제해 새 당일치기 시작 */
+    @PostMapping("/{id}/start")
+    public Mono<ResponseEntity<ItineraryResponse>> startFromRecord(
+            @RequestHeader("X-Session-Id") String sessionId,
+            @PathVariable Long id,
+            @Valid @RequestBody StartFromTripRecordRequest request) {
+        return Mono.fromCallable(() -> itineraryService.createFromTripRecord(sessionId, id, request.getStartDate()))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ItineraryResponse::from)
                 .map(ResponseEntity::ok);
     }
 

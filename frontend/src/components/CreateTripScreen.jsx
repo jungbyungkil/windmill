@@ -13,7 +13,15 @@ function todayIso() {
   return `${y}-${m}-${day}`;
 }
 
-export default function CreateTripScreen({ onCreate, loading, error, draftItineraryId, onResumeDraft }) {
+export default function CreateTripScreen({
+  onCreate,
+  onStartFromStory,
+  loading,
+  startingStoryId,
+  error,
+  draftItineraryId,
+  onResumeDraft,
+}) {
   const [regions, setRegions] = useState([]);
   const [regionsError, setRegionsError] = useState(null);
   const [sidoCode, setSidoCode] = useState('');
@@ -100,6 +108,12 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
     });
   }
 
+  function handleStartFromStory(story) {
+    setDateTouched(true);
+    if (dateInvalid || !onStartFromStory) return;
+    onStartFromStory(story, tripDate);
+  }
+
   return (
     <div className="create-trip-screen">
       <PinwheelHero />
@@ -144,14 +158,21 @@ export default function CreateTripScreen({ onCreate, loading, error, draftItiner
           </div>
         </div>
 
-        {/* 지역 선택 직후: 해당 지역 우선 · 평점/좋아요/클릭 순 Top 추천 */}
-        <TripStoryFeed signguFullCode={signguFullCode} regionLabel={regionLabel} />
+        {/* 지역 선택 직후: 해당 지역 우선 · 카드 클릭 시 그 일정 그대로 시작 (아래 여행 날짜 적용) */}
+        <TripStoryFeed
+          signguFullCode={signguFullCode}
+          regionLabel={regionLabel}
+          tripDate={tripDate}
+          onStartFromStory={handleStartFromStory}
+          startingStoryId={startingStoryId}
+          startDisabled={dateInvalid || loading}
+        />
 
         <div className="trip-form-row">
           <label className="trip-form-label" htmlFor="trip-date">
             여행 날짜 <span className="trip-form-hint-inline">하루만 선택</span>
           </label>
-          <p className="trip-form-date-help">당일치기만 지원해요. 시작~종료 기간은 선택할 수 없습니다.</p>
+          <p className="trip-form-date-help">당일치기만 지원해요. 추천 기록으로 시작할 때도 이 날짜가 적용돼요.</p>
           <input
             id="trip-date"
             type="date"

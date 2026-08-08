@@ -37,6 +37,7 @@ export default function App() {
   const [shareToken, setShareToken] = useState(() => readShareTokenFromHash());
   const [itinerary, setItinerary] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [startingStoryId, setStartingStoryId] = useState(null);
   const [createError, setCreateError] = useState(null);
   /** 핵심: 혼잡↓·동선최적화 스마트 일정 우선 노출 */
   const [showSmartPlan, setShowSmartPlan] = useState(false);
@@ -179,6 +180,27 @@ export default function App() {
       setCreateError(e.message);
     } finally {
       setCreating(false);
+    }
+  }
+
+  /** 추천 기록 카드 → 해당 장소·시간 그대로 복제해 일정 화면으로 바로 진입 */
+  async function handleStartFromStory(story, startDate) {
+    if (!story?.id || !startDate) return;
+    setStartingStoryId(story.id);
+    setCreateError(null);
+    try {
+      const result = await api.startFromTripRecord(sessionId, story.id, { startDate });
+      setItinerary(result);
+      setItineraryId(result.itineraryId);
+      setActiveDate(result.startDate);
+      setSmartPlanDate(null);
+      setShowSmartPlan(false);
+      setShowCategoryReco(false);
+      setShowAutoPlan(false);
+    } catch (e) {
+      setCreateError(e.message);
+    } finally {
+      setStartingStoryId(null);
     }
   }
 
@@ -620,7 +642,9 @@ export default function App() {
     return (
       <CreateTripScreen
         onCreate={handleCreate}
+        onStartFromStory={handleStartFromStory}
         loading={creating}
+        startingStoryId={startingStoryId}
         error={createError}
         draftItineraryId={draftItineraryId}
         onResumeDraft={handleResumeDraft}

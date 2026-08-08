@@ -149,3 +149,12 @@ export function clickTripStory(id) {
   return request(`/trip-records/${id}/click`, { method: 'POST' });
 }
 
+/** 추천 기록 일정을 그대로 복제해 당일치기 시작 */
+export function startFromTripRecord(sessionId, id, { startDate }) {
+  return request(`/trip-records/${id}/start`, {
+    method: 'POST',
+    sessionId,
+    body: { startDate },
+  });
+}
+

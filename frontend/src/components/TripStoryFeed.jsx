@@ -26,8 +26,16 @@ function formatDateRange(start, end) {
 /**
  * 당일치기 추천 기록 피드.
  * 여행 지역이 있으면 그 지역을 맨 앞에 두고, 평점·좋아요·클릭 순으로 Top 5.
+ * 카드/CTA 클릭 시 해당 일정 그대로 당일치기 시작.
  */
-export default function TripStoryFeed({ signguFullCode, regionLabel }) {
+export default function TripStoryFeed({
+  signguFullCode,
+  regionLabel,
+  tripDate,
+  onStartFromStory,
+  startingStoryId,
+  startDisabled,
+}) {
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [likedIds, setLikedIds] = useState(() => loadLikedIds());
@@ -47,7 +55,8 @@ export default function TripStoryFeed({ signguFullCode, regionLabel }) {
 
   if (!loading && stories.length === 0) return null;
 
-  async function handleOpen(story) {
+  async function handleExpand(e, story) {
+    e.stopPropagation();
     setExpandedId((prev) => (prev === story.id ? null : story.id));
     try {
       const updated = await api.clickTripStory(story.id);
@@ -55,6 +64,12 @@ export default function TripStoryFeed({ signguFullCode, regionLabel }) {
     } catch {
       // 조회수 실패는 조용히 무시
     }
+  }
+
+  function handleStart(e, story) {
+    e.stopPropagation();
+    if (!onStartFromStory || startDisabled || startingStoryId) return;
+    onStartFromStory(story, tripDate);
   }
 
   async function handleLike(e, story) {
@@ -65,7 +80,6 @@ export default function TripStoryFeed({ signguFullCode, regionLabel }) {
       const updated = await api.likeTripStory(story.id);
       setStories((prev) => {
         const next = prev.map((s) => (s.id === story.id ? { ...s, ...updated } : s));
-        // 좋아요 반영 후 같은 지역 우선 유지하며 인기순 재정렬
         return [...next].sort((a, b) => {
           const aMatch = signguFullCode && a.signguFullCode === signguFullCode ? 0 : 1;
           const bMatch = signguFullCode && b.signguFullCode === signguFullCode ? 0 : 1;
@@ -84,8 +98,8 @@ export default function TripStoryFeed({ signguFullCode, regionLabel }) {
   }
 
   const sub = regionLabel
-    ? `${regionLabel} 당일치기를 평점·좋아요·조회 순으로 보여 드려요 · 옆으로 넘겨 보세요`
-    : '하루 일정으로 다녀온 여행자들의 참고 Top 5 · 옆으로 넘겨 보세요';
+    ? `${regionLabel} 당일치기를 평점·좋아요·조회 순으로 보여 드려요 · 카드를 누르면 그 일정 그대로 시작`
+    : '하루 일정으로 다녀온 여행자들의 참고 Top 5 · 카드를 누르면 그 일정 그대로 시작';
 
   return (
     <section className="trip-story-feed" aria-label="당일치기 추천 기록">
@@ -103,11 +117,21 @@ export default function TripStoryFeed({ signguFullCode, regionLabel }) {
             const liked = likedIds.has(story.id);
             const adapted = (story.rerouteCount || 0) > 0 || (story.alternatePlaceCount || 0) > 0;
             const regionMatch = Boolean(signguFullCode && story.signguFullCode === signguFullCode);
+            const starting = startingStoryId === story.id;
             return (
               <article
                 key={story.id}
-                className={`trip-story-card ${expanded ? 'expanded' : ''} ${regionMatch ? 'region-match' : ''}`}
-                onClick={() => handleOpen(story)}
+                className={`trip-story-card ${expanded ? 'expanded' : ''} ${regionMatch ? 'region-match' : ''} ${starting ? 'starting' : ''}`}
+                onClick={(e) => handleStart(e, story)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleStart(e, story);
+                  }
+                }}
+                aria-label={`${story.placeNames?.slice(0, 2).join(' · ') || '추천 일정'}으로 당일치기 시작`}
               >
                 <div className="trip-story-media">
                   {story.thumbnailUrl ? (
@@ -166,7 +190,23 @@ export default function TripStoryFeed({ signguFullCode, regionLabel }) {
                       {liked ? '❤️' : '🤍'} {story.likeCount ?? 0}
                     </button>
                     <span className="trip-story-clicks">👀 {story.clickCount ?? 0}</span>
+                    <button
+                      type="button"
+                      className="trip-story-detail"
+                      onClick={(e) => handleExpand(e, story)}
+                    >
+                      {expanded ? '접기' : '더보기'}
+                    </button>
                   </div>
+
+                  <button
+                    type="button"
+                    className="trip-story-start"
+                    onClick={(e) => handleStart(e, story)}
+                    disabled={startDisabled || Boolean(startingStoryId)}
+                  >
+                    {starting ? '일정 불러오는 중…' : '이 일정으로 시작'}
+                  </button>
                 </div>
               </article>
             );
