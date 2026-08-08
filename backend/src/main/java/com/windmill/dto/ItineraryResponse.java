@@ -39,8 +39,18 @@ public class ItineraryResponse {
                 .withPet(itinerary.isWithPet())
                 .items(itinerary.getItems().stream()
                         .sorted(java.util.Comparator
-                                .comparingInt(com.windmill.domain.ItineraryItem::getDisplayOrder)
-                                .thenComparing(i -> i.getScheduledTime() == null ? "" : i.getScheduledTime()))
+                                .comparing((com.windmill.domain.ItineraryItem i) -> {
+                                    String t = i.getScheduledTime();
+                                    if (t == null || t.isBlank()) return Integer.MAX_VALUE;
+                                    String[] p = t.trim().split(":");
+                                    if (p.length < 2) return Integer.MAX_VALUE;
+                                    try {
+                                        return Integer.parseInt(p[0].trim()) * 60 + Integer.parseInt(p[1].trim());
+                                    } catch (NumberFormatException e) {
+                                        return Integer.MAX_VALUE;
+                                    }
+                                })
+                                .thenComparingInt(com.windmill.domain.ItineraryItem::getDisplayOrder))
                         .map(ItineraryItemResponse::from)
                         .collect(Collectors.toList()))
                 .confirmedDates(itinerary.getConfirmedDates())

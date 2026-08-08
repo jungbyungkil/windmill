@@ -297,6 +297,59 @@ public class ItineraryService {
         return itineraryRepository.save(itinerary);
     }
 
+    /**
+     * 해당 일자 일정을 scheduledTime(HH:mm) 오름차순으로 재정렬하고 displayOrder를 맞춘다.
+     * 시각이 없는 항목은 맨 뒤. 시각 값은 그대로 둔다.
+     */
+    @Transactional
+    public Itinerary sortByScheduledTime(Long itineraryId, LocalDate date) {
+        Itinerary itinerary = get(itineraryId);
+        List<ItineraryItem> targets = itinerary.getItems().stream()
+                .filter(i -> date == null
+                        || date.equals(i.getVisitDate())
+                        || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
+                .sorted(Comparator
+                        .comparing((ItineraryItem i) -> parseScheduleMinutes(i.getScheduledTime()),
+                                Comparator.nullsLast(Integer::compareTo))
+                        .thenComparingInt(ItineraryItem::getDisplayOrder))
+                .collect(Collectors.toList());
+        if (targets.isEmpty()) {
+            return itinerary;
+        }
+
+        int orderBase = itinerary.getItems().stream()
+                .filter(i -> targets.stream().noneMatch(t -> t.getId().equals(i.getId())))
+                .mapToInt(ItineraryItem::getDisplayOrder)
+                .max()
+                .orElse(-1) + 1;
+        for (int i = 0; i < targets.size(); i++) {
+            targets.get(i).setDisplayOrder(orderBase + i);
+        }
+        return itineraryRepository.save(itinerary);
+    }
+
+    /** "09:00" / "9:00" → 분 단위. 파싱 실패·빈 값이면 null */
+    private static Integer parseScheduleMinutes(String scheduledTime) {
+        if (scheduledTime == null || scheduledTime.isBlank()) {
+            return null;
+        }
+        String t = scheduledTime.trim();
+        String[] parts = t.split(":");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            int h = Integer.parseInt(parts[0].trim());
+            int m = Integer.parseInt(parts[1].trim());
+            if (h < 0 || h > 23 || m < 0 || m > 59) {
+                return null;
+            }
+            return h * 60 + m;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /** 09:00부터 체류·이동을 반영해 HH:mm 재배정 (스마트일정과 동일 감각) */
     private void assignOptimizedSchedule(List<ItineraryItem> ordered) {
         final int baseStayMinutes = 75;

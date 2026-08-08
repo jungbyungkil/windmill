@@ -2478,10 +2478,38 @@
 
 .itinerary-list-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 4px;
+}
+
+.itinerary-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-sort-time {
+  border: 1px solid color-mix(in srgb, var(--sea) 28%, var(--sand-border));
+  background: color-mix(in srgb, var(--sea) 8%, white);
+  color: var(--sea-deep);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-sort-time:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sea) 14%, white);
+}
+
+.btn-sort-time:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .itinerary-count {

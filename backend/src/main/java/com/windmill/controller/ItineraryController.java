@@ -163,6 +163,17 @@ public class ItineraryController {
                 .map(ResponseEntity::ok);
     }
 
+    /** 해당 일자 일정을 방문 시각(HH:mm) 순으로 displayOrder 재정렬 */
+    @PostMapping("/{id}/sort-by-time")
+    public Mono<ResponseEntity<ItineraryResponse>> sortByTime(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date) {
+        return Mono.fromCallable(() -> itineraryService.sortByScheduledTime(id, date))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ItineraryResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
     /** 완성 일정 공유 토큰 발급 */
     @PostMapping("/{id}/share")
     public Mono<ResponseEntity<com.windmill.dto.SharedItineraryResponse>> share(@PathVariable Long id) {

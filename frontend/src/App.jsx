@@ -31,6 +31,17 @@ function formatTripDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()} (${weekday})`;
 }
 
+/** "09:00" → 분. 없거나 잘못되면 null */
+function scheduleMinutes(scheduledTime) {
+  if (!scheduledTime || typeof scheduledTime !== 'string') return null;
+  const parts = scheduledTime.trim().split(':');
+  if (parts.length < 2) return null;
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
 export default function App() {
   const { sessionId, itineraryId, setItineraryId, draftItineraryId, leaveItineraryView, resumeDraftItinerary } = useSession();
 
@@ -76,6 +87,7 @@ export default function App() {
   const [autoReplaceNotice, setAutoReplaceNotice] = useState(null);
   const [rerouteLoading, setRerouteLoading] = useState(false);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
+  const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const autoOptimizedRef = useRef(false);
 
@@ -130,10 +142,14 @@ export default function App() {
     ? [...itinerary.items]
         .filter((i) => (i.visitDate || itinerary.startDate) === (activeDate || tripDate))
         .sort((a, b) => {
-          const ao = a.displayOrder ?? 0;
-          const bo = b.displayOrder ?? 0;
-          if (ao !== bo) return ao - bo;
-          return String(a.scheduledTime || '').localeCompare(String(b.scheduledTime || ''));
+          const ta = scheduleMinutes(a.scheduledTime);
+          const tb = scheduleMinutes(b.scheduledTime);
+          if (ta !== tb) {
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return ta - tb;
+          }
+          return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
         })
     : [];
   function openSmartPlanForDate(date) {
@@ -572,6 +588,23 @@ export default function App() {
     }
   }
 
+  /** 오늘 일정을 방문 시각 순으로 재정렬 (시각은 유지) */
+  async function handleSortByTime() {
+    if (!itineraryId || sortByTimeLoading) return;
+    setSortByTimeLoading(true);
+    setAutoReplaceNotice(null);
+    try {
+      const result = await api.sortItineraryByTime(itineraryId, activeDate);
+      setItinerary(result);
+      setAutoReplaceNotice('오늘 일정을 시간 순서로 정렬했어요.');
+    } catch (e) {
+      setAutoReplaceNotice(`시간순 정렬 실패: ${e.message}`);
+    } finally {
+      setSortByTimeLoading(false);
+      setTimeout(() => setAutoReplaceNotice(null), 4000);
+    }
+  }
+
   // 동선 꼬임 감지 시 한 번 자동 재계산
   useEffect(() => {
     if (!trigger?.routeTangleTrigger) {
@@ -756,6 +789,8 @@ export default function App() {
           onDelete={handleDeleteItem}
           onOpenDocent={handleOpenDocent}
           onPlanDay={() => openSmartPlanForDate(tripDate)}
+          onSortByTime={handleSortByTime}
+          sortByTimeLoading={sortByTimeLoading}
         />
 
         <RecommendationSearch

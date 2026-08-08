@@ -114,6 +114,11 @@ export function optimizeRoute(itineraryId, date) {
   return request(`/itineraries/${itineraryId}/optimize-route${qs({ date })}`, { method: 'POST' });
 }
 
+/** 방문 시각 순으로 일정 재정렬 (시각 값은 유지) */
+export function sortItineraryByTime(itineraryId, date) {
+  return request(`/itineraries/${itineraryId}/sort-by-time${qs({ date })}`, { method: 'POST' });
+}
+
 /** 완성 일정 공유 토큰 발급 */
 export function shareItinerary(itineraryId) {
   return request(`/itineraries/${itineraryId}/share`, { method: 'POST' });

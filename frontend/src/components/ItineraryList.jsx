@@ -11,6 +11,8 @@ export default function ItineraryList({
   onDelete,
   onOpenDocent,
   onPlanDay,
+  onSortByTime,
+  sortByTimeLoading = false,
 }) {
   const affected = new Set((affectedItemIds || []).map(Number));
 
@@ -18,9 +20,21 @@ export default function ItineraryList({
     <div className="itinerary-list">
       <div className="itinerary-list-head">
         <h2 className="section-title">{dayLabel ? `${dayLabel} 일정` : '담은 일정'}</h2>
-        {items.length > 0 && (
-          <span className="itinerary-count">{items.length}곳</span>
-        )}
+        <div className="itinerary-list-actions">
+          {items.length > 1 && onSortByTime && (
+            <button
+              type="button"
+              className="btn-sort-time"
+              onClick={onSortByTime}
+              disabled={sortByTimeLoading}
+            >
+              {sortByTimeLoading ? '정렬 중…' : '⏱ 시간순 정렬'}
+            </button>
+          )}
+          {items.length > 0 && (
+            <span className="itinerary-count">{items.length}곳</span>
+          )}
+        </div>
       </div>
       {weatherAlert && affected.size > 0 && (
         <p className="itinerary-weather-hint">
