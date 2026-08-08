@@ -5,6 +5,8 @@ import SituationBanner, { loadSituationByGeolocation, maybeNotifySituation } fro
 import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS } from '../constants';
 
+const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
+
 function todayIso() {
   const d = new Date();
   const y = d.getFullYear();
@@ -13,7 +15,15 @@ function todayIso() {
   return `${y}-${m}-${day}`;
 }
 
+function formatDraftDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  return `${d.getMonth() + 1}/${d.getDate()} (${weekday})`;
+}
+
 export default function CreateTripScreen({
+  sessionId,
   onCreate,
   onStartFromStory,
   loading,
@@ -33,6 +43,8 @@ export default function CreateTripScreen({
   const [situation, setSituation] = useState(null);
   const [situationLoading, setSituationLoading] = useState(true);
   const [situationDismissed, setSituationDismissed] = useState(false);
+  const [ongoingTrips, setOngoingTrips] = useState([]);
+  const [ongoingLoading, setOngoingLoading] = useState(Boolean(sessionId));
 
   useEffect(() => {
     api.getRegions()
@@ -42,6 +54,28 @@ export default function CreateTripScreen({
       })
       .catch((e) => setRegionsError(e.message));
   }, []);
+
+  // 미완료 당일치기 목록 (날짜별 줄 + 이어하기)
+  useEffect(() => {
+    if (!sessionId) {
+      setOngoingTrips([]);
+      setOngoingLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setOngoingLoading(true);
+    api.getOngoingItineraries(sessionId)
+      .then((list) => {
+        if (!cancelled) setOngoingTrips(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setOngoingTrips([]);
+      })
+      .finally(() => {
+        if (!cancelled) setOngoingLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [sessionId, draftItineraryId]);
 
   // 앱 실행 시 현재 위치 기반 상황 요약 + (주의 시) Notification
   useEffect(() => {
@@ -128,17 +162,54 @@ export default function CreateTripScreen({
         />
       )}
 
-      {draftItineraryId && onResumeDraft && (
+      {ongoingLoading ? (
+        <div className="draft-resume-banner draft-resume-loading">
+          <p>진행 중인 당일치기를 확인하는 중…</p>
+        </div>
+      ) : ongoingTrips.length > 0 ? (
+        <div className="draft-resume-panel">
+          <div className="draft-resume-panel-head">
+            <strong>진행 중인 여행이 있어요</strong>
+            <p>날짜별 당일치기를 이어 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
+          </div>
+          <ul className="draft-resume-list">
+            {ongoingTrips.map((trip, index) => (
+              <li key={trip.itineraryId} className="draft-resume-row">
+                <div className="draft-resume-row-main">
+                  <span className="draft-resume-day">당일치기 {index + 1}</span>
+                  <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
+                  {trip.regionDisplayName && (
+                    <span className="draft-resume-region">{trip.regionDisplayName}</span>
+                  )}
+                  <span className="draft-resume-meta">
+                    {trip.placeCount ?? 0}곳
+                    {trip.companionType && COMPANION_LABEL[trip.companionType]
+                      ? ` · ${COMPANION_LABEL[trip.companionType]}`
+                      : ''}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => onResumeDraft?.(trip.itineraryId)}
+                >
+                  이어하기
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : draftItineraryId && onResumeDraft ? (
         <div className="draft-resume-banner">
           <div>
             <strong>진행 중인 여행이 있어요</strong>
             <p>이어서 일정을 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
           </div>
-          <button type="button" className="btn-primary" onClick={onResumeDraft}>
+          <button type="button" className="btn-primary" onClick={() => onResumeDraft(draftItineraryId)}>
             이어하기
           </button>
         </div>
-      )}
+      ) : null}
 
       <form className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">

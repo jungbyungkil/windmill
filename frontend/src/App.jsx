@@ -112,8 +112,8 @@ export default function App() {
     leaveItineraryView();
   }
 
-  function handleResumeDraft() {
-    resumeDraftItinerary();
+  function handleResumeDraft(id) {
+    resumeDraftItinerary(id);
   }
 
   // 일정이 새로 로드되면 여행 시작일을 기본 활성 날짜로
@@ -641,6 +641,7 @@ export default function App() {
   if (!itinerary) {
     return (
       <CreateTripScreen
+        sessionId={sessionId}
         onCreate={handleCreate}
         onStartFromStory={handleStartFromStory}
         loading={creating}

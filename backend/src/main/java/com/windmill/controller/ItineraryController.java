@@ -7,6 +7,7 @@ import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryResponse;
+import com.windmill.dto.OngoingItineraryResponse;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.SmartPlanResponse;
@@ -49,6 +50,16 @@ public class ItineraryController {
         return Mono.fromCallable(() -> itineraryService.create(sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ItineraryResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
+    /** 세션의 미완료 당일치기 목록 - 메인 "진행 중인 여행" 이어하기 */
+    @GetMapping("/ongoing")
+    public Mono<ResponseEntity<List<OngoingItineraryResponse>>> ongoing(
+            @RequestHeader("X-Session-Id") String sessionId) {
+        return Mono.fromCallable(() -> itineraryService.findOngoingDayTrips(sessionId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(list -> list.stream().map(OngoingItineraryResponse::from).collect(Collectors.toList()))
                 .map(ResponseEntity::ok);
     }
 

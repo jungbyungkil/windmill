@@ -48,6 +48,11 @@ export function getItinerary(itineraryId) {
   return request(`/itineraries/${itineraryId}`);
 }
 
+/** 세션의 미완료 당일치기 목록 (진행 중 → 이어하기) */
+export function getOngoingItineraries(sessionId) {
+  return request('/itineraries/ongoing', { sessionId });
+}
+
 export function addItem(itineraryId, item) {
   return request(`/itineraries/${itineraryId}/items`, { method: 'POST', body: item });
 }

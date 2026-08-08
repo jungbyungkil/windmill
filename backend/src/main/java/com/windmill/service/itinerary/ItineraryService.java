@@ -142,6 +142,12 @@ public class ItineraryService {
         return itineraryRepository.findBySessionUuid(sessionUuid);
     }
 
+    /** 여행 마무리(TripRecord) 전인 당일치기만 - 메인 "진행 중인 여행" 목록 */
+    @Transactional(readOnly = true)
+    public List<Itinerary> findOngoingDayTrips(String sessionUuid) {
+        return itineraryRepository.findOngoingDayTripsBySession(sessionUuid);
+    }
+
     @Transactional
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);
