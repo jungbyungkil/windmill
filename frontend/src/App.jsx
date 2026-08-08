@@ -706,7 +706,6 @@ export default function App() {
         {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
 
         <WeatherBanner items={weatherItems} />
-        <MidWeatherBanner forecast={midWeather} />
 
         <div className="daytrip-chip-row">
           <span className="daytrip-chip">당일치기</span>
@@ -740,6 +739,8 @@ export default function App() {
           onAdd={handleAddFestival}
           addingId={addingFestivalId}
         />
+
+        <MidWeatherBanner forecast={midWeather} />
       </main>
 
       <footer className="app-footer">
