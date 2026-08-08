@@ -1793,10 +1793,42 @@
   border-radius: 12px;
   padding: 10px 12px;
   font-size: 14px;
-  background: var(--sand);
+  background: #fff;
   color: var(--ink);
   resize: vertical;
-  margin-bottom: 14px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.overall-note-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--sea) 45%, var(--sand-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 12%, transparent);
+}
+
+.overall-note-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 75%, white);
+}
+
+.trip-record-note-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 4px 0 6px;
+  text-align: left;
+}
+
+.trip-record-note-label .muted {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.trip-record-note-count {
+  margin: 0 0 12px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
 }
 
 .overall-rating-row {

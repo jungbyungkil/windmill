@@ -10,6 +10,7 @@ const RATINGS = [
 export default function TripRecordModal({ open, items, submitting, onSubmit, onClose }) {
   const [ratings, setRatings] = useState({});
   const [overallRating, setOverallRating] = useState(null);
+  const [overallNote, setOverallNote] = useState('');
 
   if (!open) return null;
 
@@ -25,7 +26,11 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
     const visitFeedback = items
       .filter((item) => ratings[item.itemId])
       .map((item) => ({ itemId: item.itemId, placeName: item.placeName, rating: ratings[item.itemId] }));
-    onSubmit({ overallRating, overallNote: '', visitFeedback });
+    onSubmit({
+      overallRating,
+      overallNote: overallNote.trim(),
+      visitFeedback,
+    });
   }
 
   return (
@@ -63,6 +68,20 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
             같은 지역으로 떠나는 다른 여행자에게도 이 일정을 보여드릴게요.
           </p>
         )}
+
+        <label className="trip-record-note-label" htmlFor="trip-overall-note">
+          한줄 의견 <span className="muted">(선택)</span>
+        </label>
+        <textarea
+          id="trip-overall-note"
+          className="overall-note-input"
+          value={overallNote}
+          onChange={(e) => setOverallNote(e.target.value.slice(0, 500))}
+          placeholder="예: 아이들과 당일치기로 좋아요. 비 올 때 실내 전환이 좋았어요."
+          rows={3}
+          maxLength={500}
+        />
+        <p className="trip-record-note-count">{overallNote.length}/500</p>
 
         {items.length > 0 && (
           <>
