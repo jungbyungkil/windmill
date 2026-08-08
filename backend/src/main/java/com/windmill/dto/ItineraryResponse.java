@@ -38,6 +38,9 @@ public class ItineraryResponse {
                 .companionType(itinerary.getCompanionType())
                 .withPet(itinerary.isWithPet())
                 .items(itinerary.getItems().stream()
+                        .sorted(java.util.Comparator
+                                .comparingInt(com.windmill.domain.ItineraryItem::getDisplayOrder)
+                                .thenComparing(i -> i.getScheduledTime() == null ? "" : i.getScheduledTime()))
                         .map(ItineraryItemResponse::from)
                         .collect(Collectors.toList()))
                 .confirmedDates(itinerary.getConfirmedDates())

@@ -126,7 +126,14 @@ export default function App() {
   // 당일치기: 해당 날짜 일정만 표시
   const tripDate = itinerary?.startDate || null;
   const visibleItems = itinerary
-    ? itinerary.items.filter((i) => (i.visitDate || itinerary.startDate) === (activeDate || tripDate))
+    ? [...itinerary.items]
+        .filter((i) => (i.visitDate || itinerary.startDate) === (activeDate || tripDate))
+        .sort((a, b) => {
+          const ao = a.displayOrder ?? 0;
+          const bo = b.displayOrder ?? 0;
+          if (ao !== bo) return ao - bo;
+          return String(a.scheduledTime || '').localeCompare(String(b.scheduledTime || ''));
+        })
     : [];
   function openSmartPlanForDate(date) {
     setSmartPlanDate(date || itinerary?.startDate || null);
@@ -533,7 +540,7 @@ export default function App() {
     try {
       const result = await api.optimizeRoute(itineraryId, activeDate);
       setItinerary(result);
-      setAutoReplaceNotice('동선이 꼬여 방문 순서를 자동으로 다시 잡았어요.');
+      setAutoReplaceNotice('동선 순서와 방문 시각을 다시 잡았어요.');
       refreshTrigger();
     } catch (e) {
       setAutoReplaceNotice(`동선 재배치 실패: ${e.message}`);

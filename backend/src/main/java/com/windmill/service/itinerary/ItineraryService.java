@@ -185,53 +185,65 @@ public class ItineraryService {
     }
 
     /**
-     * 동선 꼬임 자동 재배치 - 해당 일자(또는 전체) 항목을 최근접 순서로 재정렬하고
-     * 방문 시각을 09:00부터 75분 간격으로 다시 붙인다. 고정(pin) 항목은 상대 시각을 유지하려 시도한다.
+     * 동선 꼬임 자동 재배치 - 해당 일자 항목을 최근접 순서로 재정렬하고,
+     * 방문 시각을 09:00 시작 + (체류 75분 + 이동거리 기반)으로 다시 붙인다.
+     * 고정(pin) 여부와 관계없이 순서·시각을 갱신한다 (장소 자체는 유지).
      */
     @Transactional
     public Itinerary optimizeRoute(Long itineraryId, LocalDate date) {
         Itinerary itinerary = get(itineraryId);
         List<ItineraryItem> targets = itinerary.getItems().stream()
-                .filter(i -> date == null || date.equals(i.getVisitDate()) || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
+                .filter(i -> date == null
+                        || date.equals(i.getVisitDate())
+                        || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
                 .collect(Collectors.toList());
         if (targets.size() < 2) {
             return itinerary;
         }
 
-        List<ItineraryItem> movable = targets.stream().filter(i -> !i.isPinned()).toList();
-        List<ItineraryItem> orderedMovable = RouteTangleDetector.optimizeOrder(movable);
+        List<ItineraryItem> finalOrder = RouteTangleDetector.optimizeOrder(targets);
+        assignOptimizedSchedule(finalOrder);
 
-        // pin은 원래 displayOrder 위치에 최대한 유지, movable만 최적화 순으로 채움
-        List<ItineraryItem> finalOrder = new java.util.ArrayList<>();
-        int mi = 0;
-        for (ItineraryItem original : targets.stream()
-                .sorted(java.util.Comparator.comparingInt(ItineraryItem::getDisplayOrder))
-                .toList()) {
-            if (original.isPinned()) {
-                finalOrder.add(original);
-            } else if (mi < orderedMovable.size()) {
-                finalOrder.add(orderedMovable.get(mi++));
-            }
-        }
-        while (mi < orderedMovable.size()) {
-            finalOrder.add(orderedMovable.get(mi++));
-        }
-
-        java.time.LocalTime cursor = java.time.LocalTime.of(9, 0);
         int orderBase = itinerary.getItems().stream()
-                .filter(i -> !targets.contains(i))
+                .filter(i -> targets.stream().noneMatch(t -> t.getId().equals(i.getId())))
                 .mapToInt(ItineraryItem::getDisplayOrder)
                 .max()
                 .orElse(-1) + 1;
         for (int i = 0; i < finalOrder.size(); i++) {
-            ItineraryItem item = finalOrder.get(i);
-            item.setDisplayOrder(orderBase + i);
-            if (!item.isPinned() || item.getScheduledTime() == null || item.getScheduledTime().isBlank()) {
-                item.setScheduledTime(cursor.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
-            }
-            cursor = cursor.plusMinutes(75);
+            finalOrder.get(i).setDisplayOrder(orderBase + i);
         }
         return itineraryRepository.save(itinerary);
+    }
+
+    /** 09:00부터 체류·이동을 반영해 HH:mm 재배정 (스마트일정과 동일 감각) */
+    private void assignOptimizedSchedule(List<ItineraryItem> ordered) {
+        final int baseStayMinutes = 75;
+        final int minutesPerKm = 12;
+        final java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+        java.time.LocalTime cursor = java.time.LocalTime.of(9, 0);
+        java.time.LocalTime latestStart = java.time.LocalTime.of(20, 0);
+
+        for (int i = 0; i < ordered.size(); i++) {
+            ItineraryItem item = ordered.get(i);
+            if (cursor.isAfter(latestStart)) {
+                cursor = latestStart;
+            }
+            item.setScheduledTime(cursor.format(fmt));
+
+            int travel = 20;
+            if (i + 1 < ordered.size()) {
+                ItineraryItem next = ordered.get(i + 1);
+                Double km = com.windmill.util.GeoUtils.distanceKmSafe(
+                        item.getMapX(), item.getMapY(), next.getMapX(), next.getMapY());
+                if (km != null) {
+                    travel = (int) Math.ceil(km * minutesPerKm);
+                    travel = Math.max(10, Math.min(travel, 90));
+                }
+            } else {
+                travel = 0;
+            }
+            cursor = cursor.plusMinutes(baseStayMinutes + travel);
+        }
     }
 
     private SharedItineraryResponse toShared(Itinerary itinerary) {
