@@ -6,6 +6,7 @@ export default function ItineraryList({
   weatherAlert = false,
   dayLabel,
   onUpdateTime,
+  onUpdateItem,
   onTogglePin,
   onDelete,
   onOpenDocent,
@@ -44,6 +45,7 @@ export default function ItineraryList({
               item={item}
               alerted={affected.has(Number(item.itemId))}
               onUpdateTime={onUpdateTime}
+              onUpdateItem={onUpdateItem}
               onTogglePin={onTogglePin}
               onDelete={onDelete}
               onOpenDocent={onOpenDocent}

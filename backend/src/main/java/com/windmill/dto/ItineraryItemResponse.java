@@ -29,6 +29,7 @@ public class ItineraryItemResponse {
     private String restDateText;
     private String mapX;
     private String mapY;
+    private boolean isAlternate;
 
     public static ItineraryItemResponse from(ItineraryItem item) {
         return ItineraryItemResponse.builder()
@@ -51,6 +52,7 @@ public class ItineraryItemResponse {
                 .restDateText(item.getRestDateText())
                 .mapX(item.getMapX())
                 .mapY(item.getMapY())
+                .isAlternate(item.isAlternate())
                 .build();
     }
 }

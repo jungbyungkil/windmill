@@ -120,6 +120,30 @@ public class ItineraryService {
         if (request.getVisitDate() != null && !request.getVisitDate().isBlank()) {
             item.setVisitDate(LocalDate.parse(request.getVisitDate()));
         }
+        if (request.getPlaceName() != null && !request.getPlaceName().isBlank()) {
+            item.setPlaceName(request.getPlaceName().trim());
+        }
+        if (request.getTags() != null) {
+            item.setTags(new java.util.ArrayList<>(request.getTags()));
+        }
+        if (request.getAddr1() != null) {
+            item.setAddr1(request.getAddr1().isBlank() ? null : request.getAddr1().trim());
+        }
+        if (request.getTel() != null) {
+            item.setTel(request.getTel().isBlank() ? null : request.getTel().trim());
+        }
+        if (request.getUseFeeText() != null) {
+            item.setUseFeeText(request.getUseFeeText().isBlank() ? null : request.getUseFeeText().trim());
+        }
+        if (request.getIsFree() != null) {
+            item.setIsFree(request.getIsFree());
+        }
+        if (request.getRestDateText() != null) {
+            item.setRestDateText(request.getRestDateText().isBlank() ? null : request.getRestDateText().trim());
+        }
+        if (request.getCategory() != null) {
+            item.setCategory(request.getCategory().isBlank() ? null : request.getCategory().trim());
+        }
         return itineraryRepository.save(itinerary);
     }
 

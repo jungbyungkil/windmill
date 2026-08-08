@@ -1054,6 +1054,85 @@
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 96px;
+}
+
+.item-actions .icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.item-card.editing {
+  align-items: flex-start;
+}
+
+.alt-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--sea-deep, var(--sea));
+  background: color-mix(in srgb, var(--sea) 14%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.item-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.item-edit-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.item-edit-label input {
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--sand-card);
+  color: var(--ink);
+}
+
+.item-edit-tags {
+  margin-top: 2px;
+}
+
+.item-edit-free {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.item-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-secondary {
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ---------- Recommendation search ---------- */

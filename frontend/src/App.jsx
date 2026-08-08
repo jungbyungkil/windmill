@@ -180,6 +180,12 @@ export default function App() {
     setItinerary(result);
   }
 
+  async function handleUpdateItem(itemId, patch) {
+    const result = await api.updateItem(itineraryId, itemId, patch);
+    setItinerary(result);
+    return result;
+  }
+
   async function handleTogglePin(itemId, isPinned) {
     const result = await api.updateItem(itineraryId, itemId, { isPinned });
     setItinerary(result);
@@ -714,6 +720,7 @@ export default function App() {
           weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
           dayLabel="오늘"
           onUpdateTime={handleUpdateTime}
+          onUpdateItem={handleUpdateItem}
           onTogglePin={handleTogglePin}
           onDelete={handleDeleteItem}
           onOpenDocent={handleOpenDocent}
