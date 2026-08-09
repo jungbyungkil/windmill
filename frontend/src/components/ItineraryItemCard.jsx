@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TAG_OPTIONS } from '../constants';
 import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLevel';
-
-function normalizeTime(raw) {
-  const value = (raw || '').trim();
-  if (!value) return '';
-  const m = value.match(/^(\d{1,2}):?(\d{0,2})$/);
-  if (!m) return value.replace(/[^\d:]/g, '').slice(0, 5);
-  const hh = Math.min(23, Number(m[1]));
-  const mm = Math.min(59, Number(m[2] || '0'));
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-}
+import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 
 function draftFromItem(src) {
   return {
@@ -106,36 +97,20 @@ export default function ItineraryItemCard({
       )}
 
       {!editing ? (
-        <input
-          type="text"
-          className={`item-time ${statusClass}`}
-          inputMode="numeric"
-          placeholder="09:00"
-          aria-label="방문 시각"
-          maxLength={5}
+        <VisitTimePicker
+          className={statusClass}
           value={item.scheduledTime || ''}
-          onChange={(e) => {
-            const next = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
-            onUpdateTime(item.itemId, next);
+          onChange={(next) => {
+            if (next) onUpdateTime?.(item.itemId, next);
           }}
-          onBlur={(e) => {
-            const normalized = normalizeTime(e.target.value);
-            if (normalized) onUpdateTime(item.itemId, normalized);
-          }}
+          aria-label={`${item.placeName || '장소'} 방문 시각`}
         />
       ) : (
-        <input
-          type="text"
-          className={`item-time ${statusClass}`}
-          inputMode="numeric"
-          placeholder="09:00"
-          aria-label="방문 시각 수정"
-          maxLength={5}
+        <VisitTimePicker
+          className={statusClass}
           value={draft.scheduledTime}
-          onChange={(e) => setDraft((prev) => ({
-            ...prev,
-            scheduledTime: e.target.value.replace(/[^\d:]/g, '').slice(0, 5),
-          }))}
+          onChange={(next) => setDraft((prev) => ({ ...prev, scheduledTime: next }))}
+          aria-label="방문 시각 수정"
         />
       )}
 

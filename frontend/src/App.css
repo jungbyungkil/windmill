@@ -1138,16 +1138,49 @@
   letter-spacing: 0.02em;
 }
 
+.visit-time-wrap {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.visit-time-wrap.status-warning .item-time,
 .item-time.status-warning {
   border-color: color-mix(in srgb, var(--status-warning) 40%, var(--sand-border));
   background: color-mix(in srgb, var(--status-warning) 12%, white);
   color: #a86a00;
 }
 
+.visit-time-wrap.status-danger .item-time,
 .item-time.status-danger {
   border-color: color-mix(in srgb, var(--status-danger) 45%, var(--sand-border));
   background: color-mix(in srgb, var(--status-danger) 12%, white);
   color: var(--status-danger);
+}
+
+.item-time-picker {
+  width: auto;
+  min-width: 5.75rem;
+  max-width: 7.5rem;
+  padding: 6px 6px 6px 8px;
+  cursor: pointer;
+  color-scheme: light;
+}
+
+.item-time-picker::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  margin-left: 2px;
+}
+
+.item-time-picker:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--sea) 45%, var(--sand-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 14%, transparent);
+}
+
+.item-time-picker:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .item-status-chip {
