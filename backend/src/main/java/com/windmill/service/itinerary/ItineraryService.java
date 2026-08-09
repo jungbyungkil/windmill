@@ -350,13 +350,32 @@ public class ItineraryService {
         }
     }
 
-    /** 09:00부터 체류·이동을 반영해 HH:mm 재배정 (스마트일정과 동일 감각) */
+    /** 09:00(또는 오늘이면 지금+버퍼)부터 체류·이동을 반영해 HH:mm 재배정 */
     private void assignOptimizedSchedule(List<ItineraryItem> ordered) {
         final int baseStayMinutes = 75;
         final int minutesPerKm = 12;
         final java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
-        java.time.LocalTime cursor = java.time.LocalTime.of(9, 0);
         java.time.LocalTime latestStart = java.time.LocalTime.of(20, 0);
+        java.time.LocalTime cursor = java.time.LocalTime.of(9, 0);
+        // 오늘 일정이면 이미 지난 오전 시각으로 두지 않음
+        ItineraryItem first = ordered.isEmpty() ? null : ordered.get(0);
+        java.time.LocalDate visit = first != null && first.getVisitDate() != null
+                ? first.getVisitDate()
+                : (first != null && first.getItinerary() != null ? first.getItinerary().getStartDate() : null);
+        if (visit != null && visit.equals(java.time.LocalDate.now())) {
+            java.time.LocalTime soon = java.time.LocalTime.now().plusMinutes(30).withSecond(0).withNano(0);
+            int m = soon.getMinute();
+            if (m == 0) {
+                cursor = soon;
+            } else if (m <= 30) {
+                cursor = soon.withMinute(30);
+            } else {
+                cursor = soon.plusHours(1).withMinute(0);
+            }
+            if (cursor.isBefore(java.time.LocalTime.of(9, 0))) {
+                cursor = java.time.LocalTime.of(9, 0);
+            }
+        }
 
         for (int i = 0; i < ordered.size(); i++) {
             ItineraryItem item = ordered.get(i);

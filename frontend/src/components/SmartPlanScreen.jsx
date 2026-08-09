@@ -150,7 +150,9 @@ export default function SmartPlanScreen({
           </div>
 
           {stops.length === 0 ? (
-            <p className="empty-state">조건에 맞는 장소를 찾지 못했어요. 카테고리에서 골라보세요.</p>
+            <p className="empty-state">
+              지금 시간에는 담을 일정이 많지 않아요. 내일로 바꾸거나 카테고리에서 가까운 곳만 골라보세요.
+            </p>
           ) : (
             <ol className="smart-plan-timeline">
               {stops.map((stop, index) => renderStop(stop, index))}

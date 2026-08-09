@@ -43,7 +43,14 @@ public class SmartPlanService {
     private static final int PER_DAY_PLACES = 4;
     private static final int MAX_DAYS = 7;
     private static final LocalTime DAY_START = LocalTime.of(9, 0);
+    /** 방문 시작 시각 상한 — 이 시각 이후로는 새 장소 배정하지 않음 */
+    private static final LocalTime LATEST_START = LocalTime.of(20, 0);
+    /** 일정 윈도우 끝(체류 포함) */
+    private static final LocalTime DAY_END = LocalTime.of(21, 0);
+    /** 오늘일 때 출발 버퍼(분) — 지금 6시면 6:30부터 */
+    private static final int TODAY_LEAD_MINUTES = 30;
     private static final int BASE_STAY_MINUTES = 75;
+    private static final int DEFAULT_TRAVEL_MINUTES = 20;
     private static final int MINUTES_PER_KM = 12;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -158,25 +165,47 @@ public class SmartPlanService {
 
         for (int d = 0; d < targetDays.size(); d++) {
             LocalDate date = targetDays.get(d);
-            List<RecommendationCandidate> dayPool = takeNext(remaining, Math.min(perDay + 2, Math.max(perDay, remaining.size())));
+            LocalTime dayStart = resolveDayStart(date);
+            int capacity = maxStopsForWindow(dayStart);
+            int dayLimit = Math.min(perDay, capacity);
+
+            if (dayLimit <= 0) {
+                days.add(SmartPlanResponse.DayPlan.builder()
+                        .dayIndex(d + 1)
+                        .visitDate(date.toString())
+                        .label((d + 1) + "일차 · " + formatMd(date))
+                        .estimatedDistanceKm(0.0)
+                        .stops(List.of())
+                        .build());
+                continue;
+            }
+
+            List<RecommendationCandidate> dayPool = takeNext(remaining, Math.min(dayLimit + 2, Math.max(dayLimit, remaining.size())));
             if (dayPool.isEmpty()) {
                 days.add(SmartPlanResponse.DayPlan.builder()
                         .dayIndex(d + 1)
                         .visitDate(date.toString())
-                        .label((d + 1) + "일차")
+                        .label((d + 1) + "일차 · " + formatMd(date))
                         .estimatedDistanceKm(0.0)
                         .stops(List.of())
                         .build());
                 continue;
             }
             List<RecommendationCandidate> routed = RouteOptimizer.optimize(dayPool);
-            if (routed.size() > perDay) {
-                // 잘라낸 나머지는 다음 날 후보로 되돌림
-                List<RecommendationCandidate> leftover = new ArrayList<>(routed.subList(perDay, routed.size()));
-                routed = new ArrayList<>(routed.subList(0, perDay));
+            if (routed.size() > dayLimit) {
+                List<RecommendationCandidate> leftover = new ArrayList<>(routed.subList(dayLimit, routed.size()));
+                routed = new ArrayList<>(routed.subList(0, dayLimit));
                 remaining.addAll(0, leftover);
             }
-            assignTimes(routed);
+            assignTimes(routed, dayStart);
+            // 시작 시각이 너무 늦은 항목은 제거
+            routed = routed.stream()
+                    .filter(s -> {
+                        LocalTime t = parseTime(s.getSuggestedTime());
+                        return t != null && !t.isAfter(LATEST_START);
+                    })
+                    .collect(Collectors.toCollection(ArrayList::new));
+
             double dayKm = RouteOptimizer.totalDistanceKm(routed);
             totalKm += dayKm;
 
@@ -197,7 +226,9 @@ public class SmartPlanService {
                     .build());
         }
 
-        String summary = buildSummary(rain, heat, crowdFiltered, totalKm, allStops.size(), targetDays.size());
+        boolean sameDayPlan = targetDays.size() == 1 && targetDays.get(0).equals(LocalDate.now());
+        String summary = buildSummary(rain, heat, crowdFiltered, totalKm, allStops.size(), targetDays.size(),
+                sameDayPlan ? resolveDayStart(targetDays.get(0)) : null);
         log.info("[SmartPlan] days={}, stops={}, rain={}, heat={}, crowdFiltered={}, totalKm={}",
                 targetDays.size(), allStops.size(), rain, heat, crowdFiltered, totalKm);
 
@@ -223,31 +254,88 @@ public class SmartPlanService {
         return taken;
     }
 
-    private void assignTimes(List<RecommendationCandidate> stops) {
-        LocalTime cursor = DAY_START;
+    /**
+     * 방문일 기준 첫 일정 시각.
+     * 오늘이면 지금+30분을 30분 단위로 올린 시각(예: 18:05 → 18:30).
+     * 미래 날짜는 09:00.
+     */
+    LocalTime resolveDayStart(LocalDate visitDate) {
+        if (visitDate != null && visitDate.equals(LocalDate.now())) {
+            LocalTime soon = LocalTime.now().plusMinutes(TODAY_LEAD_MINUTES).withSecond(0).withNano(0);
+            int minute = soon.getMinute();
+            LocalTime rounded;
+            if (minute == 0) {
+                rounded = soon;
+            } else if (minute <= 30) {
+                rounded = soon.withMinute(30);
+            } else {
+                rounded = soon.plusHours(1).withMinute(0);
+            }
+            if (rounded.isBefore(DAY_START)) {
+                return DAY_START;
+            }
+            return rounded;
+        }
+        return DAY_START;
+    }
+
+    /** 시작~하루 끝 사이에 체류·이동을 넣었을 때 담을 수 있는 최대 장소 수 */
+    int maxStopsForWindow(LocalTime start) {
+        if (start == null || !start.isBefore(DAY_END) || start.isAfter(LATEST_START)) {
+            return 0;
+        }
+        long minutes = ChronoUnit.MINUTES.between(start, DAY_END);
+        int slot = BASE_STAY_MINUTES + DEFAULT_TRAVEL_MINUTES;
+        int max = (int) (minutes / slot);
+        if (max <= 0 && ChronoUnit.MINUTES.between(start, LATEST_START) >= 0) {
+            // 최소 1곳(짧은 방문)은 허용 — 시작이 LATEST_START 이하면
+            return start.isAfter(LATEST_START) ? 0 : 1;
+        }
+        return Math.min(Math.max(max, 1), DEFAULT_PLACE_COUNT);
+    }
+
+    private void assignTimes(List<RecommendationCandidate> stops, LocalTime dayStart) {
+        LocalTime cursor = dayStart != null ? dayStart : DAY_START;
         for (int i = 0; i < stops.size(); i++) {
             RecommendationCandidate stop = stops.get(i);
-            stop.setSuggestedTime(cursor.format(TIME_FORMAT));
-            int travel = 0;
+            if (cursor.isAfter(LATEST_START)) {
+                stop.setSuggestedTime(LATEST_START.format(TIME_FORMAT));
+            } else {
+                stop.setSuggestedTime(cursor.format(TIME_FORMAT));
+            }
+            int travel = DEFAULT_TRAVEL_MINUTES;
             if (i + 1 < stops.size() && stops.get(i + 1).getDistanceKm() != null) {
                 travel = (int) Math.ceil(stops.get(i + 1).getDistanceKm() * MINUTES_PER_KM);
-            } else if (i + 1 < stops.size()) {
-                travel = 20;
+                travel = Math.max(10, Math.min(travel, 90));
+            } else if (i + 1 >= stops.size()) {
+                travel = 0;
             }
             cursor = cursor.plusMinutes(BASE_STAY_MINUTES + travel);
-            if (cursor.isAfter(LocalTime.of(20, 0))) {
-                cursor = LocalTime.of(20, 0);
-            }
+        }
+    }
+
+    private static LocalTime parseTime(String hhmm) {
+        if (hhmm == null || hhmm.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(hhmm.trim(), TIME_FORMAT);
+        } catch (Exception e) {
+            return null;
         }
     }
 
     private String buildSummary(boolean rain, boolean heat, boolean crowdFiltered, double totalKm,
-                                int count, int dayCount) {
+                                int count, int dayCount, LocalTime todayStart) {
         List<String> parts = new ArrayList<>();
         if (dayCount > 1) {
             parts.add(dayCount + "일 일정");
         }
-        parts.add("혼잡도 낮은 장소 " + count + "곳");
+        if (todayStart != null) {
+            parts.add("오늘 " + todayStart.format(TIME_FORMAT) + "부터 · 남은 시간에 맞춰 " + count + "곳");
+        } else {
+            parts.add("혼잡도 낮은 장소 " + count + "곳");
+        }
         parts.add("동선 최소화" + (totalKm > 0 ? String.format(" (약 %.1fkm)", totalKm) : ""));
         if (crowdFiltered) {
             parts.add("붐비는 곳 제외");
