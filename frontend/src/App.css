@@ -2989,6 +2989,12 @@
   color: var(--muted);
 }
 
+.leg-chip.meal-chip {
+  background: color-mix(in srgb, #c4783a 18%, white);
+  color: #9a4f1c;
+  font-weight: 700;
+}
+
 .smart-plan-actions {
   display: flex;
   flex-direction: column;

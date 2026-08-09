@@ -93,6 +93,12 @@ export default function SmartPlanScreen({
             <h3>{stop.placeName}</h3>
             {stop.oneLiner && <p>{stop.oneLiner}</p>}
             <div className="smart-stop-meta">
+              {(stop.category === '점심' || stop.category === '저녁'
+                || (stop.oneLiner && stop.oneLiner.includes('🍽️'))) && (
+                <span className="leg-chip meal-chip">
+                  {stop.category === '저녁' || (stop.oneLiner || '').includes('저녁') ? '🍽️ 저녁' : '🍽️ 점심'}
+                </span>
+              )}
               {stop.crowdRate != null && (
                 <span className={`crowd-chip ${(100 - stop.crowdRate) >= 40 ? 'good' : 'warn'}`}>
                   여유 {Math.round(100 - stop.crowdRate)}%
@@ -101,7 +107,9 @@ export default function SmartPlanScreen({
               {stop.distanceKm != null && (
                 <span className="leg-chip">이전에서 {stop.distanceKm.toFixed(1)}km</span>
               )}
-              {stop.category && <span className="leg-chip">{stop.category}</span>}
+              {stop.category && stop.category !== '점심' && stop.category !== '저녁' && (
+                <span className="leg-chip">{stop.category}</span>
+              )}
             </div>
           </div>
         </article>
@@ -115,7 +123,7 @@ export default function SmartPlanScreen({
         <div className="smart-plan-brand">바람따라</div>
         <h1 className="smart-plan-title">당일치기 스마트 동선</h1>
         <p className="smart-plan-sub">
-          혼잡도를 피하고 동선 꼬임을 줄인 하루 일정이에요. 변수(비·폭염)가 있으면 실내로 바꿔 드려요.
+          오전 일정 → 점심 → 오후 일정 → 저녁 리듬으로 짜 드려요. 가족 여행은 관광을 줄이고 식사 시간을 꼭 넣어요. 비·폭염이면 실내로 바꿔 드려요.
         </p>
       </header>
 

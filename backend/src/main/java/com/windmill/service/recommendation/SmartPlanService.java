@@ -1,5 +1,6 @@
 package com.windmill.service.recommendation;
 
+import com.windmill.domain.CompanionType;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.RecommendationCandidate;
@@ -10,6 +11,7 @@ import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.trigger.RegionCondition;
 import com.windmill.service.trigger.TriggerScheduler;
 import com.windmill.service.trip.TripRecordService;
+import com.windmill.util.GeoUtils;
 import com.windmill.util.RouteOptimizer;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
@@ -24,32 +26,31 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 바람따라 핵심 플로우: TourAPI 기반 후보를
- * 1) 혼잡도(집중률) 낮은 순으로 고르고
+ * 1) 혼잡도 낮은 순으로 고르고
  * 2) 날씨(비/폭염)면 실내 코스로 전환하며
- * 3) 좌표 기준 최근접 동선으로 꼬임을 줄인 뒤
- * 4) 이동 거리를 반영해 방문 시각을 배정한다.
- * 다일 여행이면 일차별로 나눠 일정을 짠다.
+ * 3) 현실적인 당일치기 리듬(오전→점심→오후→저녁)으로 배치한다.
+ * 가족 여행은 관광을 줄이고 식사 슬롯을 반드시 넣는다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SmartPlanService {
 
-    private static final int DEFAULT_PLACE_COUNT = 5;
-    private static final int PER_DAY_PLACES = 4;
     private static final int MAX_DAYS = 7;
     private static final LocalTime DAY_START = LocalTime.of(9, 0);
-    /** 방문 시작 시각 상한 — 이 시각 이후로는 새 장소 배정하지 않음 */
     private static final LocalTime LATEST_START = LocalTime.of(20, 0);
-    /** 일정 윈도우 끝(체류 포함) */
     private static final LocalTime DAY_END = LocalTime.of(21, 0);
-    /** 오늘일 때 출발 버퍼(분) — 지금 6시면 6:30부터 */
+    private static final LocalTime LUNCH_ANCHOR = LocalTime.of(12, 0);
+    private static final LocalTime DINNER_ANCHOR = LocalTime.of(18, 0);
     private static final int TODAY_LEAD_MINUTES = 30;
-    private static final int BASE_STAY_MINUTES = 75;
+    private static final int ATTRACTION_STAY = 75;
+    private static final int FAMILY_ATTRACTION_STAY = 90;
+    private static final int MEAL_STAY = 60;
     private static final int DEFAULT_TRAVEL_MINUTES = 20;
     private static final int MINUTES_PER_KM = 12;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
@@ -65,15 +66,15 @@ public class SmartPlanService {
 
     /**
      * @param forDate null이면 여행 기간 전체(최대 7일), 지정 시 해당 일자만
+     * @param placeCount 하위 호환용(0이면 동행 유형별 자동). 명시 시 관광 상한으로만 참고.
      */
     public Mono<SmartPlanResponse> build(Itinerary itinerary, int placeCount, LocalDate forDate) {
-        int perDay = placeCount <= 0 ? (forDate != null ? DEFAULT_PLACE_COUNT : PER_DAY_PLACES)
-                : Math.min(placeCount, 8);
         RegionCode region = regionCodeService.find(itinerary.getSignguFullCode())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + itinerary.getSignguFullCode()));
 
         List<LocalDate> targetDays = resolveDays(itinerary, forDate);
-        int need = Math.max(perDay * targetDays.size(), perDay);
+        CompanionType companion = itinerary.getCompanionType();
+        boolean familyPace = isFamilyPace(companion);
 
         return triggerScheduler.ensureFresh(region)
                 .onErrorReturn(RegionCondition.builder().crowdRateByPlaceName(java.util.Map.of()).build())
@@ -90,12 +91,22 @@ public class SmartPlanService {
                         avoid = RecommendationRequest.AvoidanceHint.WEATHER;
                     }
 
-                    RecommendationRequest request = buildRequest(itinerary, avoid);
+                    List<String> attractionTags = familyPace
+                            ? List.of("#실내", "#자연", "#아이동반")
+                            : List.of("#실내", "#자연", "#역사");
+                    RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags);
+                    RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"));
+
                     final boolean rainFinal = rain;
                     final boolean heatFinal = heat;
+                    final int placeCap = placeCount > 0 ? Math.min(placeCount, 6) : 0;
 
-                    return recommendationPipeline.recommend(request)
-                            .map(candidates -> assemble(candidates, perDay, need, targetDays, rainFinal, heatFinal));
+                    return Mono.zip(
+                                    recommendationPipeline.recommend(attractionReq).onErrorReturn(List.of()),
+                                    recommendationPipeline.recommend(foodReq).onErrorReturn(List.of()))
+                            .map(tuple -> assemble(
+                                    tuple.getT1(), tuple.getT2(), targetDays,
+                                    companion, placeCap, rainFinal, heatFinal));
                 });
     }
 
@@ -117,7 +128,9 @@ public class SmartPlanService {
         return list;
     }
 
-    private RecommendationRequest buildRequest(Itinerary itinerary, RecommendationRequest.AvoidanceHint avoid) {
+    private RecommendationRequest buildRequest(Itinerary itinerary,
+                                                 RecommendationRequest.AvoidanceHint avoid,
+                                                 List<String> tags) {
         List<String> excludeContentIds = itinerary.getItems().stream()
                 .map(ItineraryItem::getContentId)
                 .filter(id -> id != null && !id.isBlank())
@@ -131,7 +144,7 @@ public class SmartPlanService {
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
                 .companionType(itinerary.getCompanionType())
-                .tags(List.of("#실내", "#자연", "#맛집"))
+                .tags(tags)
                 .excludeContentIds(excludeContentIds)
                 .excludePlaceNames(excludePlaceNames)
                 .avoidanceHint(avoid)
@@ -140,81 +153,64 @@ public class SmartPlanService {
                 .build();
     }
 
-    private SmartPlanResponse assemble(List<RecommendationCandidate> raw, int perDay, int need,
-                                       List<LocalDate> targetDays, boolean rain, boolean heat) {
-        List<RecommendationCandidate> comfortable = raw.stream()
-                .filter(c -> c.getCrowdRate() == null || c.getCrowdRate() < TriggerThresholds.CROWD_RATE_THRESHOLD)
-                .collect(Collectors.toCollection(ArrayList::new));
-        boolean crowdFiltered = comfortable.size() >= Math.min(3, need) && comfortable.size() < raw.size();
-        List<RecommendationCandidate> pool = crowdFiltered ? comfortable : new ArrayList<>(raw);
-
-        pool.sort(Comparator
-                .comparing((RecommendationCandidate c) -> c.getCrowdRate() == null ? Double.POSITIVE_INFINITY : c.getCrowdRate())
-                .thenComparing(c -> c.getThumbnailUrl() == null || c.getThumbnailUrl().isBlank() ? 1 : 0));
-
-        int poolCap = Math.min(pool.size(), Math.max(need + 4, perDay * 3));
-        if (pool.size() > poolCap) {
-            pool = new ArrayList<>(pool.subList(0, poolCap));
+    private SmartPlanResponse assemble(List<RecommendationCandidate> attractionsRaw,
+                                       List<RecommendationCandidate> foodRaw,
+                                       List<LocalDate> targetDays,
+                                       CompanionType companion,
+                                       int placeCap,
+                                       boolean rain, boolean heat) {
+        List<RecommendationCandidate> attractions = sortComfortable(attractionsRaw);
+        List<RecommendationCandidate> foods = sortComfortable(foodRaw);
+        // 맛집 풀이 비면 관광 풀에서 음식 후보를 분리
+        if (foods.isEmpty()) {
+            List<RecommendationCandidate> splitFood = new ArrayList<>();
+            List<RecommendationCandidate> splitAttr = new ArrayList<>();
+            for (RecommendationCandidate c : attractions) {
+                if (isFoodCandidate(c)) {
+                    splitFood.add(c);
+                } else {
+                    splitAttr.add(c);
+                }
+            }
+            if (!splitFood.isEmpty()) {
+                foods = splitFood;
+                attractions = splitAttr;
+            }
+        } else {
+            Set<String> foodIds = foods.stream()
+                    .map(RecommendationCandidate::getContentId)
+                    .filter(id -> id != null)
+                    .collect(Collectors.toSet());
+            attractions = attractions.stream()
+                    .filter(c -> c.getContentId() == null || !foodIds.contains(c.getContentId()))
+                    .filter(c -> !isFoodCandidate(c))
+                    .collect(Collectors.toCollection(ArrayList::new));
         }
 
-        List<RecommendationCandidate> remaining = new ArrayList<>(pool);
+        boolean crowdFiltered = attractionsRaw.stream()
+                .anyMatch(c -> c.getCrowdRate() != null && c.getCrowdRate() >= TriggerThresholds.CROWD_RATE_THRESHOLD);
+
+        List<RecommendationCandidate> attrPool = new ArrayList<>(attractions);
+        List<RecommendationCandidate> foodPool = new ArrayList<>(foods);
         List<SmartPlanResponse.DayPlan> days = new ArrayList<>();
         List<RecommendationCandidate> allStops = new ArrayList<>();
         double totalKm = 0;
         int globalRank = 1;
+        boolean familyPace = isFamilyPace(companion);
 
         for (int d = 0; d < targetDays.size(); d++) {
             LocalDate date = targetDays.get(d);
             LocalTime dayStart = resolveDayStart(date);
-            int capacity = maxStopsForWindow(dayStart);
-            int dayLimit = Math.min(perDay, capacity);
+            List<RecommendationCandidate> routed = buildDayRhythm(
+                    attrPool, foodPool, dayStart, familyPace, placeCap);
 
-            if (dayLimit <= 0) {
-                days.add(SmartPlanResponse.DayPlan.builder()
-                        .dayIndex(d + 1)
-                        .visitDate(date.toString())
-                        .label((d + 1) + "일차 · " + formatMd(date))
-                        .estimatedDistanceKm(0.0)
-                        .stops(List.of())
-                        .build());
-                continue;
-            }
-
-            List<RecommendationCandidate> dayPool = takeNext(remaining, Math.min(dayLimit + 2, Math.max(dayLimit, remaining.size())));
-            if (dayPool.isEmpty()) {
-                days.add(SmartPlanResponse.DayPlan.builder()
-                        .dayIndex(d + 1)
-                        .visitDate(date.toString())
-                        .label((d + 1) + "일차 · " + formatMd(date))
-                        .estimatedDistanceKm(0.0)
-                        .stops(List.of())
-                        .build());
-                continue;
-            }
-            List<RecommendationCandidate> routed = RouteOptimizer.optimize(dayPool);
-            if (routed.size() > dayLimit) {
-                List<RecommendationCandidate> leftover = new ArrayList<>(routed.subList(dayLimit, routed.size()));
-                routed = new ArrayList<>(routed.subList(0, dayLimit));
-                remaining.addAll(0, leftover);
-            }
-            assignTimes(routed, dayStart);
-            // 시작 시각이 너무 늦은 항목은 제거
-            routed = routed.stream()
-                    .filter(s -> {
-                        LocalTime t = parseTime(s.getSuggestedTime());
-                        return t != null && !t.isAfter(LATEST_START);
-                    })
-                    .collect(Collectors.toCollection(ArrayList::new));
-
+            fillDistances(routed);
             double dayKm = RouteOptimizer.totalDistanceKm(routed);
             totalKm += dayKm;
 
             for (RecommendationCandidate stop : routed) {
                 stop.setVisitDate(date.toString());
                 stop.setRank(globalRank++);
-                if (stop.getOneLiner() == null || stop.getOneLiner().isBlank()) {
-                    stop.setOneLiner(defaultLine(stop));
-                }
             }
             allStops.addAll(routed);
             days.add(SmartPlanResponse.DayPlan.builder()
@@ -227,10 +223,12 @@ public class SmartPlanService {
         }
 
         boolean sameDayPlan = targetDays.size() == 1 && targetDays.get(0).equals(LocalDate.now());
-        String summary = buildSummary(rain, heat, crowdFiltered, totalKm, allStops.size(), targetDays.size(),
-                sameDayPlan ? resolveDayStart(targetDays.get(0)) : null);
-        log.info("[SmartPlan] days={}, stops={}, rain={}, heat={}, crowdFiltered={}, totalKm={}",
-                targetDays.size(), allStops.size(), rain, heat, crowdFiltered, totalKm);
+        String summary = buildSummary(rain, heat, crowdFiltered, totalKm, allStops, targetDays.size(),
+                sameDayPlan ? resolveDayStart(targetDays.get(0)) : null, familyPace);
+        log.info("[SmartPlan] days={}, stops={}, meals={}, family={}, rain={}, heat={}, totalKm={}",
+                targetDays.size(), allStops.size(),
+                allStops.stream().filter(this::isMealStop).count(),
+                familyPace, rain, heat, totalKm);
 
         return SmartPlanResponse.builder()
                 .strategySummary(summary)
@@ -238,7 +236,7 @@ public class SmartPlanService {
                 .heatAdjusted(heat)
                 .crowdFiltered(crowdFiltered)
                 .estimatedTotalDistanceKm(Math.round(totalKm * 10.0) / 10.0)
-                .candidateCount(raw.size())
+                .candidateCount(attractionsRaw.size() + foodRaw.size())
                 .visitDate(targetDays.size() == 1 ? targetDays.get(0).toString() : null)
                 .dayCount(targetDays.size())
                 .days(days)
@@ -246,19 +244,242 @@ public class SmartPlanService {
                 .build();
     }
 
-    private List<RecommendationCandidate> takeNext(List<RecommendationCandidate> remaining, int n) {
-        List<RecommendationCandidate> taken = new ArrayList<>();
-        while (!remaining.isEmpty() && taken.size() < n) {
-            taken.add(remaining.remove(0));
+    /**
+     * 현실적인 당일치기: 오전 1 · 점심 · 오후 1~2 · 저녁 · (선택) 저녁 후.
+     * 가족은 오후 1곳, 저녁 후는 생략해 여유를 둔다.
+     */
+    List<RecommendationCandidate> buildDayRhythm(List<RecommendationCandidate> attrPool,
+                                                   List<RecommendationCandidate> foodPool,
+                                                   LocalTime dayStart,
+                                                   boolean familyPace,
+                                                   int placeCap) {
+        List<RecommendationCandidate> day = new ArrayList<>();
+        if (dayStart == null || dayStart.isAfter(LATEST_START)) {
+            return day;
         }
-        return taken;
+        LocalTime cursor = dayStart;
+        int attractionStay = familyPace ? FAMILY_ATTRACTION_STAY : ATTRACTION_STAY;
+        int afternoonLimit = familyPace ? 1 : 2;
+        int attractionBudget = placeCap > 0
+                ? placeCap
+                : (familyPace ? 3 : 4); // 오전1+오후1~2+(저녁후0~1)
+        int attractionsUsed = 0;
+        RecommendationCandidate prev = null;
+
+        // 1) 오전 관광 1곳 (11:30 이전 시작 가능할 때)
+        if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget) {
+            RecommendationCandidate morning = takeNearest(attrPool, prev);
+            if (morning != null) {
+                placeStop(morning, cursor, "오전 일정", false);
+                day.add(morning);
+                attractionsUsed++;
+                prev = morning;
+                cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekNearest(attrPool, prev)));
+            }
+        }
+
+        // 2) 점심 (14:00 전)
+        if (!cursor.isAfter(LocalTime.of(14, 0))) {
+            LocalTime lunchTime = maxTime(cursor, LUNCH_ANCHOR);
+            if (!lunchTime.isAfter(LocalTime.of(14, 0))) {
+                RecommendationCandidate lunch = takeNearest(foodPool, prev);
+                if (lunch != null) {
+                    placeStop(lunch, lunchTime, "🍽️ 점심", true);
+                    day.add(lunch);
+                    prev = lunch;
+                    cursor = lunchTime.plusMinutes(MEAL_STAY + DEFAULT_TRAVEL_MINUTES);
+                }
+            }
+        }
+
+        // 3) 오후 관광 1~2곳 (17:30 전)
+        int afternoonLeft = afternoonLimit;
+        while (afternoonLeft > 0 && attractionsUsed < attractionBudget && cursor.isBefore(LocalTime.of(17, 30))) {
+            RecommendationCandidate afternoon = takeNearest(attrPool, prev);
+            if (afternoon == null) {
+                break;
+            }
+            if (cursor.isAfter(LATEST_START)) {
+                attrPool.add(0, afternoon);
+                break;
+            }
+            placeStop(afternoon, cursor, "오후 일정", false);
+            day.add(afternoon);
+            attractionsUsed++;
+            afternoonLeft--;
+            prev = afternoon;
+            cursor = cursor.plusMinutes(attractionStay + DEFAULT_TRAVEL_MINUTES);
+        }
+
+        // 4) 저녁 (19:30 전)
+        if (!cursor.isAfter(LocalTime.of(19, 30))) {
+            LocalTime dinnerTime = maxTime(cursor, DINNER_ANCHOR);
+            if (!dinnerTime.isAfter(LocalTime.of(19, 30))) {
+                RecommendationCandidate dinner = takeNearest(foodPool, prev);
+                if (dinner != null) {
+                    placeStop(dinner, dinnerTime, "🍽️ 저녁", true);
+                    day.add(dinner);
+                    prev = dinner;
+                    cursor = dinnerTime.plusMinutes(MEAL_STAY + DEFAULT_TRAVEL_MINUTES);
+                }
+            }
+        }
+
+        // 5) 저녁 후 선택 1곳 — 가족은 생략(여유), 솔로/커플만
+        if (!familyPace && attractionsUsed < attractionBudget && !cursor.isAfter(LocalTime.of(19, 45))) {
+            RecommendationCandidate evening = takeNearest(attrPool, prev);
+            if (evening != null && !cursor.isAfter(LATEST_START)) {
+                placeStop(evening, cursor.isBefore(LocalTime.of(19, 30)) ? LocalTime.of(19, 30) : cursor,
+                        "저녁 후 일정", false);
+                day.add(evening);
+            } else if (evening != null) {
+                attrPool.add(0, evening);
+            }
+        }
+
+        return day.stream()
+                .filter(s -> {
+                    LocalTime t = parseTime(s.getSuggestedTime());
+                    return t != null && !t.isAfter(LATEST_START);
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    /**
-     * 방문일 기준 첫 일정 시각.
-     * 오늘이면 지금+30분을 30분 단위로 올린 시각(예: 18:05 → 18:30).
-     * 미래 날짜는 09:00.
-     */
+    private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal) {
+        stop.setSuggestedTime(time.format(TIME_FORMAT));
+        if (meal) {
+            stop.setCategory(slotLabel.contains("점심") ? "점심" : "저녁");
+            stop.setMatchedTags(List.of("#맛집"));
+            stop.setOneLiner(slotLabel + " · 여유롭게 식사해요");
+        } else {
+            if (stop.getCategory() == null || stop.getCategory().isBlank()
+                    || "점심".equals(stop.getCategory()) || "저녁".equals(stop.getCategory())) {
+                stop.setCategory(slotLabel);
+            }
+            if (stop.getOneLiner() == null || stop.getOneLiner().isBlank()) {
+                stop.setOneLiner(slotLabel + " · " + defaultLine(stop));
+            } else if (!stop.getOneLiner().contains("오전") && !stop.getOneLiner().contains("오후")
+                    && !stop.getOneLiner().contains("저녁")) {
+                stop.setOneLiner(slotLabel + " · " + stop.getOneLiner());
+            }
+        }
+    }
+
+    private List<RecommendationCandidate> sortComfortable(List<RecommendationCandidate> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<RecommendationCandidate> comfortable = raw.stream()
+                .filter(c -> c.getCrowdRate() == null || c.getCrowdRate() < TriggerThresholds.CROWD_RATE_THRESHOLD)
+                .collect(Collectors.toCollection(ArrayList::new));
+        List<RecommendationCandidate> pool = comfortable.size() >= Math.min(3, raw.size())
+                ? comfortable
+                : new ArrayList<>(raw);
+        pool.sort(Comparator
+                .comparing((RecommendationCandidate c) -> c.getCrowdRate() == null ? Double.POSITIVE_INFINITY : c.getCrowdRate())
+                .thenComparing(c -> c.getThumbnailUrl() == null || c.getThumbnailUrl().isBlank() ? 1 : 0));
+        int cap = Math.min(pool.size(), 24);
+        return new ArrayList<>(pool.subList(0, cap));
+    }
+
+    private RecommendationCandidate takeNearest(List<RecommendationCandidate> pool, RecommendationCandidate origin) {
+        if (pool == null || pool.isEmpty()) {
+            return null;
+        }
+        if (origin == null || origin.getMapX() == null || origin.getMapY() == null) {
+            return pool.remove(0);
+        }
+        int bestIdx = 0;
+        double bestKm = Double.POSITIVE_INFINITY;
+        for (int i = 0; i < pool.size(); i++) {
+            RecommendationCandidate c = pool.get(i);
+            Double km = GeoUtils.distanceKmSafe(origin.getMapX(), origin.getMapY(), c.getMapX(), c.getMapY());
+            double d = km == null ? 50.0 : km;
+            if (d < bestKm) {
+                bestKm = d;
+                bestIdx = i;
+            }
+        }
+        RecommendationCandidate chosen = pool.remove(bestIdx);
+        if (bestKm < Double.POSITIVE_INFINITY && bestKm < 50) {
+            chosen.setDistanceKm(Math.round(bestKm * 10.0) / 10.0);
+        }
+        return chosen;
+    }
+
+    private RecommendationCandidate peekNearest(List<RecommendationCandidate> pool, RecommendationCandidate origin) {
+        if (pool == null || pool.isEmpty()) {
+            return null;
+        }
+        if (origin == null) {
+            return pool.get(0);
+        }
+        RecommendationCandidate best = pool.get(0);
+        double bestKm = Double.POSITIVE_INFINITY;
+        for (RecommendationCandidate c : pool) {
+            Double km = GeoUtils.distanceKmSafe(origin.getMapX(), origin.getMapY(), c.getMapX(), c.getMapY());
+            double d = km == null ? 50.0 : km;
+            if (d < bestKm) {
+                bestKm = d;
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    private int travelMinutes(RecommendationCandidate from, RecommendationCandidate to) {
+        if (from == null || to == null) {
+            return DEFAULT_TRAVEL_MINUTES;
+        }
+        Double km = GeoUtils.distanceKmSafe(from.getMapX(), from.getMapY(), to.getMapX(), to.getMapY());
+        if (km == null) {
+            return DEFAULT_TRAVEL_MINUTES;
+        }
+        int travel = (int) Math.ceil(km * MINUTES_PER_KM);
+        return Math.max(10, Math.min(travel, 90));
+    }
+
+    private void fillDistances(List<RecommendationCandidate> routed) {
+        for (int i = 0; i < routed.size(); i++) {
+            if (i == 0) {
+                continue;
+            }
+            RecommendationCandidate prev = routed.get(i - 1);
+            RecommendationCandidate cur = routed.get(i);
+            Double km = GeoUtils.distanceKmSafe(prev.getMapX(), prev.getMapY(), cur.getMapX(), cur.getMapY());
+            if (km != null) {
+                cur.setDistanceKm(Math.round(km * 10.0) / 10.0);
+            }
+        }
+    }
+
+    static boolean isFamilyPace(CompanionType companion) {
+        return companion == CompanionType.FAMILY_4 || companion == CompanionType.EXTENDED_FAMILY;
+    }
+
+    private boolean isFoodCandidate(RecommendationCandidate c) {
+        if (c == null) {
+            return false;
+        }
+        if (c.getMatchedTags() != null && c.getMatchedTags().stream().anyMatch(t -> t != null && t.contains("맛집"))) {
+            return true;
+        }
+        String cat = c.getCategory() == null ? "" : c.getCategory();
+        String name = c.getPlaceName() == null ? "" : c.getPlaceName();
+        String text = (cat + " " + name).toLowerCase();
+        if (text.contains("식당") || text.contains("맛집") || text.contains("카페") || text.contains("레스토랑")
+                || text.contains("음식") || text.contains("베이커리") || text.contains("제과")) {
+            return true;
+        }
+        return c.getContentTypeId() != null && c.getContentTypeId() == 39;
+    }
+
+    private boolean isMealStop(RecommendationCandidate c) {
+        String cat = c.getCategory() == null ? "" : c.getCategory();
+        return "점심".equals(cat) || "저녁".equals(cat)
+                || (c.getOneLiner() != null && c.getOneLiner().contains("🍽️"));
+    }
+
     LocalTime resolveDayStart(LocalDate visitDate) {
         if (visitDate != null && visitDate.equals(LocalDate.now())) {
             LocalTime soon = LocalTime.now().plusMinutes(TODAY_LEAD_MINUTES).withSecond(0).withNano(0);
@@ -279,39 +500,22 @@ public class SmartPlanService {
         return DAY_START;
     }
 
-    /** 시작~하루 끝 사이에 체류·이동을 넣었을 때 담을 수 있는 최대 장소 수 */
+    /** 테스트·하위 호환: 단순 시간창 기준 상한 */
     int maxStopsForWindow(LocalTime start) {
         if (start == null || !start.isBefore(DAY_END) || start.isAfter(LATEST_START)) {
             return 0;
         }
         long minutes = ChronoUnit.MINUTES.between(start, DAY_END);
-        int slot = BASE_STAY_MINUTES + DEFAULT_TRAVEL_MINUTES;
+        int slot = ATTRACTION_STAY + DEFAULT_TRAVEL_MINUTES;
         int max = (int) (minutes / slot);
-        if (max <= 0 && ChronoUnit.MINUTES.between(start, LATEST_START) >= 0) {
-            // 최소 1곳(짧은 방문)은 허용 — 시작이 LATEST_START 이하면
+        if (max <= 0) {
             return start.isAfter(LATEST_START) ? 0 : 1;
         }
-        return Math.min(Math.max(max, 1), DEFAULT_PLACE_COUNT);
+        return Math.min(Math.max(max, 1), 5);
     }
 
-    private void assignTimes(List<RecommendationCandidate> stops, LocalTime dayStart) {
-        LocalTime cursor = dayStart != null ? dayStart : DAY_START;
-        for (int i = 0; i < stops.size(); i++) {
-            RecommendationCandidate stop = stops.get(i);
-            if (cursor.isAfter(LATEST_START)) {
-                stop.setSuggestedTime(LATEST_START.format(TIME_FORMAT));
-            } else {
-                stop.setSuggestedTime(cursor.format(TIME_FORMAT));
-            }
-            int travel = DEFAULT_TRAVEL_MINUTES;
-            if (i + 1 < stops.size() && stops.get(i + 1).getDistanceKm() != null) {
-                travel = (int) Math.ceil(stops.get(i + 1).getDistanceKm() * MINUTES_PER_KM);
-                travel = Math.max(10, Math.min(travel, 90));
-            } else if (i + 1 >= stops.size()) {
-                travel = 0;
-            }
-            cursor = cursor.plusMinutes(BASE_STAY_MINUTES + travel);
-        }
+    private static LocalTime maxTime(LocalTime a, LocalTime b) {
+        return a.isAfter(b) ? a : b;
     }
 
     private static LocalTime parseTime(String hhmm) {
@@ -326,17 +530,25 @@ public class SmartPlanService {
     }
 
     private String buildSummary(boolean rain, boolean heat, boolean crowdFiltered, double totalKm,
-                                int count, int dayCount, LocalTime todayStart) {
+                                List<RecommendationCandidate> stops, int dayCount,
+                                LocalTime todayStart, boolean familyPace) {
         List<String> parts = new ArrayList<>();
+        long meals = stops.stream().filter(this::isMealStop).count();
+        long sights = stops.size() - meals;
         if (dayCount > 1) {
             parts.add(dayCount + "일 일정");
         }
         if (todayStart != null) {
-            parts.add("오늘 " + todayStart.format(TIME_FORMAT) + "부터 · 남은 시간에 맞춰 " + count + "곳");
-        } else {
-            parts.add("혼잡도 낮은 장소 " + count + "곳");
+            parts.add("오늘 " + todayStart.format(TIME_FORMAT) + "부터");
         }
-        parts.add("동선 최소화" + (totalKm > 0 ? String.format(" (약 %.1fkm)", totalKm) : ""));
+        if (familyPace) {
+            parts.add("가족 여유 코스");
+        }
+        parts.add("관광 " + sights + "곳 · 식사 " + meals + "끼");
+        parts.add("오전→점심→오후→저녁 리듬");
+        if (totalKm > 0) {
+            parts.add(String.format("약 %.1fkm", totalKm));
+        }
         if (crowdFiltered) {
             parts.add("붐비는 곳 제외");
         }
@@ -354,8 +566,8 @@ public class SmartPlanService {
 
     private String defaultLine(RecommendationCandidate c) {
         if (c.getCrowdRate() != null) {
-            return String.format("여유율 %.0f%% · 동선에 자연스럽게 이어져요", 100 - c.getCrowdRate());
+            return String.format("여유율 %.0f%%", 100 - c.getCrowdRate());
         }
-        return "TourAPI 검증 장소 · 동선 최적화에 포함됐어요";
+        return "동선에 맞춰 이어져요";
     }
 }
