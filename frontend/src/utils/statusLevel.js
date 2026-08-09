@@ -1,3 +1,27 @@
+/**
+ * 실내 장소 판정 — 야외(비·폭염) 뱃지 오탐 방지.
+ * 백엔드 OutdoorActivityClassifier와 같은 우선순위: #실내·#맛집·카페/식당명.
+ */
+export function isIndoorPlace(item) {
+  if (!item) return false;
+  const tags = (item.tags || []).map((t) => String(t).trim());
+  if (tags.some((t) => t === '#실내' || t === '실내' || t === '#맛집' || t === '맛집')) {
+    return true;
+  }
+  const text = `${item.category || ''} ${item.placeName || ''}`.toLowerCase();
+  const indoorKeywords = [
+    '박물관', '전시', '미술관', '도서관', '아트센터', '갤러리',
+    '카페', '식당', '레스토랑', '맛집', '제과', '베이커리', '갈비', '불고기',
+    '실내', '키즈카페', '영화관', '쇼핑몰', '백화점',
+  ];
+  if (indoorKeywords.some((k) => text.includes(k.toLowerCase()))) {
+    return true;
+  }
+  const type = item.contentTypeId;
+  if (type === 14 || type === 39) return true;
+  return false;
+}
+
 /** 바람따라 상태 컬러 체계: NORMAL(정상) · WARNING(주의) · DANGER(긴급) */
 
 export const STATUS_LABEL = {
@@ -9,15 +33,17 @@ export const STATUS_LABEL = {
 /**
  * 일정 항목 상태.
  * 야외+날씨/폭염 → DANGER, 휴무·혼잡 → WARNING
+ * 실내 장소는 야외 알림으로 DANGER가 되지 않음.
  */
 export function itemStatusLevel(item, {
   weatherAlerted = false,
   businessAlerted = false,
   crowdAlerted = false,
-  /** @deprecated 하위 호환 — weatherAlerted로 취급 */
+  /** @deprecated */
   alerted = false,
 } = {}) {
-  if (weatherAlerted || alerted) return 'DANGER';
+  const weather = (weatherAlerted || alerted) && !isIndoorPlace(item);
+  if (weather) return 'DANGER';
   if (businessAlerted || crowdAlerted) return 'WARNING';
   const crowd = item?.crowdRate;
   if (crowd != null && crowd >= 70) return 'WARNING';

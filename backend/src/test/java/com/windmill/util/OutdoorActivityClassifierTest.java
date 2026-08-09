@@ -70,10 +70,20 @@ class OutdoorActivityClassifierTest {
     }
 
     @Test
-    void artCenterIsIndoor() {
+    void cafeNameIsIndoorEvenWithoutTag() {
         ItineraryItem item = ItineraryItem.builder()
-                .placeName("아트센터 예술의 시간")
-                .contentTypeId(14)
+                .placeName("어느멋진날카페")
+                .contentTypeId(12)
+                .build();
+        assertFalse(OutdoorActivityClassifier.isOutdoor(item));
+    }
+
+    @Test
+    void tagWithoutHashIsIndoor() {
+        ItineraryItem item = ItineraryItem.builder()
+                .placeName("어딘가")
+                .contentTypeId(12)
+                .tags(List.of("실내"))
                 .build();
         assertFalse(OutdoorActivityClassifier.isOutdoor(item));
     }

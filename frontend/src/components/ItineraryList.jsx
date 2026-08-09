@@ -2,10 +2,43 @@ import ItineraryItemCard from './ItineraryItemCard';
 import DayRouteStrip from './DayRouteStrip';
 import TravelTipsCard from './TravelTipsCard';
 import BaramiBubble from './BaramiBubble';
-import { tipsFromTrigger, baramiCommentFromTrigger, triggerStatusLevel } from '../utils/statusLevel';
+import { tipsFromTrigger, baramiCommentFromTrigger, triggerStatusLevel, isIndoorPlace } from '../utils/statusLevel';
 
 function toIdSet(ids) {
   return new Set((ids || []).map(Number));
+}
+
+/**
+ * 야외(비·폭염) 영향 ID만 사용.
+ * weatherAffectedItemIds가 오면 그대로(빈 배열 포함).
+ * 구버전 API만 affectedItemIds로 폴백하되, 실내 장소는 제외.
+ */
+function resolveWeatherIds(weatherAffectedItemIds, weatherAlert, affectedItemIds, items) {
+  if (Array.isArray(weatherAffectedItemIds)) {
+    return weatherAffectedItemIds.filter((id) => {
+      const item = items.find((i) => Number(i.itemId) === Number(id));
+      return item ? !isIndoorPlace(item) : true;
+    });
+  }
+  if (!weatherAlert) return [];
+  return (affectedItemIds || []).filter((id) => {
+    const item = items.find((i) => Number(i.itemId) === Number(id));
+    return item ? !isIndoorPlace(item) : false;
+  });
+}
+
+function resolveBusinessIds(businessAffectedItemIds, trigger, affectedItemIds, weatherIds) {
+  if (Array.isArray(businessAffectedItemIds)) {
+    return businessAffectedItemIds;
+  }
+  // 구버전: 휴무 트리거만 있고 야외 ID가 아니면 affected를 휴무로 취급
+  if (trigger?.businessTrigger && !trigger?.weatherTrigger && !trigger?.heatTrigger) {
+    return affectedItemIds || [];
+  }
+  if (trigger?.businessTrigger) {
+    return (affectedItemIds || []).filter((id) => !weatherIds.has(Number(id)));
+  }
+  return [];
 }
 
 export default function ItineraryList({
@@ -26,10 +59,16 @@ export default function ItineraryList({
   onSortByTime,
   sortByTimeLoading = false,
 }) {
-  const weatherIds = toIdSet(
-    weatherAffectedItemIds?.length ? weatherAffectedItemIds : (weatherAlert ? affectedItemIds : []),
+  const weatherIdList = resolveWeatherIds(
+    weatherAffectedItemIds,
+    weatherAlert,
+    affectedItemIds,
+    items,
   );
-  const businessIds = toIdSet(businessAffectedItemIds);
+  const weatherIds = toIdSet(weatherIdList);
+  const businessIds = toIdSet(
+    resolveBusinessIds(businessAffectedItemIds, trigger, affectedItemIds, weatherIds),
+  );
   const crowdIds = toIdSet(crowdAffectedItemIds);
   const tips = tipsFromTrigger(trigger);
   const tipLevel = triggerStatusLevel(trigger);
@@ -93,11 +132,12 @@ export default function ItineraryList({
         <div className="item-cards">
           {items.map((item) => {
             const id = Number(item.itemId);
+            const indoor = isIndoorPlace(item);
             return (
               <ItineraryItemCard
                 key={item.itemId}
                 item={item}
-                weatherAlerted={weatherIds.has(id)}
+                weatherAlerted={weatherIds.has(id) && !indoor}
                 businessAlerted={businessIds.has(id)}
                 crowdAlerted={crowdIds.has(id)}
                 onUpdateTime={onUpdateTime}

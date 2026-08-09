@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TAG_OPTIONS } from '../constants';
-import { itemStatusLevel, STATUS_LABEL } from '../utils/statusLevel';
+import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLevel';
 
 function normalizeTime(raw) {
   const value = (raw || '').trim();
@@ -44,7 +44,7 @@ export default function ItineraryItemCard({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
-  const isWeather = weatherAlerted || alerted;
+  const isWeather = (weatherAlerted || alerted) && !isIndoorPlace(item);
   const status = itemStatusLevel(item, {
     weatherAlerted: isWeather,
     businessAlerted,
