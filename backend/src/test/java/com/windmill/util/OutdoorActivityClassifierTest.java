@@ -40,11 +40,41 @@ class OutdoorActivityClassifierTest {
     }
 
     @Test
-    void waterParkIsOutdoor() {
+    void indoorTagWinsOverNature() {
         ItineraryItem item = ItineraryItem.builder()
-                .placeName("속초 워터파크")
-                .contentTypeId(28)
+                .placeName("해변 근처 카페")
+                .contentTypeId(12)
+                .tags(List.of("#실내", "#자연", "#맛집"))
                 .build();
-        assertTrue(OutdoorActivityClassifier.isOutdoor(item));
+        assertFalse(OutdoorActivityClassifier.isOutdoor(item));
+    }
+
+    @Test
+    void foodTagIsIndoor() {
+        ItineraryItem item = ItineraryItem.builder()
+                .placeName("가산물갈비")
+                .contentTypeId(12)
+                .tags(List.of("#맛집"))
+                .build();
+        assertFalse(OutdoorActivityClassifier.isOutdoor(item));
+    }
+
+    @Test
+    void libraryIsIndoor() {
+        ItineraryItem item = ItineraryItem.builder()
+                .placeName("금천구립금나래도서관")
+                .contentTypeId(14)
+                .tags(List.of("#실내", "#자연"))
+                .build();
+        assertFalse(OutdoorActivityClassifier.isOutdoor(item));
+    }
+
+    @Test
+    void artCenterIsIndoor() {
+        ItineraryItem item = ItineraryItem.builder()
+                .placeName("아트센터 예술의 시간")
+                .contentTypeId(14)
+                .build();
+        assertFalse(OutdoorActivityClassifier.isOutdoor(item));
     }
 }

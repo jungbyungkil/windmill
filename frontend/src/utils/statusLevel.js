@@ -8,10 +8,17 @@ export const STATUS_LABEL = {
 
 /**
  * 일정 항목 상태.
- * 날씨·폭염 영향 → DANGER, 혼잡 높음 → WARNING, 그 외 → NORMAL
+ * 야외+날씨/폭염 → DANGER, 휴무·혼잡 → WARNING
  */
-export function itemStatusLevel(item, { alerted = false } = {}) {
-  if (alerted) return 'DANGER';
+export function itemStatusLevel(item, {
+  weatherAlerted = false,
+  businessAlerted = false,
+  crowdAlerted = false,
+  /** @deprecated 하위 호환 — weatherAlerted로 취급 */
+  alerted = false,
+} = {}) {
+  if (weatherAlerted || alerted) return 'DANGER';
+  if (businessAlerted || crowdAlerted) return 'WARNING';
   const crowd = item?.crowdRate;
   if (crowd != null && crowd >= 70) return 'WARNING';
   return 'NORMAL';
@@ -39,7 +46,7 @@ export function tipsFromTrigger(trigger) {
     tips.push({ id: 'crowd', icon: '👥', text: '혼잡이 예상돼요. 이른 시간이나 대안 장소로 피하면 편해요.' });
   }
   if (trigger.businessTrigger) {
-    tips.push({ id: 'biz', icon: '🚫', text: '휴무·영업 종료 일정이 있어요. 열고 닫는 시간을 한 번 더 확인하세요.' });
+    tips.push({ id: 'biz', icon: '🚫', text: '방문일 기준 정기휴무·영업종료 장소가 있어요. 대체 일정을 골라보세요.' });
   }
   if (trigger.routeTangleTrigger) {
     tips.push({ id: 'route', icon: '🔀', text: '동선이 꼬였어요. 자동 재배치로 이동을 줄여 보세요.' });

@@ -30,6 +30,10 @@ function draftFromItem(src) {
  */
 export default function ItineraryItemCard({
   item,
+  weatherAlerted = false,
+  businessAlerted = false,
+  crowdAlerted = false,
+  /** @deprecated */
   alerted = false,
   onUpdateTime,
   onUpdateItem,
@@ -40,7 +44,12 @@ export default function ItineraryItemCard({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
-  const status = itemStatusLevel(item, { alerted });
+  const isWeather = weatherAlerted || alerted;
+  const status = itemStatusLevel(item, {
+    weatherAlerted: isWeather,
+    businessAlerted,
+    crowdAlerted,
+  });
   const statusClass = `status-${status.toLowerCase()}`;
 
   useEffect(() => {
@@ -86,7 +95,7 @@ export default function ItineraryItemCard({
 
   return (
     <div
-      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${alerted ? 'weather-affected' : ''} ${editing ? 'editing' : ''}`}
+      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''}`}
       data-status={status}
     >
       <span className={`item-status-rail ${statusClass}`} title={STATUS_LABEL[status]} aria-hidden="true" />
@@ -137,7 +146,11 @@ export default function ItineraryItemCard({
               <span className="item-name">{item.placeName}</span>
               <span className={`item-status-chip ${statusClass}`}>{STATUS_LABEL[status]}</span>
               {item.isAlternate && <span className="alt-badge" title="추천으로 담은 장소">추천</span>}
-              {alerted && <span className="weather-affected-badge" title="비·폭염 영향">⚠️ 야외</span>}
+              {isWeather && <span className="weather-affected-badge" title="비·폭염 영향 야외 일정">⚠️ 야외</span>}
+              {businessAlerted && <span className="business-affected-badge" title="방문일 정기휴무·영업종료">🚫 휴무</span>}
+              {crowdAlerted && !isWeather && !businessAlerted && (
+                <span className="crowd-affected-badge" title="혼잡 주의">👥 혼잡</span>
+              )}
               {item.pinned && <span className="pin-badge" title={item.pinnedReason || '고정됨'}>📌</span>}
             </div>
 

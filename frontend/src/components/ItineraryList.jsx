@@ -4,9 +4,16 @@ import TravelTipsCard from './TravelTipsCard';
 import BaramiBubble from './BaramiBubble';
 import { tipsFromTrigger, baramiCommentFromTrigger, triggerStatusLevel } from '../utils/statusLevel';
 
+function toIdSet(ids) {
+  return new Set((ids || []).map(Number));
+}
+
 export default function ItineraryList({
   items,
   affectedItemIds = [],
+  weatherAffectedItemIds,
+  businessAffectedItemIds,
+  crowdAffectedItemIds,
   weatherAlert = false,
   trigger = null,
   dayLabel,
@@ -19,7 +26,11 @@ export default function ItineraryList({
   onSortByTime,
   sortByTimeLoading = false,
 }) {
-  const affected = new Set((affectedItemIds || []).map(Number));
+  const weatherIds = toIdSet(
+    weatherAffectedItemIds?.length ? weatherAffectedItemIds : (weatherAlert ? affectedItemIds : []),
+  );
+  const businessIds = toIdSet(businessAffectedItemIds);
+  const crowdIds = toIdSet(crowdAffectedItemIds);
   const tips = tipsFromTrigger(trigger);
   const tipLevel = triggerStatusLevel(trigger);
   const baramiComment = baramiCommentFromTrigger(trigger);
@@ -50,12 +61,22 @@ export default function ItineraryList({
       )}
 
       {items.length > 0 && (
-        <DayRouteStrip items={items} affectedItemIds={affectedItemIds} />
+        <DayRouteStrip
+          items={items}
+          weatherAffectedItemIds={[...weatherIds]}
+          businessAffectedItemIds={[...businessIds]}
+          crowdAffectedItemIds={[...crowdIds]}
+        />
       )}
 
-      {weatherAlert && affected.size > 0 && (
+      {weatherIds.size > 0 && (
         <p className="itinerary-weather-hint">
-          빨간 표시된 야외 일정은 비·폭염 영향권이에요. 바람개비에서 실내 일정으로 바꿔보세요.
+          빨간 <strong>야외</strong> 표시는 비·폭염 영향 일정이에요. 바람개비에서 실내로 바꿔보세요.
+        </p>
+      )}
+      {businessIds.size > 0 && (
+        <p className="itinerary-business-hint">
+          <strong>휴무</strong> 표시는 방문일 기준 정기휴무·영업종료예요. 대체 장소를 골라보세요.
         </p>
       )}
       {items.length === 0 ? (
@@ -70,18 +91,23 @@ export default function ItineraryList({
         </div>
       ) : (
         <div className="item-cards">
-          {items.map((item) => (
-            <ItineraryItemCard
-              key={item.itemId}
-              item={item}
-              alerted={affected.has(Number(item.itemId))}
-              onUpdateTime={onUpdateTime}
-              onUpdateItem={onUpdateItem}
-              onTogglePin={onTogglePin}
-              onDelete={onDelete}
-              onOpenDocent={onOpenDocent}
-            />
-          ))}
+          {items.map((item) => {
+            const id = Number(item.itemId);
+            return (
+              <ItineraryItemCard
+                key={item.itemId}
+                item={item}
+                weatherAlerted={weatherIds.has(id)}
+                businessAlerted={businessIds.has(id)}
+                crowdAlerted={crowdIds.has(id)}
+                onUpdateTime={onUpdateTime}
+                onUpdateItem={onUpdateItem}
+                onTogglePin={onTogglePin}
+                onDelete={onDelete}
+                onOpenDocent={onOpenDocent}
+              />
+            );
+          })}
         </div>
       )}
 

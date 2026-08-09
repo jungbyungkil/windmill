@@ -1202,10 +1202,42 @@
   padding: 2px 8px;
 }
 
+.business-affected-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--level-warning);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.crowd-affected-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea-deep);
+  background: color-mix(in srgb, var(--sea) 16%, white);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.item-card.business-affected {
+  border-color: color-mix(in srgb, var(--status-warning) 42%, var(--sand-border));
+  background: color-mix(in srgb, var(--status-warning) 6%, var(--sand-card));
+}
+
 .itinerary-weather-hint {
   font-size: 13px;
   color: var(--level-danger);
   background: color-mix(in srgb, var(--level-danger) 8%, white);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.itinerary-business-hint {
+  font-size: 13px;
+  color: #a86a00;
+  background: color-mix(in srgb, var(--level-warning) 10%, white);
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 10px;

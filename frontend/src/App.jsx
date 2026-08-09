@@ -348,7 +348,8 @@ export default function App() {
         return;
       }
       const top = candidates[0];
-      const affectedId = trigger?.affectedItemIds?.[0];
+      const affectedId = (trigger?.weatherAffectedItemIds?.[0]
+        ?? trigger?.affectedItemIds?.[0]);
       const affectedItem = affectedId ? itinerary.items.find((i) => i.itemId === affectedId) : null;
 
       if (affectedItem) {
@@ -410,11 +411,18 @@ export default function App() {
         return;
       }
 
-      const affectedIds = (trigger?.affectedItemIds || []).map(Number);
+      const affectedIds = (trigger?.weatherAffectedItemIds?.length
+        ? trigger.weatherAffectedItemIds
+        : (trigger?.affectedItemIds || [])).map(Number);
       const affectedItems = itinerary.items.filter((i) => affectedIds.includes(Number(i.itemId)));
       const targets = affectedItems.length > 0
         ? affectedItems
-        : itinerary.items.filter((i) => (i.visitDate || itinerary.startDate) === activeDate);
+        : itinerary.items.filter((i) => {
+            if ((i.visitDate || itinerary.startDate) !== activeDate) return false;
+            const tags = i.tags || [];
+            if (tags.includes('#실내') || tags.includes('#맛집')) return false;
+            return true;
+          });
 
       if (targets.length === 0) {
         setAltCandidates(candidates);
@@ -781,6 +789,9 @@ export default function App() {
         <ItineraryList
           items={visibleItems}
           affectedItemIds={trigger?.affectedItemIds}
+          weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
+          businessAffectedItemIds={trigger?.businessAffectedItemIds}
+          crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
           weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
           trigger={trigger}
           dayLabel="오늘"

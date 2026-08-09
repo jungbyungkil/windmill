@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * 일정 항목이 야외(실외) 활동인지 판정.
- * 폭염 시 실내 전환 알림·바람개비 경고에 사용한다.
+ * 폭염/비 시 실내 전환 알림·바람개비 경고에 사용한다.
+ * #실내·#맛집·도서관·식당 등은 실내로 본다 (#자연과 같이 있어도 실내 우선).
  */
 public final class OutdoorActivityClassifier {
 
@@ -19,7 +20,8 @@ public final class OutdoorActivityClassifier {
         }
         List<String> tags = item.getTags();
         if (tags != null) {
-            if (tags.contains("#실내")) {
+            // 실내·먹거리 태그가 있으면 야외 알림 대상이 아님 (#자연과 공존해도 실내 우선)
+            if (tags.contains("#실내") || tags.contains("#맛집")) {
                 return false;
             }
             if (tags.contains("#자연") || tags.contains("#액티비티")) {
@@ -31,7 +33,10 @@ public final class OutdoorActivityClassifier {
                 + " "
                 + (item.getPlaceName() == null ? "" : item.getPlaceName())).toLowerCase();
 
-        if (containsAny(text, "박물관", "전시", "미술관", "카페", "식당", "레스토랑", "실내", "키즈카페", "갤러리")) {
+        if (containsAny(text,
+                "박물관", "전시", "미술관", "도서관", "아트센터", "예술의전당", "갤러리",
+                "카페", "식당", "레스토랑", "맛집", "갈비", "불고기", "물회", "베이커리",
+                "실내", "키즈카페", "영화관", "쇼핑몰", "백화점", "온천", "찜질")) {
             return false;
         }
         if (containsAny(text, "해변", "해수욕", "산 ", "등산", "공원", "워터파크", "야외", "산책", "캠핑", "수상", "스키")) {

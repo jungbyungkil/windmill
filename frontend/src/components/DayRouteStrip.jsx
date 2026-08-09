@@ -1,12 +1,22 @@
 import { itemStatusLevel } from '../utils/statusLevel';
 
 /**
- * 당일치기 동선 스트립 — 지도 루트 겹침 레이아웃의 경량 버전.
- * 장소 순서·상태 색을 한 줄로 보여 연관 체인 추천 UI 참고용으로도 쓴다.
+ * 당일치기 동선 스트립 — 장소 순서·상태 색을 한 줄로 표시.
  */
-export default function DayRouteStrip({ items = [], affectedItemIds = [] }) {
+export default function DayRouteStrip({
+  items = [],
+  weatherAffectedItemIds = [],
+  businessAffectedItemIds = [],
+  crowdAffectedItemIds = [],
+  /** @deprecated */
+  affectedItemIds = [],
+}) {
   if (!items.length) return null;
-  const affected = new Set((affectedItemIds || []).map(Number));
+  const weather = new Set((weatherAffectedItemIds || []).map(Number));
+  const business = new Set((businessAffectedItemIds || []).map(Number));
+  const crowd = new Set((crowdAffectedItemIds || []).map(Number));
+  // 구버전 API만 있을 때 날씨 알림으로 오인하지 않도록 affected는 상태색만 약하게
+  const legacy = new Set((affectedItemIds || []).map(Number));
 
   return (
     <section className="day-route-strip" aria-label="오늘 동선 미리보기">
@@ -16,8 +26,11 @@ export default function DayRouteStrip({ items = [], affectedItemIds = [] }) {
       </div>
       <ol className="day-route-track">
         {items.map((item, index) => {
+          const id = Number(item.itemId);
           const level = itemStatusLevel(item, {
-            alerted: affected.has(Number(item.itemId)),
+            weatherAlerted: weather.has(id),
+            businessAlerted: business.has(id) || (!weather.size && !business.size && legacy.has(id)),
+            crowdAlerted: crowd.has(id),
           }).toLowerCase();
           return (
             <li key={item.itemId} className={`day-route-stop level-${level}`}>
