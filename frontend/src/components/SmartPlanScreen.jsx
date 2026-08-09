@@ -50,6 +50,17 @@ export default function SmartPlanScreen({
     }
   }
 
+  /** 선택한 스마트 동선을 일정에 담은 뒤 카테고리로 이동 */
+  async function handleBrowseCategories() {
+    setConfirming(true);
+    try {
+      const selected = (plan?.stops || []).filter((s) => checked[s.contentId]);
+      await onBrowseCategories?.(selected);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   const selectedCount = plan?.stops?.filter((s) => checked[s.contentId]).length || 0;
   const stops = plan?.stops || [];
 
@@ -155,8 +166,13 @@ export default function SmartPlanScreen({
             >
               {confirming ? '담는 중...' : `✅ 이 동선으로 시작 (${selectedCount})`}
             </button>
-            <button type="button" className="btn-skip" onClick={onBrowseCategories}>
-              카테고리에서 더 고르기
+            <button
+              type="button"
+              className="btn-skip"
+              disabled={confirming}
+              onClick={handleBrowseCategories}
+            >
+              {confirming ? '담는 중...' : '선택한 동선 담고 · 카테고리에서 더 고르기'}
             </button>
             <button type="button" className="btn-skip" onClick={onSkip}>
               건너뛰고 직접 담을래요

@@ -510,6 +510,17 @@ export default function App() {
     if (result?.startDate) setActiveDate(result.startDate);
   }
 
+  /** 스마트 동선에서 고른 장소를 먼저 담은 뒤 카테고리 추천으로 이동 */
+  async function handleBrowseCategoriesFromSmartPlan(selected = []) {
+    if (selected.length > 0) {
+      await handleConfirmSmartPlan(selected);
+    } else {
+      setShowSmartPlan(false);
+      setSmartPlanDate(null);
+    }
+    setShowCategoryReco(true);
+  }
+
   function handleGenerateAutoPlan(tags) {
     return api.getAutoPlan(itineraryId, { tags, placeCount: 5 });
   }
@@ -701,11 +712,7 @@ export default function App() {
         dayLabel={null}
         onGenerate={handleGenerateSmartPlan}
         onConfirm={handleConfirmSmartPlan}
-        onBrowseCategories={() => {
-          setShowSmartPlan(false);
-          setSmartPlanDate(null);
-          setShowCategoryReco(true);
-        }}
+        onBrowseCategories={handleBrowseCategoriesFromSmartPlan}
         onSkip={() => {
           setShowSmartPlan(false);
           setSmartPlanDate(null);
