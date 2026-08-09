@@ -1,4 +1,4 @@
-import { itemStatusLevel } from '../utils/statusLevel';
+import { itemStatusLevel, isIndoorPlace } from '../utils/statusLevel';
 
 /**
  * 당일치기 동선 스트립 — 장소 순서·상태 색을 한 줄로 표시.
@@ -8,15 +8,11 @@ export default function DayRouteStrip({
   weatherAffectedItemIds = [],
   businessAffectedItemIds = [],
   crowdAffectedItemIds = [],
-  /** @deprecated */
-  affectedItemIds = [],
 }) {
   if (!items.length) return null;
   const weather = new Set((weatherAffectedItemIds || []).map(Number));
   const business = new Set((businessAffectedItemIds || []).map(Number));
   const crowd = new Set((crowdAffectedItemIds || []).map(Number));
-  // 구버전 API만 있을 때 날씨 알림으로 오인하지 않도록 affected는 상태색만 약하게
-  const legacy = new Set((affectedItemIds || []).map(Number));
 
   return (
     <section className="day-route-strip" aria-label="오늘 동선 미리보기">
@@ -27,9 +23,10 @@ export default function DayRouteStrip({
       <ol className="day-route-track">
         {items.map((item, index) => {
           const id = Number(item.itemId);
+          const indoor = isIndoorPlace(item);
           const level = itemStatusLevel(item, {
-            weatherAlerted: weather.has(id),
-            businessAlerted: business.has(id) || (!weather.size && !business.size && legacy.has(id)),
+            weatherAlerted: weather.has(id) && !indoor,
+            businessAlerted: business.has(id),
             crowdAlerted: crowd.has(id),
           }).toLowerCase();
           return (
