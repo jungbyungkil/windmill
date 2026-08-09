@@ -20,6 +20,10 @@
   --level-normal: #0f9d8a;
   --level-warning: #e89b12;
   --level-danger: #d94a42;
+  /* DAY 카드 컬러 코딩과 맞춘 상태 언어 (정상·주의·긴급) */
+  --status-normal: var(--level-normal);
+  --status-warning: var(--level-warning);
+  --status-danger: var(--level-danger);
 
   --display: 'Outfit', 'Noto Sans KR', sans-serif;
   --sans: 'Noto Sans KR', system-ui, sans-serif;

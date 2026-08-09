@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react';
 import * as api from '../api/windmillApi';
+import BaramiBubble from './BaramiBubble';
+
+const ICON_GRID_CATEGORIES = new Set(['RESTAURANT', 'CAFE', '음식점', '카페', '맛집', '식당']);
+
+function isIconGridCategory(group) {
+  if (!group) return false;
+  const key = String(group.category || '');
+  const label = String(group.label || '');
+  if (ICON_GRID_CATEGORIES.has(key) || ICON_GRID_CATEGORIES.has(label)) return true;
+  return /음식|맛집|카페|식당|레스토랑/.test(label);
+}
 
 /**
  * 일정 생성 직후 우선 노출되는 API 기반 카테고리 추천 화면.
- * AI 스케줄보다 먼저 뜨며, TourAPI + 방문자(집중률) 순으로 정렬된 장소를 보여준다.
+ * 맛집·카페는 대표 먹거리형 원형 썸네일 그리드로 보여 준다.
  */
 export default function CategoryRecommendScreen({
   regionCode,
@@ -44,6 +55,7 @@ export default function CategoryRecommendScreen({
   }
 
   const activeGroup = groups?.find((g) => g.category === activeCategory) || groups?.[0];
+  const iconGrid = isIconGridCategory(activeGroup);
 
   return (
     <div className="category-reco-screen">
@@ -90,6 +102,42 @@ export default function CategoryRecommendScreen({
 
               {(activeGroup.places?.length || 0) === 0 ? (
                 <p className="empty-state">이 카테고리 추천을 아직 찾지 못했어요.</p>
+              ) : iconGrid ? (
+                <div className="category-icon-grid" role="list">
+                  {activeGroup.places.map((place) => {
+                    const added = addedIds.has(place.contentId);
+                    return (
+                      <article
+                        key={place.contentId}
+                        className={`category-icon-card ${added ? 'added' : ''}`}
+                        role="listitem"
+                      >
+                        <button
+                          type="button"
+                          className="category-icon-hit"
+                          disabled={added || addingId === place.contentId}
+                          onClick={() => handleAdd(place)}
+                          aria-label={`${place.placeName} 일정에 담기`}
+                        >
+                          <span className="category-icon-thumb">
+                            {place.thumbnailUrl ? (
+                              <img src={place.thumbnailUrl} alt="" loading="lazy" />
+                            ) : (
+                              <span className="category-icon-placeholder">🍽️</span>
+                            )}
+                          </span>
+                          <span className="category-icon-name">{place.placeName}</span>
+                          {place.crowdRate != null && (
+                            <span className="category-icon-meta">여유 {Math.round(100 - place.crowdRate)}%</span>
+                          )}
+                          <span className="category-icon-cta">
+                            {added ? '담김' : addingId === place.contentId ? '…' : '+ 담기'}
+                          </span>
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="category-place-grid">
                   {activeGroup.places.map((place) => {
@@ -127,6 +175,8 @@ export default function CategoryRecommendScreen({
               )}
             </section>
           )}
+
+          <BaramiBubble comment="취향에 맞는 곳을 골라 담아 보세요. 담은 장소는 오늘 일정에 바로 붙어요!" compact />
         </>
       )}
 

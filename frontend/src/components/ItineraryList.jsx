@@ -1,9 +1,14 @@
 import ItineraryItemCard from './ItineraryItemCard';
+import DayRouteStrip from './DayRouteStrip';
+import TravelTipsCard from './TravelTipsCard';
+import BaramiBubble from './BaramiBubble';
+import { tipsFromTrigger, baramiCommentFromTrigger, triggerStatusLevel } from '../utils/statusLevel';
 
 export default function ItineraryList({
   items,
   affectedItemIds = [],
   weatherAlert = false,
+  trigger = null,
   dayLabel,
   onUpdateTime,
   onUpdateItem,
@@ -15,6 +20,9 @@ export default function ItineraryList({
   sortByTimeLoading = false,
 }) {
   const affected = new Set((affectedItemIds || []).map(Number));
+  const tips = tipsFromTrigger(trigger);
+  const tipLevel = triggerStatusLevel(trigger);
+  const baramiComment = baramiCommentFromTrigger(trigger);
 
   return (
     <div className="itinerary-list">
@@ -36,6 +44,15 @@ export default function ItineraryList({
           )}
         </div>
       </div>
+
+      {tips.length > 0 && (
+        <TravelTipsCard tips={tips} level={tipLevel} />
+      )}
+
+      {items.length > 0 && (
+        <DayRouteStrip items={items} affectedItemIds={affectedItemIds} />
+      )}
+
       {weatherAlert && affected.size > 0 && (
         <p className="itinerary-weather-hint">
           빨간 표시된 야외 일정은 비·폭염 영향권이에요. 바람개비에서 실내 일정으로 바꿔보세요.
@@ -67,6 +84,8 @@ export default function ItineraryList({
           ))}
         </div>
       )}
+
+      {items.length > 0 && <BaramiBubble comment={baramiComment} />}
     </div>
   );
 }

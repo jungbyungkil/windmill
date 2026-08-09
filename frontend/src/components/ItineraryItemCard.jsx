@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TAG_OPTIONS } from '../constants';
+import { itemStatusLevel, STATUS_LABEL } from '../utils/statusLevel';
 
 function normalizeTime(raw) {
   const value = (raw || '').trim();
@@ -25,7 +26,7 @@ function draftFromItem(src) {
 }
 
 /**
- * 일정 카드 - 기존에 담은 장소 / 새로 추천받아 담은 장소 모두 수정 가능.
+ * 일정 카드 - 정상·주의·긴급 상태 컬러로 시간 뱃지·테두리를 맞춘다.
  */
 export default function ItineraryItemCard({
   item,
@@ -39,6 +40,8 @@ export default function ItineraryItemCard({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
+  const status = itemStatusLevel(item, { alerted });
+  const statusClass = `status-${status.toLowerCase()}`;
 
   useEffect(() => {
     if (!editing) {
@@ -82,7 +85,11 @@ export default function ItineraryItemCard({
   }
 
   return (
-    <div className={`item-card ${item.pinned ? 'pinned' : ''} ${alerted ? 'weather-affected' : ''} ${editing ? 'editing' : ''}`}>
+    <div
+      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${alerted ? 'weather-affected' : ''} ${editing ? 'editing' : ''}`}
+      data-status={status}
+    >
+      <span className={`item-status-rail ${statusClass}`} title={STATUS_LABEL[status]} aria-hidden="true" />
       {item.thumbnailUrl ? (
         <img className="item-thumb" src={item.thumbnailUrl} alt={item.placeName} loading="lazy" />
       ) : (
@@ -92,7 +99,7 @@ export default function ItineraryItemCard({
       {!editing ? (
         <input
           type="text"
-          className="item-time"
+          className={`item-time ${statusClass}`}
           inputMode="numeric"
           placeholder="09:00"
           aria-label="방문 시각"
@@ -110,7 +117,7 @@ export default function ItineraryItemCard({
       ) : (
         <input
           type="text"
-          className="item-time"
+          className={`item-time ${statusClass}`}
           inputMode="numeric"
           placeholder="09:00"
           aria-label="방문 시각 수정"
@@ -128,6 +135,7 @@ export default function ItineraryItemCard({
           <>
             <div className="item-head">
               <span className="item-name">{item.placeName}</span>
+              <span className={`item-status-chip ${statusClass}`}>{STATUS_LABEL[status]}</span>
               {item.isAlternate && <span className="alt-badge" title="추천으로 담은 장소">추천</span>}
               {alerted && <span className="weather-affected-badge" title="비·폭염 영향">⚠️ 야외</span>}
               {item.pinned && <span className="pin-badge" title={item.pinnedReason || '고정됨'}>📌</span>}
@@ -149,7 +157,7 @@ export default function ItineraryItemCard({
             </div>
 
             {item.crowdRate !== null && item.crowdRate !== undefined && (
-              <div className="item-crowd">혼잡도 {Math.round(item.crowdRate)}%</div>
+              <div className={`item-crowd ${statusClass}`}>혼잡도 {Math.round(item.crowdRate)}%</div>
             )}
           </>
         ) : (

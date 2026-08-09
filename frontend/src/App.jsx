@@ -782,6 +782,7 @@ export default function App() {
           items={visibleItems}
           affectedItemIds={trigger?.affectedItemIds}
           weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
+          trigger={trigger}
           dayLabel="오늘"
           onUpdateTime={handleUpdateTime}
           onUpdateItem={handleUpdateItem}

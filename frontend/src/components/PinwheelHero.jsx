@@ -1,3 +1,6 @@
+import BaramiBubble from './BaramiBubble';
+import { baramiCommentFromTrigger } from '../utils/statusLevel';
+
 const LEVEL_META = {
   NORMAL: { caption: '변수 없음 · 순항 중', sub: '날씨·혼잡·동선이 바뀌면 여기서 미리 알려드려요' },
   WARNING: { caption: '변수 감지 · 미리 알려드려요', sub: '일정을 조금 바꾸면 더 편해질 수 있어요' },
@@ -179,6 +182,8 @@ export default function PinwheelHero({
           {!interactive && level === 'NORMAL' && (
             <p className="pinwheel-hint">대응한 일정은 기록으로 남아 다른 여행자에게도 참고가 돼요.</p>
           )}
+
+          <BaramiBubble comment={baramiCommentFromTrigger(trigger)} compact />
         </div>
       )}
     </div>
