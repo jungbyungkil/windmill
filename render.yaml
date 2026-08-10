@@ -42,3 +42,9 @@ services:
         value: gpt-4o-mini
       - key: H2_CONSOLE_ENABLED
         value: "false"
+      # 카카오 길찾기 서버 프록시 (런타임). Dashboard에서 REST API 키 입력
+      - key: KAKAO_REST_API_KEY
+        sync: false
+      # 카카오맵 JS SDK (Docker 빌드 시 Vite에 주입). Dashboard에서 JavaScript 키 입력 후 Redeploy
+      - key: VITE_KAKAO_JS_KEY
+        sync: false

@@ -1,8 +1,10 @@
 import { itemStatusLevel, isIndoorPlace } from '../utils/statusLevel';
+import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 
 /**
  * 당일치기 동선 스트립 — 장소 순서·상태 색을 한 줄로 표시.
  * 🔄 로 GPS를 다시 받아 현재 위치를 시작점으로 순서를 재계산한다.
+ * 장소 탭 → 카카오맵 좌표 이동.
  */
 export default function DayRouteStrip({
   items = [],
@@ -21,7 +23,7 @@ export default function DayRouteStrip({
     <section className={`day-route-strip${gpsOptimizing ? ' is-reordering' : ''}`} aria-label="오늘 동선 미리보기">
       <div className="day-route-strip-head">
         <span className="day-route-chip">오늘 동선</span>
-        <span className="day-route-sub">최단 이동 · 상태 색으로 표시</span>
+        <span className="day-route-sub">탭하면 카카오맵 · 상태 색으로 표시</span>
         {onOptimizeFromGps && items.length >= 2 && (
           <button
             type="button"
@@ -44,16 +46,25 @@ export default function DayRouteStrip({
             businessAlerted: business.has(id),
             crowdAlerted: crowd.has(id),
           }).toLowerCase();
+          const openable = canOpenInKakaoMap(item);
           return (
             <li key={item.itemId} className={`day-route-stop level-${level}`}>
               {index > 0 && <span className="day-route-line" aria-hidden="true" />}
-              <span className="day-route-node" title={item.placeName}>
-                <span className="day-route-order">{index + 1}</span>
-              </span>
-              <span className="day-route-label">
-                <strong>{item.scheduledTime || '--:--'}</strong>
-                <em>{item.placeName}</em>
-              </span>
+              <button
+                type="button"
+                className={`day-route-stop-btn${openable ? '' : ' is-static'}`}
+                onClick={() => openable && openInKakaoMap(item)}
+                disabled={!openable}
+                title={openable ? '카카오맵에서 보기' : item.placeName}
+              >
+                <span className="day-route-node">
+                  <span className="day-route-order">{index + 1}</span>
+                </span>
+                <span className="day-route-label">
+                  <strong>{item.scheduledTime || '--:--'}</strong>
+                  <em>{item.placeName}</em>
+                </span>
+              </button>
             </li>
           );
         })}

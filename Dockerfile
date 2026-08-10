@@ -4,6 +4,9 @@ WORKDIR /app
 COPY frontend/package*.json frontend/
 RUN cd frontend && npm ci
 COPY frontend frontend
+# Render가 서비스 env를 Docker build-arg로 넘김 → Vite에 주입 (JS 키는 도메인 제한된 공개 키)
+ARG VITE_KAKAO_JS_KEY=
+ENV VITE_KAKAO_JS_KEY=$VITE_KAKAO_JS_KEY
 RUN cd frontend && npm run build
 
 # === 2단계: Spring Boot 백엔드 빌드 ===
@@ -16,6 +19,7 @@ COPY --from=frontend-build /app/backend/src/main/resources/static backend/src/ma
 RUN cd backend && mvn -B clean package -DskipTests
 
 # === 3단계: 실행 이미지 ===
+# KAKAO_REST_API_KEY / TOURAPI_KEY 등은 런타임 env로만 주입 (이미지에 베이크하지 않음)
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=backend-build /app/backend/target/windmill-backend-0.0.1-SNAPSHOT.jar app.jar

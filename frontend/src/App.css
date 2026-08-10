@@ -1265,6 +1265,42 @@
   word-break: keep-all;
 }
 
+.item-name-map {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: var(--sea-deep);
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--sea) 35%, transparent);
+}
+
+.item-name-map:hover {
+  color: var(--sea);
+  text-decoration-color: var(--sea);
+}
+
+.reco-info-link {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reco-info-link:hover {
+  color: var(--sea-deep);
+}
+
 .item-thumb {
   width: 52px;
   height: 52px;
@@ -3548,6 +3584,29 @@
   scroll-snap-align: start;
 }
 
+.day-route-stop-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.day-route-stop-btn.is-static {
+  cursor: default;
+}
+
+.day-route-stop-btn:not(.is-static):hover .day-route-label em {
+  color: var(--sea-deep);
+  text-decoration: underline;
+}
+
 .day-route-line {
   position: absolute;
   left: -44px;
@@ -3737,6 +3796,23 @@
   font-size: 11px;
   font-style: normal;
   color: var(--sea-deep);
+}
+
+.day-route-map-open {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--sea) 28%, var(--sand-border));
+  background: color-mix(in srgb, var(--sea) 8%, white);
+  color: var(--sea-deep);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.day-route-map-open:hover {
+  background: color-mix(in srgb, var(--sea) 14%, white);
 }
 
 @media (min-width: 640px) {

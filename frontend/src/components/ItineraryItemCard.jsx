@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TAG_OPTIONS } from '../constants';
 import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLevel';
+import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 
 function draftFromItem(src) {
@@ -84,6 +85,12 @@ export default function ItineraryItemCard({
     setEditing(false);
   }
 
+  const mapAvailable = canOpenInKakaoMap(item);
+
+  function handleOpenMap() {
+    openInKakaoMap(item);
+  }
+
   return (
     <div
       className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''}`}
@@ -118,7 +125,18 @@ export default function ItineraryItemCard({
         {!editing ? (
           <>
             <div className="item-head">
-              <span className="item-name">{item.placeName}</span>
+              {mapAvailable ? (
+                <button
+                  type="button"
+                  className="item-name item-name-map"
+                  onClick={handleOpenMap}
+                  title="카카오맵에서 보기"
+                >
+                  {item.placeName}
+                </button>
+              ) : (
+                <span className="item-name">{item.placeName}</span>
+              )}
               <span className={`item-status-chip ${statusClass}`}>{STATUS_LABEL[status]}</span>
               {item.isAlternate && <span className="alt-badge" title="추천으로 담은 장소">추천</span>}
               {isWeather && <span className="weather-affected-badge" title="비·폭염 영향 야외 일정">⚠️ 야외</span>}
@@ -136,7 +154,15 @@ export default function ItineraryItemCard({
             )}
 
             <div className="reco-info">
-              {item.addr1 && <div className="reco-info-row">📍 {item.addr1}</div>}
+              {item.addr1 && (
+                mapAvailable ? (
+                  <button type="button" className="reco-info-row reco-info-link" onClick={handleOpenMap}>
+                    📍 {item.addr1}
+                  </button>
+                ) : (
+                  <div className="reco-info-row">📍 {item.addr1}</div>
+                )
+              )}
               {(item.isFree || item.useFeeText) && (
                 <div className="reco-info-row">🎫 {item.isFree ? '무료' : item.useFeeText}</div>
               )}
@@ -257,6 +283,14 @@ export default function ItineraryItemCard({
           disabled={editing}
         >
           {item.pinned ? '📌' : '📍'}
+        </button>
+        <button
+          className="icon-btn"
+          title="카카오맵에서 보기"
+          onClick={handleOpenMap}
+          disabled={editing || !mapAvailable}
+        >
+          🗺️
         </button>
         <button className="icon-btn" title="AI 도슨트 듣기" onClick={() => onOpenDocent(item)} disabled={editing}>🎧</button>
         <button className="icon-btn danger" title="삭제" onClick={() => onDelete(item.itemId)} disabled={editing}>🗑️</button>

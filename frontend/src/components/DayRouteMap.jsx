@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-maps-sdk';
 import { getMapRoute } from '../api/windmillApi';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
+import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 
 const JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
 
@@ -135,6 +136,18 @@ function DayRouteMapCanvas({ stops, center }) {
               <strong>{selected.item.placeName}</strong>
               <p>{statusText(selected.item, selected.weather, selected.business, selected.crowd)}</p>
               {selected.item.category && <em>{selected.item.category}</em>}
+              {canOpenInKakaoMap(selected.item) && (
+                <button
+                  type="button"
+                  className="day-route-map-open"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInKakaoMap(selected.item);
+                  }}
+                >
+                  카카오맵에서 보기
+                </button>
+              )}
             </div>
           </CustomOverlayMap>
         )}
