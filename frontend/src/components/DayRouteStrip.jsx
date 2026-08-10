@@ -2,12 +2,15 @@ import { itemStatusLevel, isIndoorPlace } from '../utils/statusLevel';
 
 /**
  * 당일치기 동선 스트립 — 장소 순서·상태 색을 한 줄로 표시.
+ * 🔄 로 GPS를 다시 받아 현재 위치를 시작점으로 순서를 재계산한다.
  */
 export default function DayRouteStrip({
   items = [],
   weatherAffectedItemIds = [],
   businessAffectedItemIds = [],
   crowdAffectedItemIds = [],
+  onOptimizeFromGps,
+  gpsOptimizing = false,
 }) {
   if (!items.length) return null;
   const weather = new Set((weatherAffectedItemIds || []).map(Number));
@@ -15,10 +18,22 @@ export default function DayRouteStrip({
   const crowd = new Set((crowdAffectedItemIds || []).map(Number));
 
   return (
-    <section className="day-route-strip" aria-label="오늘 동선 미리보기">
+    <section className={`day-route-strip${gpsOptimizing ? ' is-reordering' : ''}`} aria-label="오늘 동선 미리보기">
       <div className="day-route-strip-head">
         <span className="day-route-chip">오늘 동선</span>
-        <span className="day-route-sub">시간 순 · 상태 색으로 표시</span>
+        <span className="day-route-sub">최단 이동 · 상태 색으로 표시</span>
+        {onOptimizeFromGps && items.length >= 2 && (
+          <button
+            type="button"
+            className="day-route-gps-btn"
+            onClick={onOptimizeFromGps}
+            disabled={gpsOptimizing}
+            title="현재 위치를 시작점으로 순서 다시 잡기"
+            aria-label="GPS로 동선 다시 잡기"
+          >
+            {gpsOptimizing ? '…' : '🔄'}
+          </button>
+        )}
       </div>
       <ol className="day-route-track">
         {items.map((item, index) => {

@@ -3422,8 +3422,45 @@
 .day-route-strip-head {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.day-route-gps-btn {
+  margin-left: auto;
+  border: 1px solid var(--sand-border);
+  background: white;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.day-route-gps-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sea) 10%, white);
+  transform: rotate(-30deg);
+}
+
+.day-route-gps-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.day-route-strip.is-reordering .day-route-order {
+  animation: day-route-pop 0.45s ease;
+}
+
+@keyframes day-route-pop {
+  0% { transform: scale(0.7); opacity: 0.4; }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .day-route-chip {

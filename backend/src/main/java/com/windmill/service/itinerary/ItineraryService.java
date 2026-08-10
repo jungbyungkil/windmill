@@ -11,6 +11,7 @@ import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.util.VisitOrderOptimizer;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -267,12 +268,12 @@ public class ItineraryService {
     }
 
     /**
-     * 동선 꼬임 자동 재배치 - 해당 일자 항목을 최근접 순서로 재정렬하고,
-     * 방문 시각을 09:00 시작 + (체류 75분 + 이동거리 기반)으로 다시 붙인다.
-     * 고정(pin) 여부와 관계없이 순서·시각을 갱신한다 (장소 자체는 유지).
+     * 동선 최단 재배치 — Haversine 순열 전수조사(소수 n).
+     * originLon/Lat(WGS84)가 있으면 GPS를 0번 시작점으로 두고 나머지를 재정렬한다.
      */
     @Transactional
-    public Itinerary optimizeRoute(Long itineraryId, LocalDate date) {
+    public OptimizeRouteResult optimizeRoute(Long itineraryId, LocalDate date,
+                                             Double originLon, Double originLat) {
         Itinerary itinerary = get(itineraryId);
         List<ItineraryItem> targets = itinerary.getItems().stream()
                 .filter(i -> date == null
@@ -280,10 +281,12 @@ public class ItineraryService {
                         || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
                 .collect(Collectors.toList());
         if (targets.size() < 2) {
-            return itinerary;
+            return new OptimizeRouteResult(itinerary, null, null);
         }
 
-        List<ItineraryItem> finalOrder = RouteTangleDetector.optimizeOrder(targets);
+        String oLon = originLon != null ? String.valueOf(originLon) : null;
+        String oLat = originLat != null ? String.valueOf(originLat) : null;
+        List<ItineraryItem> finalOrder = RouteTangleDetector.optimizeOrderFromOrigin(targets, oLon, oLat);
         assignOptimizedSchedule(finalOrder);
 
         int orderBase = itinerary.getItems().stream()
@@ -294,7 +297,30 @@ public class ItineraryService {
         for (int i = 0; i < finalOrder.size(); i++) {
             finalOrder.get(i).setDisplayOrder(orderBase + i);
         }
-        return itineraryRepository.save(itinerary);
+        Itinerary saved = itineraryRepository.save(itinerary);
+
+        double km = VisitOrderOptimizer.pathDistanceKm(
+                finalOrder.stream().filter(this::itemHasCoords).toList(),
+                oLon, oLat,
+                ItineraryItem::getMapX, ItineraryItem::getMapY);
+        String message = oLon != null && oLat != null
+                ? String.format("현재 위치를 시작점으로, 총 이동거리 약 %.1fkm가 최소인 순서로 바꿨어요.", km)
+                : String.format("이 순서가 총 이동거리를 최소화한 순서예요 (약 %.1fkm).", km);
+        return new OptimizeRouteResult(saved, message, km);
+    }
+
+    /** 하위 호환 */
+    @Transactional
+    public Itinerary optimizeRoute(Long itineraryId, LocalDate date) {
+        return optimizeRoute(itineraryId, date, null, null).itinerary();
+    }
+
+    public record OptimizeRouteResult(Itinerary itinerary, String message, Double totalDistanceKm) {
+    }
+
+    private boolean itemHasCoords(ItineraryItem item) {
+        return item.getMapX() != null && !item.getMapX().isBlank()
+                && item.getMapY() != null && !item.getMapY().isBlank();
     }
 
     /**

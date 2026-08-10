@@ -109,9 +109,14 @@ export function getDocent(contentId, contentTypeId, lang = 'ko') {
   return request(`/docent/${contentId}${qs({ contentTypeId, lang })}`);
 }
 
-/** 동선 꼬임 자동 재배치 */
-export function optimizeRoute(itineraryId, date) {
-  return request(`/itineraries/${itineraryId}/optimize-route${qs({ date })}`, { method: 'POST' });
+/** 동선 최단 재배치 (optional GPS originLon/Lat = WGS84) */
+export function optimizeRoute(itineraryId, date, origin) {
+  const params = { date };
+  if (origin?.lon != null && origin?.lat != null) {
+    params.originLon = origin.lon;
+    params.originLat = origin.lat;
+  }
+  return request(`/itineraries/${itineraryId}/optimize-route${qs(params)}`, { method: 'POST' });
 }
 
 /** 방문 시각 순으로 일정 재정렬 (시각 값은 유지) */

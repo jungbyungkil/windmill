@@ -3,13 +3,11 @@ package com.windmill.util;
 import com.windmill.dto.RecommendationCandidate;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
- * 동선 꼬임 최소화 - 좌표가 있는 후보를 최근접 이웃(nearest-neighbor)으로 연결한다.
- * 완벽한 TSP는 아니지만 TourAPI 후보 소수(≤10)에서는 충분히 실용적이다.
+ * 추천 후보 동선 최적화 — Haversine 순열 전수조사(소수 n) / NN 폴백.
+ * 시작점은 여유율(혼잡↓)이 가장 좋은 곳으로 고정한 뒤 나머지를 최단으로 잇는다.
  */
 public final class RouteOptimizer {
 
@@ -36,62 +34,42 @@ public final class RouteOptimizer {
 
         // 시작점: 여유율(혼잡↓)이 가장 좋은 곳 — 제품 목표와 맞춤
         RecommendationCandidate start = withCoords.stream()
-                .min((a, b) -> compareCrowdThenName(a, b))
+                .min(RouteOptimizer::compareCrowdThenName)
                 .orElse(withCoords.get(0));
 
+        List<RecommendationCandidate> rest = new ArrayList<>(withCoords);
+        rest.remove(start);
         List<RecommendationCandidate> ordered = new ArrayList<>();
-        Set<String> visited = new HashSet<>();
-        RecommendationCandidate current = start;
-        ordered.add(current);
-        visited.add(key(current));
-
-        while (ordered.size() < withCoords.size()) {
-            RecommendationCandidate nearest = null;
-            double best = Double.MAX_VALUE;
-            for (RecommendationCandidate c : withCoords) {
-                if (visited.contains(key(c))) {
-                    continue;
-                }
-                Double d = GeoUtils.distanceKmSafe(current.getMapX(), current.getMapY(), c.getMapX(), c.getMapY());
-                double dist = d == null ? Double.MAX_VALUE : d;
-                if (dist < best) {
-                    best = dist;
-                    nearest = c;
-                }
-            }
-            if (nearest == null) {
-                break;
-            }
-            nearest.setDistanceKm(best == Double.MAX_VALUE ? null : best);
-            ordered.add(nearest);
-            visited.add(key(nearest));
-            current = nearest;
+        ordered.add(start);
+        if (!rest.isEmpty()) {
+            ordered.addAll(VisitOrderOptimizer.optimizeFromOrigin(
+                    rest, start.getMapX(), start.getMapY(),
+                    RecommendationCandidate::getMapX, RecommendationCandidate::getMapY));
         }
 
-        // 첫 장소는 이전 구간 없음
-        if (!ordered.isEmpty()) {
-            ordered.get(0).setDistanceKm(null);
-        }
+        totalDistanceKm(ordered);
         ordered.addAll(withoutCoords);
         return ordered;
     }
 
     /** 순서대로 이어지는 구간 거리 합(km). 좌표 없는 구간은 무시 */
     public static double totalDistanceKm(List<RecommendationCandidate> ordered) {
-        double sum = 0;
-        for (int i = 1; i < ordered.size(); i++) {
-            RecommendationCandidate prev = ordered.get(i - 1);
-            RecommendationCandidate cur = ordered.get(i);
-            Double d = GeoUtils.distanceKmSafe(prev.getMapX(), prev.getMapY(), cur.getMapX(), cur.getMapY());
-            if (d != null) {
-                sum += d;
-                cur.setDistanceKm(d);
+        double sum = VisitOrderOptimizer.pathDistanceKm(
+                ordered, null, null,
+                RecommendationCandidate::getMapX, RecommendationCandidate::getMapY);
+        if (ordered != null) {
+            for (int i = 0; i < ordered.size(); i++) {
+                if (i == 0) {
+                    ordered.get(0).setDistanceKm(null);
+                    continue;
+                }
+                RecommendationCandidate prev = ordered.get(i - 1);
+                RecommendationCandidate cur = ordered.get(i);
+                Double d = GeoUtils.distanceKmSafe(prev.getMapX(), prev.getMapY(), cur.getMapX(), cur.getMapY());
+                cur.setDistanceKm(d == null ? null : Math.round(d * 10.0) / 10.0);
             }
         }
-        if (!ordered.isEmpty()) {
-            ordered.get(0).setDistanceKm(null);
-        }
-        return Math.round(sum * 10.0) / 10.0;
+        return sum;
     }
 
     private static int compareCrowdThenName(RecommendationCandidate a, RecommendationCandidate b) {
@@ -112,9 +90,5 @@ public final class RouteOptimizer {
     private static boolean hasCoords(RecommendationCandidate c) {
         return c.getMapX() != null && !c.getMapX().isBlank()
                 && c.getMapY() != null && !c.getMapY().isBlank();
-    }
-
-    private static String key(RecommendationCandidate c) {
-        return c.getContentId() != null ? c.getContentId() : c.getPlaceName();
     }
 }

@@ -58,6 +58,8 @@ export default function ItineraryList({
   onPlanDay,
   onSortByTime,
   sortByTimeLoading = false,
+  onOptimizeFromGps,
+  gpsOptimizing = false,
 }) {
   const weatherIdList = resolveWeatherIds(
     weatherAffectedItemIds,
@@ -105,6 +107,8 @@ export default function ItineraryList({
           weatherAffectedItemIds={[...weatherIds]}
           businessAffectedItemIds={[...businessIds]}
           crowdAffectedItemIds={[...crowdIds]}
+          onOptimizeFromGps={onOptimizeFromGps}
+          gpsOptimizing={gpsOptimizing}
         />
       )}
 

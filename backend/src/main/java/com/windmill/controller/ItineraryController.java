@@ -152,14 +152,25 @@ public class ItineraryController {
                 .map(ResponseEntity::ok);
     }
 
-    /** 동선 꼬임 자동 재배치 - 해당 일자 순서를 최적화하고 시각을 다시 붙인다 */
+    /**
+     * 동선 최단 재배치(순열 TSP / Haversine).
+     * originLon·originLat(WGS84)를 주면 GPS를 0번 시작점으로 두고 나머지를 재정렬한다.
+     */
     @PostMapping("/{id}/optimize-route")
     public Mono<ResponseEntity<ItineraryResponse>> optimizeRoute(
             @PathVariable Long id,
-            @RequestParam(required = false) LocalDate date) {
-        return Mono.fromCallable(() -> itineraryService.optimizeRoute(id, date))
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) Double originLon,
+            @RequestParam(required = false) Double originLat) {
+        return Mono.fromCallable(() -> {
+                    ItineraryService.OptimizeRouteResult result =
+                            itineraryService.optimizeRoute(id, date, originLon, originLat);
+                    ItineraryResponse body = ItineraryResponse.from(result.itinerary());
+                    body.setRouteHint(result.message());
+                    body.setOptimizedDistanceKm(result.totalDistanceKm());
+                    return body;
+                })
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
                 .map(ResponseEntity::ok);
     }
 

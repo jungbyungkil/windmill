@@ -504,6 +504,15 @@ export default function App() {
         mapY: candidate.mapY,
       });
     }
+    const visitDate = selected[0]?.visitDate || fallbackDate;
+    if (selected.length >= 2) {
+      result = await api.optimizeRoute(itineraryId, visitDate);
+      setAutoReplaceNotice(
+        result.routeHint
+          || '이 순서가 총 이동거리를 최소화한 순서예요.',
+      );
+      setTimeout(() => setAutoReplaceNotice(null), 6000);
+    }
     setItinerary(result);
     setShowSmartPlan(false);
     setSmartPlanDate(null);
@@ -548,6 +557,14 @@ export default function App() {
         mapY: candidate.mapY,
       });
     }
+    if (selected.length >= 2) {
+      result = await api.optimizeRoute(itineraryId, visitDate);
+      setAutoReplaceNotice(
+        result.routeHint
+          || '이 순서가 총 이동거리를 최소화한 순서예요.',
+      );
+      setTimeout(() => setAutoReplaceNotice(null), 6000);
+    }
     setItinerary(result);
     setShowAutoPlan(false);
   }
@@ -589,15 +606,20 @@ export default function App() {
   }
 
   /** 동선 꼬임 자동 재배치 */
-  async function handleOptimizeRoute() {
+  async function handleOptimizeRoute(origin) {
     if (!itineraryId || optimizeLoading) return;
     autoOptimizedRef.current = true;
     setOptimizeLoading(true);
     setAutoReplaceNotice(null);
     try {
-      const result = await api.optimizeRoute(itineraryId, activeDate);
+      const result = await api.optimizeRoute(itineraryId, activeDate, origin);
       setItinerary(result);
-      setAutoReplaceNotice('동선 순서와 방문 시각을 다시 잡았어요.');
+      setAutoReplaceNotice(
+        result.routeHint
+          || (origin
+            ? '현재 위치를 시작점으로 동선을 다시 잡았어요.'
+            : '이 순서가 총 이동거리를 최소화한 순서예요.'),
+      );
       refreshTrigger();
     } catch (e) {
       setAutoReplaceNotice(`동선 재배치 실패: ${e.message}`);
@@ -605,6 +627,35 @@ export default function App() {
       setOptimizeLoading(false);
       setTimeout(() => setAutoReplaceNotice(null), 6000);
     }
+  }
+
+  /** 오늘 동선 🔄 — GPS를 다시 받아 시작점으로 순서 재계산 */
+  function handleOptimizeFromGps() {
+    if (!navigator.geolocation) {
+      setAutoReplaceNotice('이 기기에서는 위치를 쓸 수 없어요.');
+      setTimeout(() => setAutoReplaceNotice(null), 4000);
+      return;
+    }
+    setOptimizeLoading(true);
+    setAutoReplaceNotice('현재 위치를 확인하는 중…');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        handleOptimizeRoute({
+          lon: pos.coords.longitude,
+          lat: pos.coords.latitude,
+        });
+      },
+      (err) => {
+        setOptimizeLoading(false);
+        setAutoReplaceNotice(
+          err?.code === 1
+            ? '위치 권한이 필요해요. 브라우저 설정에서 허용해 주세요.'
+            : '위치를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+        setTimeout(() => setAutoReplaceNotice(null), 5000);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    );
   }
 
   /** 오늘 일정을 방문 시각 순으로 재정렬 (시각은 유지) */
@@ -779,7 +830,7 @@ export default function App() {
           autoLoading={autoReplacing}
           onRerouteSchedule={handleRerouteSchedule}
           rerouteLoading={rerouteLoading}
-          onOptimizeRoute={handleOptimizeRoute}
+          onOptimizeRoute={() => handleOptimizeRoute()}
           optimizeLoading={optimizeLoading}
         />
 
@@ -810,6 +861,8 @@ export default function App() {
           onPlanDay={() => openSmartPlanForDate(tripDate)}
           onSortByTime={handleSortByTime}
           sortByTimeLoading={sortByTimeLoading}
+          onOptimizeFromGps={handleOptimizeFromGps}
+          gpsOptimizing={optimizeLoading}
         />
 
         <RecommendationSearch

@@ -26,6 +26,11 @@ public class ItineraryResponse {
     /** 확정된 날짜 목록 - 프론트 일자별 페이지 탭에서 체크표시/다음날 이동 가능 여부 판단에 사용 */
     private Set<LocalDate> confirmedDates;
 
+    /** 동선 최적화 직후 안내 문구(선택) */
+    private String routeHint;
+    /** 동선 최적화 직후 총 이동거리 km(선택, Haversine) */
+    private Double optimizedDistanceKm;
+
     public static ItineraryResponse from(Itinerary itinerary) {
         return ItineraryResponse.builder()
                 .itineraryId(itinerary.getId())

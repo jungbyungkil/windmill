@@ -2,17 +2,15 @@ package com.windmill.service.itinerary;
 
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.RouteTangleResult;
-import com.windmill.util.GeoUtils;
+import com.windmill.util.VisitOrderOptimizer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
- * 저장된 일정 항목의 좌표로 동선 꼬임(비효율)을 감지한다.
- * 현재 순서 총거리 / 최근접 최적화 총거리 비율이 임계치 이상이면 tangled.
+ * 저장된 일정 항목의 좌표로 동선 꼬임(비효율)을 감지하고,
+ * Haversine 기반 순열 전수조사(소수 n)로 순서를 최적화한다.
  */
 public final class RouteTangleDetector {
 
@@ -32,11 +30,18 @@ public final class RouteTangleDetector {
             return RouteTangleResult.builder().tangled(false).message(null).build();
         }
 
-        double current = pathDistance(withCoords);
-        List<ItineraryItem> optimized = nearestNeighbor(withCoords);
-        double best = pathDistance(optimized);
+        double current = VisitOrderOptimizer.pathDistanceKm(
+                withCoords, null, null, ItineraryItem::getMapX, ItineraryItem::getMapY);
+        List<ItineraryItem> optimized = VisitOrderOptimizer.optimize(
+                withCoords, ItineraryItem::getMapX, ItineraryItem::getMapY);
+        double best = VisitOrderOptimizer.pathDistanceKm(
+                optimized, null, null, ItineraryItem::getMapX, ItineraryItem::getMapY);
         if (best <= 0.01) {
-            return RouteTangleResult.builder().tangled(false).currentDistanceKm(round(current)).optimizedDistanceKm(round(best)).build();
+            return RouteTangleResult.builder()
+                    .tangled(false)
+                    .currentDistanceKm(round(current))
+                    .optimizedDistanceKm(round(best))
+                    .build();
         }
         double ratio = current / best;
         boolean tangled = ratio >= WASTE_RATIO_THRESHOLD;
@@ -51,64 +56,28 @@ public final class RouteTangleDetector {
                 .build();
     }
 
-    /** 최근접 이웃으로 재정렬한 목록 (원본 리스트는 변경하지 않음) */
+    /** 순열(또는 NN)로 재정렬. 좌표 없는 항목은 맨 뒤. */
     public static List<ItineraryItem> optimizeOrder(List<ItineraryItem> items) {
-        List<ItineraryItem> withCoords = items.stream()
-                .filter(RouteTangleDetector::hasCoords)
-                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
-                .toList();
-        List<ItineraryItem> without = items.stream()
-                .filter(i -> !hasCoords(i))
-                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
-                .toList();
-        if (withCoords.size() < 2) {
-            return new ArrayList<>(items);
-        }
-        List<ItineraryItem> ordered = nearestNeighbor(withCoords);
-        ordered.addAll(without);
-        return ordered;
+        return optimizeOrderFromOrigin(items, null, null);
     }
 
-    private static List<ItineraryItem> nearestNeighbor(List<ItineraryItem> points) {
-        List<ItineraryItem> remaining = new ArrayList<>(points);
-        List<ItineraryItem> ordered = new ArrayList<>();
-        ItineraryItem current = remaining.remove(0);
-        ordered.add(current);
-        Set<Long> seen = new HashSet<>();
-        seen.add(current.getId());
-        while (!remaining.isEmpty()) {
-            ItineraryItem best = null;
-            double bestD = Double.MAX_VALUE;
-            for (ItineraryItem c : remaining) {
-                Double d = GeoUtils.distanceKmSafe(current.getMapX(), current.getMapY(), c.getMapX(), c.getMapY());
-                double dist = d == null ? Double.MAX_VALUE : d;
-                if (dist < bestD) {
-                    bestD = dist;
-                    best = c;
-                }
-            }
-            if (best == null) {
-                break;
-            }
-            remaining.remove(best);
-            ordered.add(best);
-            current = best;
-            seen.add(best.getId());
+    /**
+     * GPS 등 시작점(경도/위도 문자열)을 0번으로 두고 나머지 순서를 최단으로 잡는다.
+     */
+    public static List<ItineraryItem> optimizeOrderFromOrigin(List<ItineraryItem> items,
+                                                              String originLon,
+                                                              String originLat) {
+        if (items == null || items.isEmpty()) {
+            return new ArrayList<>();
         }
-        return ordered;
-    }
-
-    private static double pathDistance(List<ItineraryItem> ordered) {
-        double sum = 0;
-        for (int i = 1; i < ordered.size(); i++) {
-            ItineraryItem a = ordered.get(i - 1);
-            ItineraryItem b = ordered.get(i);
-            Double d = GeoUtils.distanceKmSafe(a.getMapX(), a.getMapY(), b.getMapX(), b.getMapY());
-            if (d != null) {
-                sum += d;
-            }
+        List<ItineraryItem> sorted = items.stream()
+                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
+                .toList();
+        if (sorted.stream().filter(RouteTangleDetector::hasCoords).count() < 2) {
+            return new ArrayList<>(sorted);
         }
-        return sum;
+        return VisitOrderOptimizer.optimizeFromOrigin(
+                sorted, originLon, originLat, ItineraryItem::getMapX, ItineraryItem::getMapY);
     }
 
     private static boolean hasCoords(ItineraryItem item) {
