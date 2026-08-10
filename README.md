@@ -51,6 +51,13 @@ IDE Run Configuration 또는 셸에서 환경변수로 넣어야 합니다.
 | `OPENAI_API_KEY` | (없음) | Stage4 태그/한줄소개, AI 도슨트, AI 초안 일정 |
 | `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI 모델 |
 | `H2_CONSOLE_ENABLED` | `false` | 로컬에서만 `true` 권장 (`/h2-console`) |
+| `KAKAO_REST_API_KEY` | (없음) | 카카오 길찾기(서버). 없으면 지도 직선 폴백 |
+
+프론트(`frontend/.env`, 빌드 타임):
+
+| 변수 | 설명 |
+|------|------|
+| `VITE_KAKAO_JS_KEY` | 카카오 JavaScript 키(도메인 제한 필수) |
 
 OpenAI 키가 없어도 TourAPI 기반 **스마트 동선·혼잡·날씨 대응**은 동작합니다.
 
@@ -122,8 +129,32 @@ docker run -p 8080:8080 -e TOURAPI_KEY=디코딩키 windmill
 | `SPRING_PROFILES_ACTIVE` | `prod` |
 | `TOURAPI_KEY` | 필수 |
 | `OPENAI_API_KEY` | 선택 |
+| `KAKAO_REST_API_KEY` | 선택(길찾기 도로 경로). 없으면 지도에 직선 연결 |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Postgres 접속 정보 |
 | `PORT` | 서버 포트(플랫폼이 주입하는 경우 그대로) |
+
+프론트 빌드 시(Vite):
+
+| 변수 | 설명 |
+|------|------|
+| `VITE_KAKAO_JS_KEY` | 카카오 **JavaScript** 키. Web 도메인 제한 필수 |
+
+---
+
+## 카카오맵
+
+「오늘 동선」 타임라인 바로 아래 **접이식 지도**가 붙습니다.
+
+- 마커: `mapX`/`mapY`(WGS84) + 방문 순서 번호, 바람개비 상태색(정상/주의/긴급)
+- 경로: `POST /api/map/route` → 서버가 카카오 모빌리티 길찾기를 호출해 도로 폴리라인 반환 (REST 키 미노출)
+- 키 없거나 길찾기 실패 시 Haversine 직선으로 폴백
+
+설정:
+
+1. [카카오 개발자](https://developers.kakao.com) 앱 생성
+2. **JavaScript 키** → `frontend/.env`의 `VITE_KAKAO_JS_KEY`
+3. 플랫폼 → Web 도메인: `http://localhost:5173`, Render 배포 URL 등
+4. **REST API 키** → 서버 `KAKAO_REST_API_KEY` (길찾기 전용, 프론트에 넣지 말 것)
 
 ---
 
@@ -163,5 +194,6 @@ windmill/
 - [ ] GitHub 저장소 접근 권한
 - [ ] `TOURAPI_KEY` (Decoding) 및 data.go.kr 활용신청 목록 공유
 - [ ] (선택) `OPENAI_API_KEY`
+- [ ] (선택) 카카오 `KAKAO_REST_API_KEY` + 프론트 `VITE_KAKAO_JS_KEY` 및 Web 도메인 등록
 - [ ] (배포 담당) Render 등 대시보드·Postgres 접속 정보
 - [ ] 로컬에서 `mvn spring-boot:run` + `npm run dev`로 스마트 동선 생성까지 확인

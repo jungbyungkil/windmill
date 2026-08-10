@@ -3,6 +3,11 @@ function formatDate(yyyyMMdd) {
   return `${yyyyMMdd.slice(4, 6)}.${yyyyMMdd.slice(6, 8)}`;
 }
 
+function openFestivalUrl(url) {
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 /** 본문 흐름과 분리된 하단 참고 영역 - 축제 정보는 선택 사항 */
 export default function FestivalBanner({ festivals, onAdd, addingId }) {
   if (!festivals || festivals.length === 0) return null;
@@ -13,15 +18,36 @@ export default function FestivalBanner({ festivals, onAdd, addingId }) {
         <span className="festival-ref-badge">참고</span>
         <div>
           <div className="festival-banner-title">이 기간 · 이 지역 축제</div>
-          <p className="festival-banner-sub">일정 필수는 아니에요. 관심 있으면 담아 보세요.</p>
+          <p className="festival-banner-sub">일정 필수는 아니에요. 관심 있으면 담아 보세요. 이름을 누르면 축제 페이지로 이동해요.</p>
         </div>
       </div>
       <div className="festival-card-list">
         {festivals.map((f) => (
           <div key={f.contentId} className="festival-card">
-            {f.thumbnailUrl && <img className="festival-thumb" src={f.thumbnailUrl} alt={f.placeName} />}
+            {f.thumbnailUrl && (
+              <button
+                type="button"
+                className="festival-thumb-btn"
+                onClick={() => openFestivalUrl(f.homepageUrl)}
+                disabled={!f.homepageUrl}
+                aria-label={f.homepageUrl ? `${f.placeName} 축제 페이지 열기` : undefined}
+              >
+                <img className="festival-thumb" src={f.thumbnailUrl} alt="" />
+              </button>
+            )}
             <div className="festival-info">
-              <div className="festival-name">{f.placeName}</div>
+              {f.homepageUrl ? (
+                <button
+                  type="button"
+                  className="festival-name festival-name-link"
+                  onClick={() => openFestivalUrl(f.homepageUrl)}
+                >
+                  {f.placeName}
+                  <span className="festival-ext" aria-hidden="true">↗</span>
+                </button>
+              ) : (
+                <div className="festival-name">{f.placeName}</div>
+              )}
               <div className="festival-period">{formatDate(f.eventStartDate)} ~ {formatDate(f.eventEndDate)}</div>
               {f.addr1 && <div className="festival-addr">{f.addr1}</div>}
             </div>

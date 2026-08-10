@@ -1,5 +1,6 @@
 import ItineraryItemCard from './ItineraryItemCard';
 import DayRouteStrip from './DayRouteStrip';
+import DayRouteMap from './DayRouteMap';
 import TravelTipsCard from './TravelTipsCard';
 import BaramiBubble from './BaramiBubble';
 import { tipsFromTrigger, baramiCommentFromTrigger, triggerStatusLevel, isIndoorPlace } from '../utils/statusLevel';
@@ -109,6 +110,15 @@ export default function ItineraryList({
           crowdAffectedItemIds={[...crowdIds]}
           onOptimizeFromGps={onOptimizeFromGps}
           gpsOptimizing={gpsOptimizing}
+        />
+      )}
+
+      {items.length > 0 && (
+        <DayRouteMap
+          items={items}
+          weatherAffectedItemIds={[...weatherIds]}
+          businessAffectedItemIds={[...businessIds]}
+          crowdAffectedItemIds={[...crowdIds]}
         />
       )}
 

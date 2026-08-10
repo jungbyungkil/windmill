@@ -11,6 +11,7 @@ import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.VisitOrderOptimizer;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -155,6 +156,8 @@ public class ItineraryService {
         int nextOrder = itinerary.getItems().size();
         // visitDate 미지정(예: 기존 단일 일자 플로우)이면 여행 시작일로 채운다 - 일자별 페이지 그룹핑 기준
         LocalDate visitDate = request.getVisitDate() != null ? request.getVisitDate() : itinerary.getStartDate();
+        List<String> tags = PlaceTagSanitizer.sanitizeStored(
+                request.getTags(), request.getContentTypeId(), request.getPlaceName(), request.getCategory());
         ItineraryItem item = ItineraryItem.builder()
                 .itinerary(itinerary)
                 .contentId(request.getContentId())
@@ -162,7 +165,7 @@ public class ItineraryService {
                 .placeName(request.getPlaceName())
                 .thumbnailUrl(request.getThumbnailUrl())
                 .scheduledTime(request.getScheduledTime())
-                .tags(request.getTags() == null ? List.of() : request.getTags())
+                .tags(tags)
                 .crowdRate(request.getCrowdRate())
                 .displayOrder(nextOrder)
                 .visitDate(visitDate)
@@ -207,7 +210,8 @@ public class ItineraryService {
             item.setPlaceName(request.getPlaceName().trim());
         }
         if (request.getTags() != null) {
-            item.setTags(new java.util.ArrayList<>(request.getTags()));
+            item.setTags(PlaceTagSanitizer.sanitizeStored(
+                    request.getTags(), item.getContentTypeId(), item.getPlaceName(), item.getCategory()));
         }
         if (request.getAddr1() != null) {
             item.setAddr1(request.getAddr1().isBlank() ? null : request.getAddr1().trim());

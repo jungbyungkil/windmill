@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RelatedCandidate;
 import com.windmill.service.ai.OpenAiService;
+import com.windmill.util.PlaceTagSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,13 +34,14 @@ public class Stage4TagMatchingService {
         if (candidates.isEmpty()) {
             return Mono.just(List.of());
         }
+        final List<String> requested = requestedTags == null ? List.of() : requestedTags;
         if (!openAiService.isConfigured()) {
-            return Mono.just(fallback(candidates));
+            return Mono.just(fallback(candidates, requested));
         }
-        String prompt = buildPrompt(candidates, requestedTags, naturalLanguageQuery);
+        String prompt = buildPrompt(candidates, requested, naturalLanguageQuery);
         return openAiService.complete(prompt)
-                .map(response -> parseResponse(response, candidates))
-                .onErrorReturn(fallback(candidates));
+                .map(response -> parseResponse(response, candidates, requested))
+                .onErrorReturn(fallback(candidates, requested));
     }
 
     private String buildPrompt(List<RelatedCandidate> candidates, List<String> requestedTags, String query) {
@@ -59,6 +61,11 @@ public class Stage4TagMatchingService {
                 관광지 목록:
                 %s
 
+                규칙:
+                - matchedTags는 반드시 위의 "요청 태그 후보"에 있는 것만 사용하세요. 없으면 빈 배열.
+                - 전시관·박물관·스테이션·체험관 등 관광/문화시설에 #맛집을 붙이지 마세요.
+                - 음식점·식당만 #맛집을 쓰세요.
+
                 각 항목에 대해 아래 JSON 배열 형식으로만 반환하세요. 다른 설명은 하지 마세요.
                 [
                   {"placeName": "장소명", "matchedTags": ["#태그"], "oneLiner": "한 문장 소개"}
@@ -66,7 +73,8 @@ public class Stage4TagMatchingService {
                 """, query == null ? "없음" : query, tagsText, candidateLines);
     }
 
-    private List<RecommendationCandidate> parseResponse(String response, List<RelatedCandidate> candidates) {
+    private List<RecommendationCandidate> parseResponse(String response, List<RelatedCandidate> candidates,
+                                                          List<String> requestedTags) {
         try {
             String json = OpenAiService.stripJsonFence(response);
             JsonNode array = objectMapper.readTree(json);
@@ -85,17 +93,17 @@ public class Stage4TagMatchingService {
                         oneLiner = match.path("oneLiner").asText();
                     }
                 }
-                return toCandidate(c, matchedTags, oneLiner);
+                return toCandidate(c, matchedTags, oneLiner, requestedTags);
             }).collect(Collectors.toList());
         } catch (Exception e) {
             log.warn("[Stage4] OpenAI 응답 파싱 실패, 기본 문장으로 대체: {}", e.getMessage());
-            return fallback(candidates);
+            return fallback(candidates, requestedTags);
         }
     }
 
-    private List<RecommendationCandidate> fallback(List<RelatedCandidate> candidates) {
+    private List<RecommendationCandidate> fallback(List<RelatedCandidate> candidates, List<String> requestedTags) {
         return candidates.stream()
-                .map(c -> toCandidate(c, List.of(), defaultOneLiner(c)))
+                .map(c -> toCandidate(c, List.of(), defaultOneLiner(c), requestedTags))
                 .collect(Collectors.toList());
     }
 
@@ -106,7 +114,10 @@ public class Stage4TagMatchingService {
         return c.getPlaceName() + "을(를) 추천해요.";
     }
 
-    private RecommendationCandidate toCandidate(RelatedCandidate c, List<String> matchedTags, String oneLiner) {
+    private RecommendationCandidate toCandidate(RelatedCandidate c, List<String> matchedTags, String oneLiner,
+                                                  List<String> requestedTags) {
+        List<String> tags = PlaceTagSanitizer.sanitize(
+                matchedTags, c.getContentTypeId(), c.getPlaceName(), c.getCategoryLcls(), requestedTags);
         return RecommendationCandidate.builder()
                 .contentId(c.getContentId())
                 .contentTypeId(c.getContentTypeId())
@@ -115,7 +126,7 @@ public class Stage4TagMatchingService {
                 .thumbnailUrl(c.getThumbnailUrl())
                 .crowdRate(c.getCrowdRate())
                 .freeRatePercent(c.getCrowdRate() == null ? null : 100 - c.getCrowdRate())
-                .matchedTags(matchedTags)
+                .matchedTags(tags)
                 .oneLiner(oneLiner)
                 .rank(c.getRank())
                 .addr1(c.getAddr1())

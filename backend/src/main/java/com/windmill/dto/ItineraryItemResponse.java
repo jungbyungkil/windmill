@@ -1,6 +1,7 @@
 package com.windmill.dto;
 
 import com.windmill.domain.ItineraryItem;
+import com.windmill.util.PlaceTagSanitizer;
 import lombok.Builder;
 import lombok.Data;
 
@@ -32,6 +33,9 @@ public class ItineraryItemResponse {
     private boolean isAlternate;
 
     public static ItineraryItemResponse from(ItineraryItem item) {
+        // 이미 저장된 #맛집 오탐도 응답 시점에 바로잡음 (체험관·스테이션 등)
+        List<String> tags = PlaceTagSanitizer.sanitizeStored(
+                item.getTags(), item.getContentTypeId(), item.getPlaceName(), null);
         return ItineraryItemResponse.builder()
                 .itemId(item.getId())
                 .contentId(item.getContentId())
@@ -39,7 +43,7 @@ public class ItineraryItemResponse {
                 .placeName(item.getPlaceName())
                 .thumbnailUrl(item.getThumbnailUrl())
                 .scheduledTime(item.getScheduledTime())
-                .tags(item.getTags())
+                .tags(tags)
                 .crowdRate(item.getCrowdRate())
                 .isPinned(item.isPinned())
                 .pinnedReason(item.getPinnedReason())

@@ -1,0 +1,220 @@
+package com.windmill.client;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.dto.MapRouteRequest;
+import com.windmill.dto.MapRouteResponse;
+import com.windmill.util.GeoUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Mono;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 카카오 모빌리티 자동차 길찾기 프록시.
+ * REST API 키는 서버에만 두고, 프론트에는 경로 좌표만 내려준다.
+ * 키 없거나 실패 시 Haversine 직선 폴백.
+ *
+ * @see <a href="https://developers.kakaomobility.com">Kakao Mobility Directions</a>
+ */
+@Slf4j
+@Component
+public class KakaoDirectionsClient {
+
+    private static final String DIRECTIONS_URL = "https://apis-navi.kakaomobility.com/v1/directions";
+    /** origin + waypoints(≤5) + destination */
+    private static final int MAX_POINTS_PER_REQUEST = 7;
+
+    private final WebClient webClient;
+    private final String restApiKey;
+
+    public KakaoDirectionsClient(WebClient.Builder webClientBuilder,
+                                 @Value("${kakao.rest-api-key:}") String restApiKey) {
+        this.webClient = webClientBuilder.build();
+        this.restApiKey = restApiKey == null ? "" : restApiKey.trim();
+    }
+
+    public boolean isConfigured() {
+        return !restApiKey.isBlank();
+    }
+
+    public Mono<MapRouteResponse> route(List<MapRouteRequest.MapPoint> points) {
+        if (points == null || points.size() < 2) {
+            return Mono.just(MapRouteResponse.builder()
+                    .path(List.of())
+                    .roadBased(false)
+                    .message("경로를 그리려면 좌표가 있는 장소가 2곳 이상 필요해요.")
+                    .build());
+        }
+        if (!isConfigured()) {
+            return Mono.just(straightFallback(points, "카카오 REST 키가 없어 직선으로 연결했어요."));
+        }
+        return fetchRoadPath(points)
+                .onErrorResume(e -> {
+                    log.warn("[KakaoDirections] fallback to straight line: {}", e.toString());
+                    return Mono.just(straightFallback(points, "길찾기를 불러오지 못해 직선으로 연결했어요."));
+                });
+    }
+
+    private Mono<MapRouteResponse> fetchRoadPath(List<MapRouteRequest.MapPoint> points) {
+        if (points.size() <= MAX_POINTS_PER_REQUEST) {
+            return callDirections(points);
+        }
+        // 7곳 초과: 겹치지 않게 청크로 이어 붙임 (청크 경계 공유 1점)
+        List<Mono<MapRouteResponse>> parts = new ArrayList<>();
+        for (int start = 0; start < points.size() - 1; start += MAX_POINTS_PER_REQUEST - 1) {
+            int end = Math.min(start + MAX_POINTS_PER_REQUEST, points.size());
+            parts.add(callDirections(points.subList(start, end)));
+            if (end >= points.size()) {
+                break;
+            }
+        }
+        return Mono.zip(parts, arr -> {
+            List<MapRouteResponse.LatLng> path = new ArrayList<>();
+            int dist = 0;
+            int dur = 0;
+            for (Object o : arr) {
+                MapRouteResponse part = (MapRouteResponse) o;
+                if (part.getPath() != null) {
+                    for (MapRouteResponse.LatLng p : part.getPath()) {
+                        if (path.isEmpty() || !nearlySame(path.get(path.size() - 1), p)) {
+                            path.add(p);
+                        }
+                    }
+                }
+                if (part.getDistanceMeters() != null) {
+                    dist += part.getDistanceMeters();
+                }
+                if (part.getDurationSeconds() != null) {
+                    dur += part.getDurationSeconds();
+                }
+            }
+            return MapRouteResponse.builder()
+                    .path(path)
+                    .distanceMeters(dist > 0 ? dist : null)
+                    .durationSeconds(dur > 0 ? dur : null)
+                    .roadBased(true)
+                    .build();
+        });
+    }
+
+    private Mono<MapRouteResponse> callDirections(List<MapRouteRequest.MapPoint> points) {
+        MapRouteRequest.MapPoint origin = points.get(0);
+        MapRouteRequest.MapPoint dest = points.get(points.size() - 1);
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString(DIRECTIONS_URL)
+                .queryParam("origin", formatPoint(origin))
+                .queryParam("destination", formatPoint(dest))
+                .queryParam("priority", "RECOMMEND")
+                .queryParam("car_fuel", "GASOLINE")
+                .queryParam("car_hipass", "false")
+                .queryParam("summary", "false");
+        if (points.size() > 2) {
+            StringBuilder waypoints = new StringBuilder();
+            for (int i = 1; i < points.size() - 1; i++) {
+                if (i > 1) {
+                    waypoints.append('|');
+                }
+                waypoints.append(formatPoint(points.get(i)));
+            }
+            builder.queryParam("waypoints", waypoints.toString());
+        }
+        URI uri = builder.encode().build().toUri();
+
+        return webClient.get()
+                .uri(uri)
+                .header(HttpHeaders.AUTHORIZATION, "KakaoAK " + restApiKey)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(this::parseResponse)
+                .flatMap(resp -> {
+                    if (resp.getPath() == null || resp.getPath().isEmpty()) {
+                        return Mono.error(new IllegalStateException("empty path from Kakao"));
+                    }
+                    return Mono.just(resp);
+                });
+    }
+
+    private MapRouteResponse parseResponse(JsonNode root) {
+        JsonNode routes = root.path("routes");
+        if (!routes.isArray() || routes.isEmpty()) {
+            throw new IllegalStateException("no routes");
+        }
+        JsonNode route = routes.get(0);
+        int code = route.path("result_code").asInt(-1);
+        if (code != 0) {
+            throw new IllegalStateException("kakao result_code=" + code + " " + route.path("result_msg").asText());
+        }
+        List<MapRouteResponse.LatLng> path = new ArrayList<>();
+        JsonNode sections = route.path("sections");
+        if (sections.isArray()) {
+            for (JsonNode section : sections) {
+                JsonNode roads = section.path("roads");
+                if (!roads.isArray()) {
+                    continue;
+                }
+                for (JsonNode road : roads) {
+                    JsonNode vertexes = road.path("vertexes");
+                    if (!vertexes.isArray()) {
+                        continue;
+                    }
+                    for (int i = 0; i + 1 < vertexes.size(); i += 2) {
+                        double lng = vertexes.get(i).asDouble();
+                        double lat = vertexes.get(i + 1).asDouble();
+                        MapRouteResponse.LatLng p = MapRouteResponse.LatLng.builder().lat(lat).lng(lng).build();
+                        if (path.isEmpty() || !nearlySame(path.get(path.size() - 1), p)) {
+                            path.add(p);
+                        }
+                    }
+                }
+            }
+        }
+        JsonNode summary = route.path("summary");
+        Integer distance = summary.has("distance") ? summary.get("distance").asInt() : null;
+        Integer duration = summary.has("duration") ? summary.get("duration").asInt() : null;
+        return MapRouteResponse.builder()
+                .path(path)
+                .distanceMeters(distance)
+                .durationSeconds(duration)
+                .roadBased(true)
+                .build();
+    }
+
+    private static String formatPoint(MapRouteRequest.MapPoint p) {
+        return p.getLon() + "," + p.getLat();
+    }
+
+    private static boolean nearlySame(MapRouteResponse.LatLng a, MapRouteResponse.LatLng b) {
+        return Math.abs(a.getLat() - b.getLat()) < 1e-7 && Math.abs(a.getLng() - b.getLng()) < 1e-7;
+    }
+
+    static MapRouteResponse straightFallback(List<MapRouteRequest.MapPoint> points, String message) {
+        List<MapRouteResponse.LatLng> path = new ArrayList<>();
+        double meters = 0;
+        MapRouteRequest.MapPoint prev = null;
+        for (MapRouteRequest.MapPoint p : points) {
+            path.add(MapRouteResponse.LatLng.builder().lat(p.getLat()).lng(p.getLon()).build());
+            if (prev != null) {
+                Double km = GeoUtils.distanceKmSafe(
+                        String.valueOf(prev.getLon()), String.valueOf(prev.getLat()),
+                        String.valueOf(p.getLon()), String.valueOf(p.getLat()));
+                if (km != null) {
+                    meters += km * 1000.0;
+                }
+            }
+            prev = p;
+        }
+        return MapRouteResponse.builder()
+                .path(path)
+                .distanceMeters(meters > 0 ? (int) Math.round(meters) : null)
+                .roadBased(false)
+                .message(message)
+                .build();
+    }
+}

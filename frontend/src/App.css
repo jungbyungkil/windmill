@@ -7,6 +7,8 @@
   max-width: 720px;
   margin: 0 auto;
   width: 100%;
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
 }
 
 .app-header {
@@ -17,6 +19,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 24px -18px rgba(6, 70, 90, 0.45);
   backdrop-filter: saturate(1.1);
+  padding-top: env(safe-area-inset-top, 0);
 }
 
 .header-inner {
@@ -209,7 +212,7 @@
 
 .app-main {
   flex: 1;
-  padding: 18px 16px 48px;
+  padding: 18px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -328,8 +331,8 @@
   color: var(--sea-deep);
   border: 1px solid color-mix(in srgb, var(--sea) 16%, var(--sand-border));
   border-radius: 10px;
-  padding: 3px 9px;
-  font-size: 11px;
+  padding: 4px 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1034,6 +1037,21 @@
   border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
+  display: block;
+}
+
+.festival-thumb-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 10px;
+}
+
+.festival-thumb-btn:disabled {
+  cursor: default;
+  opacity: 0.9;
 }
 
 .festival-info {
@@ -1046,17 +1064,45 @@
   font-weight: 600;
 }
 
+.festival-name-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sea-deep);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.festival-name-link:hover {
+  color: var(--sea);
+}
+
+.festival-ext {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
 .festival-period {
   font-size: 12px;
   color: var(--sea);
 }
 
 .festival-addr {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .festival-add-btn {
@@ -1211,9 +1257,12 @@
 
 .item-name {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: -0.02em;
   color: var(--ink);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .item-thumb {
@@ -2436,11 +2485,11 @@
 }
 
 .reco-info-row {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .reco-restdate {
@@ -3542,19 +3591,25 @@
 }
 
 .day-route-label strong {
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
 .day-route-label em {
   font-style: normal;
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--muted);
-  max-width: 84px;
-  white-space: nowrap;
+  max-width: 96px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  white-space: normal;
 }
 
 @keyframes fade-up {
@@ -3568,6 +3623,122 @@
   }
 }
 
+.day-route-map {
+  margin: 0 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-border);
+  background: color-mix(in srgb, var(--sea) 3%, white);
+  overflow: hidden;
+}
+
+.day-route-map-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.day-route-map-toggle-meta {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.day-route-map-body {
+  padding: 0 10px 10px;
+}
+
+.day-route-map-canvas {
+  width: 100%;
+  height: 260px;
+  border-radius: 12px;
+  border: 1px solid var(--sand-border);
+}
+
+.day-route-map-hint,
+.day-route-map-caption {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.day-route-map-pin {
+  --pin-color: var(--status-normal);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.day-route-map-pin-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--pin-color);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--pin-color) 45%, transparent);
+  border: 2px solid #fff;
+}
+
+.day-route-map-pin::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--pin-color);
+  margin-top: -2px;
+}
+
+.day-route-map-info {
+  min-width: 140px;
+  max-width: 200px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--sand-border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  text-align: left;
+}
+
+.day-route-map-info strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.day-route-map-info p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.day-route-map-info em {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--sea-deep);
+}
+
 @media (min-width: 640px) {
   .category-place-grid {
     grid-template-columns: 1fr 1fr;
@@ -3579,6 +3750,195 @@
 
   .reco-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .day-route-map-canvas {
+    height: 320px;
+  }
+}
+
+/* ---------- Mobile readability (앱웹) ---------- */
+@media (max-width: 640px) {
+  .header-inner {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .logo {
+    font-size: 18px;
+  }
+
+  .btn-share,
+  .btn-finish {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .app-main {
+    padding: 14px 14px max(40px, calc(24px + env(safe-area-inset-bottom, 0px)));
+    gap: 18px;
+  }
+
+  .section-title {
+    font-size: 17px;
+  }
+
+  .empty-state,
+  .draft-resume-banner p,
+  .draft-resume-panel-head p,
+  .festival-banner-sub,
+  .smart-plan-sub,
+  .day-route-sub,
+  .day-route-map-caption,
+  .day-route-map-hint {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .item-card {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 12px 12px 16px;
+  }
+
+  .item-body {
+    flex: 1 1 140px;
+  }
+
+  .item-name {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .item-actions {
+    flex: 1 1 100%;
+    max-width: none;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--sand-border);
+  }
+
+  .item-actions .icon-btn {
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  .item-time,
+  .item-time-picker {
+    font-size: 14px;
+    min-height: 42px;
+  }
+
+  .tag-chip,
+  .alt-badge,
+  .weather-affected-badge,
+  .business-affected-badge,
+  .crowd-affected-badge,
+  .item-status-chip,
+  .pin-badge,
+  .leg-chip,
+  .crowd-chip,
+  .smart-flag,
+  .daytrip-chip {
+    font-size: 12px;
+    padding: 4px 9px;
+  }
+
+  .festival-card {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .festival-info {
+    min-width: 0;
+  }
+
+  .festival-name,
+  .festival-name-link {
+    font-size: 15px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+    white-space: normal;
+  }
+
+  .festival-period,
+  .festival-addr {
+    font-size: 13px;
+  }
+
+  .festival-add-btn {
+    align-self: center;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .day-route-stop {
+    width: 100px;
+  }
+
+  .day-route-label em {
+    max-width: 96px;
+    font-size: 12px;
+  }
+
+  .day-route-map-toggle {
+    font-size: 14px;
+    min-height: 44px;
+  }
+
+  .smart-stop-body h3,
+  .category-place-body h3 {
+    font-size: 15px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+  }
+
+  .smart-stop-body p,
+  .category-place-body p,
+  .reco-card p {
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-line-clamp: 3;
+  }
+
+  .create-trip-screen,
+  .smart-plan-screen,
+  .category-reco-screen {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .create-trip-screen h1,
+  .smart-plan-title,
+  .category-reco-screen h1 {
+    font-size: 1.45rem;
+    line-height: 1.3;
+  }
+
+  .btn-primary,
+  .btn-skip {
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  .auto-replace-notice,
+  .itinerary-weather-hint,
+  .itinerary-business-hint {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .barami-text,
+  .travel-tips-card,
+  .situation-body {
+    font-size: 14px;
+    line-height: 1.55;
   }
 }
 

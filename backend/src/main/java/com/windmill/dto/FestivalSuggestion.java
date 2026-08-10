@@ -15,4 +15,6 @@ public class FestivalSuggestion {
     /** yyyyMMdd 원문 그대로 - 프론트에서 표시 형식으로 가공 */
     private String eventStartDate;
     private String eventEndDate;
+    /** detailCommon2 homepage에서 추출한 외부 URL (없으면 null) */
+    private String homepageUrl;
 }

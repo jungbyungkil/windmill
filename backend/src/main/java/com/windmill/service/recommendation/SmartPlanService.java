@@ -12,6 +12,7 @@ import com.windmill.service.trigger.RegionCondition;
 import com.windmill.service.trigger.TriggerScheduler;
 import com.windmill.service.trip.TripRecordService;
 import com.windmill.util.GeoUtils;
+import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.RouteOptimizer;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
@@ -356,6 +357,13 @@ public class SmartPlanService {
                     || "점심".equals(stop.getCategory()) || "저녁".equals(stop.getCategory())) {
                 stop.setCategory(slotLabel);
             }
+            // 관광 슬롯에 #맛집 오탐이 남지 않도록 정리
+            stop.setMatchedTags(PlaceTagSanitizer.sanitize(
+                    stop.getMatchedTags(),
+                    stop.getContentTypeId(),
+                    stop.getPlaceName(),
+                    stop.getCategory(),
+                    null));
             if (stop.getOneLiner() == null || stop.getOneLiner().isBlank()) {
                 stop.setOneLiner(slotLabel + " · " + defaultLine(stop));
             } else if (!stop.getOneLiner().contains("오전") && !stop.getOneLiner().contains("오후")
@@ -461,17 +469,7 @@ public class SmartPlanService {
         if (c == null) {
             return false;
         }
-        if (c.getMatchedTags() != null && c.getMatchedTags().stream().anyMatch(t -> t != null && t.contains("맛집"))) {
-            return true;
-        }
-        String cat = c.getCategory() == null ? "" : c.getCategory();
-        String name = c.getPlaceName() == null ? "" : c.getPlaceName();
-        String text = (cat + " " + name).toLowerCase();
-        if (text.contains("식당") || text.contains("맛집") || text.contains("카페") || text.contains("레스토랑")
-                || text.contains("음식") || text.contains("베이커리") || text.contains("제과")) {
-            return true;
-        }
-        return c.getContentTypeId() != null && c.getContentTypeId() == 39;
+        return PlaceTagSanitizer.looksLikeFood(c.getContentTypeId(), c.getPlaceName(), c.getCategory());
     }
 
     private boolean isMealStop(RecommendationCandidate c) {
