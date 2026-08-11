@@ -28,6 +28,8 @@ public class ItineraryItemResponse {
     private String useFeeText;
     private Boolean isFree;
     private String restDateText;
+    private String closeTime;
+    private String useTimeText;
     private String mapX;
     private String mapY;
     private boolean isAlternate;
@@ -54,6 +56,8 @@ public class ItineraryItemResponse {
                 .useFeeText(item.getUseFeeText())
                 .isFree(item.getIsFree())
                 .restDateText(item.getRestDateText())
+                .closeTime(item.getCloseTime())
+                .useTimeText(item.getUseTimeText())
                 .mapX(item.getMapX())
                 .mapY(item.getMapY())
                 .isAlternate(item.isAlternate())

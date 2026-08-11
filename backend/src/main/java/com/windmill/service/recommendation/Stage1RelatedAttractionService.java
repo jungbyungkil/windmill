@@ -340,11 +340,15 @@ public class Stage1RelatedAttractionService {
                 continue;
             }
             String thumbnail = item.path("firstimage").asText(null);
+            String mapX = blankToNull(item.path("mapx").asText(null));
+            String mapY = blankToNull(item.path("mapy").asText(null));
             result.add(RelatedCandidate.builder()
                     .placeName(name)
                     .contentId(item.path("contentid").asText(null))
                     .contentTypeId(parseContentTypeId(item))
                     .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
+                    .mapX(mapX)
+                    .mapY(mapY)
                     .categoryLcls(categoryLcls)
                     .rank(rank++)
                     .build());
@@ -388,9 +392,19 @@ public class Stage1RelatedAttractionService {
                     candidate.setContentTypeId(typeId == null ? null : Integer.valueOf(typeId));
                     String thumbnail = match.path("firstimage").asText(null);
                     candidate.setThumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail);
+                    if (blankToNull(candidate.getMapX()) == null) {
+                        candidate.setMapX(blankToNull(match.path("mapx").asText(null)));
+                    }
+                    if (blankToNull(candidate.getMapY()) == null) {
+                        candidate.setMapY(blankToNull(match.path("mapy").asText(null)));
+                    }
                     return candidate;
                 })
                 .defaultIfEmpty(candidate)
                 .onErrorReturn(candidate);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

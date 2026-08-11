@@ -15,6 +15,8 @@ import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
 import SharedItineraryScreen from './components/SharedItineraryScreen';
+import ClosingGateModal from './components/ClosingGateModal';
+import { checkClosingGate } from './utils/closingTime';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -85,6 +87,7 @@ export default function App() {
 
   const [autoReplacing, setAutoReplacing] = useState(false);
   const [autoReplaceNotice, setAutoReplaceNotice] = useState(null);
+  const [closingGate, setClosingGate] = useState(null);
   const [rerouteLoading, setRerouteLoading] = useState(false);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
@@ -266,11 +269,20 @@ export default function App() {
   }
 
   async function addCandidateToItinerary(candidate, visitDate = activeDate, isAlternate = false) {
+    const dayItems = (itinerary?.items || []).filter(
+      (i) => (i.visitDate || itinerary.startDate) === (visitDate || itinerary?.startDate),
+    );
+    const gate = checkClosingGate(candidate, { dayItems, visitDate: visitDate || itinerary?.startDate });
+    if (gate.blocked) {
+      setClosingGate({ placeName: candidate.placeName, message: gate.message });
+      throw new Error(gate.message);
+    }
     const result = await api.addItem(itineraryId, {
       contentId: candidate.contentId,
       contentTypeId: candidate.contentTypeId,
       placeName: candidate.placeName,
       thumbnailUrl: candidate.thumbnailUrl,
+      scheduledTime: candidate.scheduledTime || candidate.suggestedTime,
       tags: candidate.matchedTags,
       crowdRate: candidate.crowdRate,
       visitDate,
@@ -279,6 +291,8 @@ export default function App() {
       useFeeText: candidate.useFeeText,
       isFree: candidate.isFree,
       restDateText: candidate.restDateText,
+      closeTime: candidate.closeTime,
+      useTimeText: candidate.useTimeText,
       category: candidate.category,
       mapX: candidate.mapX,
       mapY: candidate.mapY,
@@ -302,6 +316,8 @@ export default function App() {
     setAddingContentId(candidate.contentId);
     try {
       await addCandidateToItinerary(candidate);
+    } catch {
+      /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
     } finally {
       setAddingContentId(null);
     }
@@ -369,6 +385,8 @@ export default function App() {
           useFeeText: top.useFeeText,
           isFree: top.isFree,
           restDateText: top.restDateText,
+          closeTime: top.closeTime,
+          useTimeText: top.useTimeText,
           category: top.category,
           mapX: top.mapX,
           mapY: top.mapY,
@@ -485,33 +503,36 @@ export default function App() {
     let result = itinerary;
     const fallbackDate = smartPlanDate || activeDate || itinerary.startDate;
     for (const candidate of selected) {
-      result = await api.addItem(itineraryId, {
-        contentId: candidate.contentId,
-        contentTypeId: candidate.contentTypeId,
-        placeName: candidate.placeName,
-        thumbnailUrl: candidate.thumbnailUrl,
-        scheduledTime: candidate.suggestedTime,
-        tags: candidate.matchedTags,
-        crowdRate: candidate.crowdRate,
-        visitDate: candidate.visitDate || fallbackDate,
-        addr1: candidate.addr1,
-        tel: candidate.tel,
-        useFeeText: candidate.useFeeText,
-        isFree: candidate.isFree,
-        restDateText: candidate.restDateText,
-        category: candidate.category,
-        mapX: candidate.mapX,
-        mapY: candidate.mapY,
-      });
+      try {
+        result = await addCandidateToItinerary(
+          { ...candidate, scheduledTime: candidate.suggestedTime },
+          candidate.visitDate || fallbackDate,
+          false,
+        );
+      } catch (e) {
+        // 마감 게이트면 모달 후 해당 장소만 건너뜀
+        if (!closingGate && e?.message) {
+          setClosingGate({ placeName: candidate.placeName, message: e.message });
+        }
+      }
+    }
+    // refresh from last successful setItinerary inside addCandidate
+    result = itinerary;
+    // re-fetch to sync if partial adds
+    try {
+      result = await api.getItinerary(itineraryId);
+      setItinerary(result);
+    } catch {
+      /* keep local */
     }
     const visitDate = selected[0]?.visitDate || fallbackDate;
-    if (selected.length >= 2) {
+    if (selected.length >= 2 && (result?.items || []).length >= 2) {
       result = await api.optimizeRoute(itineraryId, visitDate);
       setAutoReplaceNotice(
         result.routeHint
           || '이 순서가 총 이동거리를 최소화한 순서예요.',
       );
-      setTimeout(() => setAutoReplaceNotice(null), 6000);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
     setItinerary(result);
     setShowSmartPlan(false);
@@ -535,37 +556,29 @@ export default function App() {
   }
 
   async function handleConfirmAutoPlan(selected) {
-    let result = itinerary;
+    let skipped = 0;
     const visitDate = activeDate || itinerary.startDate;
     for (const candidate of selected) {
-      result = await api.addItem(itineraryId, {
-        contentId: candidate.contentId,
-        contentTypeId: candidate.contentTypeId,
-        placeName: candidate.placeName,
-        thumbnailUrl: candidate.thumbnailUrl,
-        scheduledTime: candidate.suggestedTime,
-        tags: candidate.matchedTags,
-        crowdRate: candidate.crowdRate,
-        visitDate,
-        addr1: candidate.addr1,
-        tel: candidate.tel,
-        useFeeText: candidate.useFeeText,
-        isFree: candidate.isFree,
-        restDateText: candidate.restDateText,
-        category: candidate.category,
-        mapX: candidate.mapX,
-        mapY: candidate.mapY,
-      });
+      try {
+        await addCandidateToItinerary(
+          { ...candidate, scheduledTime: candidate.suggestedTime },
+          visitDate,
+          false,
+        );
+      } catch {
+        skipped += 1;
+      }
     }
-    if (selected.length >= 2) {
-      result = await api.optimizeRoute(itineraryId, visitDate);
-      setAutoReplaceNotice(
-        result.routeHint
-          || '이 순서가 총 이동거리를 최소화한 순서예요.',
-      );
-      setTimeout(() => setAutoReplaceNotice(null), 6000);
+    try {
+      const result = await api.getItinerary(itineraryId);
+      setItinerary(result);
+    } catch {
+      /* keep */
     }
-    setItinerary(result);
+    if (skipped > 0) {
+      setAutoReplaceNotice(`마감 시간 때문에 ${skipped}곳은 자동으로 건너뛰었어요.`);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+    }
     setShowAutoPlan(false);
   }
 
@@ -605,7 +618,7 @@ export default function App() {
     if (docentItem) await fetchDocent(docentItem, lang);
   }
 
-  /** 동선 꼬임 자동 재배치 */
+  /** 동선 재계산 — GPS 있으면 시작점, 없으면 장소만으로 매트릭스 TSP + 시간표 */
   async function handleOptimizeRoute(origin) {
     if (!itineraryId || optimizeLoading) return;
     autoOptimizedRef.current = true;
@@ -617,27 +630,26 @@ export default function App() {
       setAutoReplaceNotice(
         result.routeHint
           || (origin
-            ? '현재 위치를 시작점으로 동선을 다시 잡았어요.'
-            : '이 순서가 총 이동거리를 최소화한 순서예요.'),
+            ? '현재 위치를 반영해 동선을 다시 계산했어요.'
+            : '이동시간·체류를 반영해 동선을 다시 계산했어요.'),
       );
       refreshTrigger();
     } catch (e) {
-      setAutoReplaceNotice(`동선 재배치 실패: ${e.message}`);
+      setAutoReplaceNotice(`동선 재계산 실패: ${e.message}`);
     } finally {
       setOptimizeLoading(false);
       setTimeout(() => setAutoReplaceNotice(null), 6000);
     }
   }
 
-  /** 오늘 동선 🔄 — GPS를 다시 받아 시작점으로 순서 재계산 */
+  /** 오늘 동선 「동선 재계산」 — GPS 시도 후 서버 TSP·시간표 */
   function handleOptimizeFromGps() {
+    setOptimizeLoading(true);
+    setAutoReplaceNotice('동선 재계산 중…');
     if (!navigator.geolocation) {
-      setAutoReplaceNotice('이 기기에서는 위치를 쓸 수 없어요.');
-      setTimeout(() => setAutoReplaceNotice(null), 4000);
+      handleOptimizeRoute(null);
       return;
     }
-    setOptimizeLoading(true);
-    setAutoReplaceNotice('현재 위치를 확인하는 중…');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         handleOptimizeRoute({
@@ -645,16 +657,11 @@ export default function App() {
           lat: pos.coords.latitude,
         });
       },
-      (err) => {
-        setOptimizeLoading(false);
-        setAutoReplaceNotice(
-          err?.code === 1
-            ? '위치 권한이 필요해요. 브라우저 설정에서 허용해 주세요.'
-            : '위치를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.',
-        );
-        setTimeout(() => setAutoReplaceNotice(null), 5000);
+      () => {
+        // 위치 거부·실패여도 장소 간 매트릭스로 재계산
+        handleOptimizeRoute(null);
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   }
 
@@ -908,6 +915,13 @@ export default function App() {
         language={docentLang}
         onLanguageChange={handleDocentLangChange}
         onClose={() => setDocentOpen(false)}
+      />
+
+      <ClosingGateModal
+        open={Boolean(closingGate)}
+        placeName={closingGate?.placeName}
+        message={closingGate?.message}
+        onClose={() => setClosingGate(null)}
       />
 
       <TripRecordModal

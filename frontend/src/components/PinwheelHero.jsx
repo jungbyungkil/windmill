@@ -145,7 +145,7 @@ export default function PinwheelHero({
                   onClick={() => onOptimizeRoute()}
                   disabled={optimizeLoading}
                 >
-                  {optimizeLoading ? '동선 재배치 중...' : '🔀 동선 자동 재배치'}
+                  {optimizeLoading ? '동선 재계산 중...' : '🔀 동선 재계산'}
                 </button>
               )}
               {weatherAlert && onRerouteSchedule && (

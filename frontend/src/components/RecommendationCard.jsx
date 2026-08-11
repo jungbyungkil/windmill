@@ -41,6 +41,12 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         )}
         {candidate.tel && <div className="reco-info-row">☎️ {candidate.tel}</div>}
         {candidate.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {candidate.restDateText}</div>}
+        {candidate.closeTime && (
+          <div className="reco-info-row reco-close">🕐 마감 {candidate.closeTime}{candidate.useTimeText ? ` · ${candidate.useTimeText}` : ''}</div>
+        )}
+        {!candidate.closeTime && candidate.useTimeText && (
+          <div className="reco-info-row reco-close">🕐 {candidate.useTimeText}</div>
+        )}
       </div>
 
       <div className="reco-meta">

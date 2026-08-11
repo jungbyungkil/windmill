@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-maps-sdk';
 import { getMapRoute, getPublicConfig } from '../api/windmillApi';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
-import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
+import { canOpenInKakaoMap, geocodePlaceWithKakaoServices, openInKakaoMap } from '../utils/kakaoMap';
 
 const BUILD_TIME_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
 
@@ -20,6 +20,10 @@ function parseCoord(item) {
   return { lat, lng };
 }
 
+function canGeocode(item) {
+  return Boolean((item?.addr1 || '').trim() || (item?.placeName || '').trim());
+}
+
 function statusText(item, weather, business, crowd) {
   const parts = [];
   if (item.scheduledTime) parts.push(item.scheduledTime);
@@ -31,20 +35,88 @@ function statusText(item, weather, business, crowd) {
   return parts.join(' · ');
 }
 
-function DayRouteMapCanvas({ stops, center, jsKey }) {
+function buildStopMeta(item, index, weather, business, crowd) {
+  const id = Number(item.itemId);
+  const indoor = isIndoorPlace(item);
+  const level = itemStatusLevel(item, {
+    weatherAlerted: weather.has(id) && !indoor,
+    businessAlerted: business.has(id),
+    crowdAlerted: crowd.has(id),
+  });
+  return {
+    item,
+    index,
+    id,
+    level,
+    weather: weather.has(id) && !indoor,
+    business: business.has(id),
+    crowd: crowd.has(id),
+  };
+}
+
+function DayRouteMapCanvas({ draftStops, jsKey }) {
   const [loading, error] = useKakaoLoader({
     appkey: jsKey,
     libraries: ['services'],
   });
+  const [stops, setStops] = useState([]);
+  const [resolving, setResolving] = useState(true);
+  const [failedNames, setFailedNames] = useState([]);
+  const [geocodedCount, setGeocodedCount] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [route, setRoute] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
 
+  const draftKey = draftStops
+    .map((s) => `${s.id}:${s.item.mapX}:${s.item.mapY}:${s.item.addr1 || ''}`)
+    .join('|');
+
+  useEffect(() => {
+    if (loading || error) return undefined;
+    let cancelled = false;
+
+    async function resolveStops() {
+      setResolving(true);
+      const resolved = [];
+      const failed = [];
+      let fromAddress = 0;
+
+      for (const draft of draftStops) {
+        if (cancelled) return;
+        if (draft.lat != null && draft.lng != null) {
+          resolved.push(draft);
+          continue;
+        }
+        const coord = await geocodePlaceWithKakaoServices(draft.item);
+        if (coord) {
+          fromAddress += 1;
+          resolved.push({ ...draft, ...coord, fromAddress: true });
+        } else {
+          failed.push(draft.item.placeName || '이름 없음');
+        }
+      }
+
+      if (cancelled) return;
+      resolved.sort((a, b) => a.index - b.index);
+      setStops(resolved);
+      setFailedNames(failed);
+      setGeocodedCount(fromAddress);
+      setResolving(false);
+    }
+
+    resolveStops();
+    return () => {
+      cancelled = true;
+    };
+    // draftKey encodes identity + address/coord changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, draftKey]);
+
   const stopKey = stops.map((s) => `${s.id}:${s.lat}:${s.lng}`).join('|');
 
   useEffect(() => {
-    if (stops.length < 2) {
+    if (resolving || stops.length < 2) {
       setRoute(null);
       return undefined;
     }
@@ -70,26 +142,59 @@ function DayRouteMapCanvas({ stops, center, jsKey }) {
     return () => {
       cancelled = true;
     };
-    // stopKey captures coordinate/order changes without unstable array identity
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopKey]);
+  }, [stopKey, resolving]);
+
+  const center = useMemo(() => {
+    if (!stops.length) return { lat: 37.5665, lng: 126.978 };
+    const lat = stops.reduce((s, p) => s + p.lat, 0) / stops.length;
+    const lng = stops.reduce((s, p) => s + p.lng, 0) / stops.length;
+    return { lat, lng };
+  }, [stops]);
 
   const path = (route?.path || []).map((p) => ({ lat: p.lat, lng: p.lng }));
   const selected = stops.find((s) => s.id === selectedId);
 
-  if (loading) {
+  if (loading || resolving) {
     return <p className="day-route-map-hint">지도를 불러오는 중…</p>;
   }
   if (error) {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '배포도메인';
+    return (
+      <div className="day-route-map-hint">
+        <p>카카오맵 SDK 로드에 실패했어요. 키는 내려오지만, Web 도메인 제한일 가능성이 큽니다.</p>
+        <p>
+          카카오 개발자 콘솔 → 앱 → 플랫폼 → Web → 사이트 도메인에 아래를 등록하세요.
+        </p>
+        <code>{host}</code>
+        <p className="day-route-map-hint-sub">
+          `https://` 없이 도메인만 넣고, JavaScript 키인지(REST 키가 아닌지) 확인해 주세요.
+        </p>
+      </div>
+    );
+  }
+
+  if (stops.length === 0) {
     return (
       <p className="day-route-map-hint">
-        카카오맵을 불러오지 못했어요. JS 키와 Web 도메인 제한을 확인해 주세요.
+        주소로도 위치를 찾지 못했어요. 장소명·주소를 확인해 주세요.
+        {failedNames.length > 0 ? ` (${failedNames.join(', ')})` : ''}
       </p>
     );
   }
 
   return (
     <>
+      {geocodedCount > 0 && (
+        <p className="day-route-map-hint">
+          좌표가 없던 {geocodedCount}곳은 주소·이름으로 위치를 찾았어요.
+        </p>
+      )}
+      {failedNames.length > 0 && (
+        <p className="day-route-map-hint">
+          위치를 찾지 못한 곳: {failedNames.join(', ')}
+        </p>
+      )}
       <Map
         center={center}
         level={7}
@@ -135,14 +240,19 @@ function DayRouteMapCanvas({ stops, center, jsKey }) {
             <div className="day-route-map-info">
               <strong>{selected.item.placeName}</strong>
               <p>{statusText(selected.item, selected.weather, selected.business, selected.crowd)}</p>
-              {selected.item.category && <em>{selected.item.category}</em>}
+              {selected.fromAddress && <em>주소 기준 위치</em>}
+              {selected.item.category && !selected.fromAddress && <em>{selected.item.category}</em>}
               {canOpenInKakaoMap(selected.item) && (
                 <button
                   type="button"
                   className="day-route-map-open"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openInKakaoMap(selected.item);
+                    openInKakaoMap({
+                      ...selected.item,
+                      mapX: String(selected.lng),
+                      mapY: String(selected.lat),
+                    });
                   }}
                 >
                   카카오맵에서 보기
@@ -170,6 +280,7 @@ function DayRouteMapCanvas({ stops, center, jsKey }) {
 
 /**
  * 오늘 동선 카카오맵 — 접이식. 순서 마커 + 도로 폴리라인(서버 프록시) + 상태 색.
+ * TourAPI 좌표가 없어도 주소/장소명으로 카카오 지오코딩해 표시한다.
  */
 export default function DayRouteMap({
   items = [],
@@ -203,38 +314,20 @@ export default function DayRouteMap({
   const business = useMemo(() => new Set((businessAffectedItemIds || []).map(Number)), [businessAffectedItemIds]);
   const crowd = useMemo(() => new Set((crowdAffectedItemIds || []).map(Number)), [crowdAffectedItemIds]);
 
-  const stops = useMemo(() => {
-    return (items || [])
-      .map((item, index) => {
-        const coord = parseCoord(item);
-        if (!coord) return null;
-        const id = Number(item.itemId);
-        const indoor = isIndoorPlace(item);
-        const level = itemStatusLevel(item, {
-          weatherAlerted: weather.has(id) && !indoor,
-          businessAlerted: business.has(id),
-          crowdAlerted: crowd.has(id),
-        });
-        return {
-          item,
-          index,
-          id,
-          ...coord,
-          level,
-          weather: weather.has(id) && !indoor,
-          business: business.has(id),
-          crowd: crowd.has(id),
-        };
-      })
-      .filter(Boolean);
+  const draftStops = useMemo(() => {
+    return (items || []).map((item, index) => {
+      const meta = buildStopMeta(item, index, weather, business, crowd);
+      const coord = parseCoord(item);
+      if (coord) return { ...meta, ...coord };
+      if (!canGeocode(item)) return null;
+      return meta;
+    }).filter(Boolean);
   }, [items, weather, business, crowd]);
 
-  const center = useMemo(() => {
-    if (!stops.length) return { lat: 37.5665, lng: 126.978 };
-    const lat = stops.reduce((s, p) => s + p.lat, 0) / stops.length;
-    const lng = stops.reduce((s, p) => s + p.lng, 0) / stops.length;
-    return { lat, lng };
-  }, [stops]);
+  const knownCoordCount = useMemo(
+    () => draftStops.filter((s) => s.lat != null && s.lng != null).length,
+    [draftStops],
+  );
 
   return (
     <section className="day-route-map" aria-label="오늘 동선 지도">
@@ -246,7 +339,11 @@ export default function DayRouteMap({
       >
         <span>지도로 보기</span>
         <span className="day-route-map-toggle-meta">
-          {stops.length > 0 ? `${stops.length}곳` : '좌표 없음'}
+          {draftStops.length > 0
+            ? knownCoordCount < draftStops.length
+              ? `${knownCoordCount}+주소 ${draftStops.length}곳`
+              : `${draftStops.length}곳`
+            : '위치 없음'}
           {' · '}
           {open ? '접기' : '펼치기'}
         </span>
@@ -260,11 +357,11 @@ export default function DayRouteMap({
               확인하고, 카카오 개발자 콘솔 Web 도메인에 배포 주소를 등록해 주세요.
             </p>
           )}
-          {jsKey && stops.length === 0 && (
-            <p className="day-route-map-hint">좌표가 있는 장소가 아직 없어요.</p>
+          {jsKey && draftStops.length === 0 && (
+            <p className="day-route-map-hint">좌표·주소가 있는 장소가 아직 없어요.</p>
           )}
-          {jsKey && stops.length > 0 && (
-            <DayRouteMapCanvas stops={stops} center={center} jsKey={jsKey} />
+          {jsKey && draftStops.length > 0 && (
+            <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} />
           )}
         </div>
       )}

@@ -54,6 +54,10 @@ public class ItineraryItem {
     private Boolean isFree;
     private String restDateText;
 
+    /** TourAPI usetime 파싱 스냅샷 "HH:mm" — 선택 시 마감 게이트에 사용 */
+    private String closeTime;
+    private String useTimeText;
+
     /** RecommendationCandidate.category 스냅샷 - 여행기록 집계(CommunityScheduleService)에서 슬롯별 카테고리 표시에 사용 */
     private String category;
     /** "자동 재배치"/"대안 추천" 경로로 담겼는지 - 여행기록에 그대로 스냅샷되어 실시간 대응 사례로 집계됨.

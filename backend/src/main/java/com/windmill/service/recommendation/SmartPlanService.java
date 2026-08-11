@@ -11,6 +11,8 @@ import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.trigger.RegionCondition;
 import com.windmill.service.trigger.TriggerScheduler;
 import com.windmill.service.trip.TripRecordService;
+import com.windmill.util.ClosingTimeGate;
+import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.GeoUtils;
 import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.RouteOptimizer;
@@ -82,8 +84,8 @@ public class SmartPlanService {
                 .flatMap(condition -> {
                     boolean rain = condition.getCurrentPop() != null
                             && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
-                    boolean heat = condition.getCurrentTemp() != null
-                            && condition.getCurrentTemp() >= TriggerThresholds.HEAT_TEMP_THRESHOLD;
+                    boolean heat = condition.heatProxyTemp() != null
+                            && condition.heatProxyTemp() >= TriggerThresholds.HEAT_ADVISORY_TMX;
 
                     RecommendationRequest.AvoidanceHint avoid = null;
                     if (heat) {
@@ -189,7 +191,7 @@ public class SmartPlanService {
         }
 
         boolean crowdFiltered = attractionsRaw.stream()
-                .anyMatch(c -> c.getCrowdRate() != null && c.getCrowdRate() >= TriggerThresholds.CROWD_RATE_THRESHOLD);
+                .anyMatch(c -> CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered());
 
         List<RecommendationCandidate> attrPool = new ArrayList<>(attractions);
         List<RecommendationCandidate> foodPool = new ArrayList<>(foods);
@@ -347,7 +349,22 @@ public class SmartPlanService {
     }
 
     private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal) {
-        stop.setSuggestedTime(time.format(TIME_FORMAT));
+        LocalTime close = ClosingTimeGate.parseHhMm(stop.getCloseTime());
+        if (close == null) {
+            close = BusinessHoursEvaluator.extractCloseTimeFromText(stop.getUseTimeText());
+        }
+        LocalTime visit = time;
+        ClosingTimeGate.CheckResult check = ClosingTimeGate.check(close, visit);
+        if (check.blocked()) {
+            LocalTime safe = close.minusMinutes(BusinessHoursEvaluator.CLOSE_BUFFER_MINUTES + 1L);
+            if (safe.isBefore(DAY_START) || ClosingTimeGate.check(close, safe).blocked()) {
+                // 마감에 맞춰 넣을 수 없으면 suggestedTime을 비워 이후 필터에서 탈락
+                stop.setSuggestedTime(null);
+                return;
+            }
+            visit = safe;
+        }
+        stop.setSuggestedTime(visit.format(TIME_FORMAT));
         if (meal) {
             stop.setCategory(slotLabel.contains("점심") ? "점심" : "저녁");
             stop.setMatchedTags(List.of("#맛집"));
@@ -357,7 +374,6 @@ public class SmartPlanService {
                     || "점심".equals(stop.getCategory()) || "저녁".equals(stop.getCategory())) {
                 stop.setCategory(slotLabel);
             }
-            // 관광 슬롯에 #맛집 오탐이 남지 않도록 정리
             stop.setMatchedTags(PlaceTagSanitizer.sanitize(
                     stop.getMatchedTags(),
                     stop.getContentTypeId(),
@@ -378,7 +394,7 @@ public class SmartPlanService {
             return new ArrayList<>();
         }
         List<RecommendationCandidate> comfortable = raw.stream()
-                .filter(c -> c.getCrowdRate() == null || c.getCrowdRate() < TriggerThresholds.CROWD_RATE_THRESHOLD)
+                .filter(c -> !CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered())
                 .collect(Collectors.toCollection(ArrayList::new));
         List<RecommendationCandidate> pool = comfortable.size() >= Math.min(3, raw.size())
                 ? comfortable

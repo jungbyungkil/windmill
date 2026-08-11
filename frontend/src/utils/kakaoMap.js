@@ -115,6 +115,71 @@ export function openKakaoMapRoute(from, to, by = 'car') {
   );
 }
 
+/**
+ * 카카오맵 JS SDK(services)로 주소→좌표 변환.
+ * 1) addr1 주소검색 2) 실패 시 장소명(+주소) 키워드검색
+ * SDK 미로드·실패 시 null.
+ * @returns {Promise<{lat:number,lng:number}|null>}
+ */
+export function geocodePlaceWithKakaoServices(place) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.kakao?.maps?.services || !place) {
+      resolve(null);
+      return;
+    }
+    const { Status, Geocoder, Places } = window.kakao.maps.services;
+    const addr = (place.addr1 || '').trim();
+    const name = (place.placeName || place.name || '').trim();
+
+    const finish = (lat, lng) => {
+      const la = Number(lat);
+      const ln = Number(lng);
+      if (!Number.isFinite(la) || !Number.isFinite(ln) || (la === 0 && ln === 0)) {
+        resolve(null);
+        return;
+      }
+      resolve({ lat: la, lng: ln });
+    };
+
+    const tryKeyword = () => {
+      const query = [name, addr].filter(Boolean).join(' ').trim() || name || addr;
+      if (!query) {
+        resolve(null);
+        return;
+      }
+      const places = new Places();
+      places.keywordSearch(query, (result, status) => {
+        if (status === Status.OK && result?.[0]) {
+          finish(result[0].y, result[0].x);
+        } else if (name && addr && query !== name) {
+          places.keywordSearch(name, (result2, status2) => {
+            if (status2 === Status.OK && result2?.[0]) {
+              finish(result2[0].y, result2[0].x);
+            } else {
+              resolve(null);
+            }
+          });
+        } else {
+          resolve(null);
+        }
+      });
+    };
+
+    if (addr) {
+      const geocoder = new Geocoder();
+      geocoder.addressSearch(addr, (result, status) => {
+        if (status === Status.OK && result?.[0]) {
+          finish(result[0].y, result[0].x);
+        } else {
+          tryKeyword();
+        }
+      });
+      return;
+    }
+    tryKeyword();
+  });
+}
+
 function tryOpenAppThenFallback(appUrl, fallbackUrl) {
   let leftPage = false;
   const markLeft = () => {

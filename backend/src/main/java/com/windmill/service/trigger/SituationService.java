@@ -3,6 +3,7 @@ package com.windmill.service.trigger;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SituationSummaryResponse;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.TriggerThresholds;
 import com.windmill.util.WeatherGridUtils;
 import lombok.RequiredArgsConstructor;
@@ -48,17 +49,18 @@ public class SituationService {
     private Mono<SituationSummaryResponse> summarizeRegion(RegionCode region) {
         return triggerScheduler.ensureFresh(region)
                 .map(condition -> {
-                    Double temp = condition.getCurrentTemp();
+                    Double temp = condition.heatProxyTemp();
                     Double pop = condition.getCurrentPop();
-                    boolean heat = temp != null && temp >= TriggerThresholds.HEAT_TEMP_THRESHOLD;
+                    boolean heatWarning = temp != null && temp >= TriggerThresholds.HEAT_WARNING_TMX;
+                    boolean heat = temp != null && temp >= TriggerThresholds.HEAT_ADVISORY_TMX;
                     boolean rain = pop != null && pop >= TriggerThresholds.WEATHER_POP_THRESHOLD;
-                    int crowded = (int) condition.getCrowdRateByPlaceName().values().stream()
-                            .filter(r -> r != null && r >= TriggerThresholds.CROWD_RATE_THRESHOLD)
-                            .count();
+                    int crowded = countCrowdedPlaces(condition);
 
                     List<String> tips = new ArrayList<>();
-                    if (heat) {
-                        tips.add("폭염이에요. 실내 코스·수분 섭취를 권해요.");
+                    if (heatWarning) {
+                        tips.add("최고기온 35℃ 이상(폭염경보 수준)이에요. 실내 코스·수분 섭취를 권해요.");
+                    } else if (heat) {
+                        tips.add("최고기온 33℃ 이상(폭염주의보 수준)이에요. 실내 코스·수분 섭취를 권해요.");
                     }
                     if (rain) {
                         tips.add("비 소식이 있어요. 실내 일정을 미리 준비하세요.");
@@ -70,7 +72,10 @@ public class SituationService {
                         tips.add("지금은 순항 중이에요. 바람따라 스마트 일정으로 떠나볼까요?");
                     }
 
-                    String weatherLabel = rain ? "비/소나기 주의" : heat ? "폭염 주의" : "대체로 무난";
+                    String weatherLabel = rain ? "비/소나기 주의"
+                            : heatWarning ? "폭염경보 수준"
+                            : heat ? "폭염주의보 수준"
+                            : "대체로 무난";
                     String headline;
                     if (heat || rain) {
                         headline = region.getSidoName() + " " + region.getSignguName() + " · 상황 주의";
@@ -78,7 +83,7 @@ public class SituationService {
                         headline = region.getSidoName() + " " + region.getSignguName() + " · 여행하기 좋아요";
                     }
 
-                    String detail = String.format("기온 %s · 강수확률 %s · 혼잡 예상 %d곳",
+                    String detail = String.format("최고기온 %s · 강수확률 %s · 혼잡 예상 %d곳",
                             temp == null ? "-" : Math.round(temp) + "℃",
                             pop == null ? "-" : Math.round(pop) + "%",
                             crowded);
@@ -97,6 +102,22 @@ public class SituationService {
                             .tips(tips)
                             .build();
                 });
+    }
+
+    private static int countCrowdedPlaces(RegionCondition condition) {
+        if (condition.getCrowdRateByPlaceName() == null || condition.getCrowdRateByPlaceName().isEmpty()) {
+            return 0;
+        }
+        int n = 0;
+        for (String name : condition.getCrowdRateByPlaceName().keySet()) {
+            if (CrowdCongestionEvaluator.evaluate(
+                    condition.getCrowdCategory(name),
+                    condition.getCrowdRelativePercent(name),
+                    condition.getCrowdRate(name)).isTriggered()) {
+                n++;
+            }
+        }
+        return n;
     }
 
     private RegionCode nearestRegion(int nx, int ny) {

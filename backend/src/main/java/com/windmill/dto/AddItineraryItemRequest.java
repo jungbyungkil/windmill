@@ -24,6 +24,9 @@ public class AddItineraryItemRequest {
     private String useFeeText;
     private Boolean isFree;
     private String restDateText;
+    /** "HH:mm" 영업 종료 스냅샷 */
+    private String closeTime;
+    private String useTimeText;
     private String category;
     private boolean isAlternate;
     private String mapX;

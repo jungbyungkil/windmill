@@ -45,6 +45,26 @@ class VisitOrderOptimizerTest {
     }
 
     @Test
+    void travelMinutesMatrixPicksFasterRoadOrder() {
+        Spot a = new Spot("a", "127.0", "37.0");
+        Spot b = new Spot("b", "127.05", "37.0");
+        Spot c = new Spot("c", "127.10", "37.0");
+        // 직선은 a-b-c가 짧지만, 도로로는 a→c가 매우 빠르고 c→b도 빠름 → a-c-b 선호
+        int[][] minutes = {
+                {0, 40, 10},
+                {40, 0, 40},
+                {10, 15, 0},
+        };
+
+        List<Spot> ordered = VisitOrderOptimizer.optimizeWithTravelMinutes(
+                List.of(a, b, c), minutes, null);
+
+        assertEquals("a", ordered.get(0).id());
+        assertEquals("c", ordered.get(1).id());
+        assertEquals("b", ordered.get(2).id());
+    }
+
+    @Test
     void placesWithoutCoordsGoLast() {
         Spot a = new Spot("a", "127.0", "37.0");
         Spot b = new Spot("b", "127.05", "37.0");

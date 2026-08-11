@@ -3,6 +3,7 @@ package com.windmill.service.recommendation;
 import com.windmill.client.CrowdRateClient;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
+import com.windmill.util.CrowdCongestionEvaluator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,11 @@ public class Stage3CrowdRateFilter {
         return crowdRateClient.crowdRateList(region.getLDongRegnCd(), region.getSignguFullCode(), candidate.getPlaceName(), 1, 1)
                 .map(items -> {
                     if (!items.isEmpty()) {
-                        candidate.setCrowdRate(items.get(0).path("cnctrRate").asDouble());
+                        JsonNode first = items.get(0);
+                        Double rate = CrowdCongestionEvaluator.extractNumericRate(first);
+                        if (rate != null) {
+                            candidate.setCrowdRate(rate);
+                        }
                     }
                     return candidate;
                 })

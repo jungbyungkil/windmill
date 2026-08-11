@@ -11,9 +11,10 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 /**
- * 한국관광공사 관광지 집중률 방문자 추이 예측 정보 서비스 (TatsCnctrRateService).
- * 관광지별 향후 30일 집중률(cnctrRate, 0~100)을 baseYmd(일자)별로 제공.
- * tAtsNm(관광지명) 기준으로만 매칭 가능 - KorService2 contentId와 직접 연결 안 됨.
+ * 한국관광공사 관광지 집중률 방문자 추이 예측 (TatsCnctrRateService, KT 이동통신 기반).
+ * cnctrRate: 해당 관광지 피크=100인 상대 집중률(0~100). 절대 방문자 수가 아님.
+ * 카테고리 필드가 오면 CrowdCongestionEvaluator가 우선 사용하고,
+ * 수치만 있으면 장소별 시리즈 평균 대비 %로 트리거한다.
  */
 @Slf4j
 @Component

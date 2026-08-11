@@ -9,8 +9,8 @@ import java.util.function.Function;
  * n ≤ {@link #BRUTE_FORCE_LIMIT} 이면 순열 전수조사로 열린 경로 최단을 고르고,
  * 그보다 크면 최근접 이웃으로 폴백한다.
  * <p>
- * 거리: Haversine 직선거리(km). TarRlte/Tmap 이동시간 필드는 API에 없어 미사용 —
- * 추후 도로 시간 매트릭스가 생기면 cost 함수만 교체하면 된다.
+ * 기본 거리: Haversine 직선거리(km).
+ * 카카오 이동시간 매트릭스가 있으면 {@link #optimizeWithTravelMinutes}로 분 단위 TSP.
  */
 public final class VisitOrderOptimizer {
 
@@ -18,6 +18,109 @@ public final class VisitOrderOptimizer {
     public static final int BRUTE_FORCE_LIMIT = 8;
 
     private VisitOrderOptimizer() {
+    }
+
+    /**
+     * 이동시간(분) 매트릭스로 열린 TSP.
+     *
+     * @param items           좌표 있는 장소 (매트릭스 인덱스와 동일 순서)
+     * @param minutesBetween  minutes[i][j] = i→j
+     * @param minutesFromOrigin null이거나 length=n — GPS→i 분
+     */
+    public static <T> List<T> optimizeWithTravelMinutes(List<T> items,
+                                                        int[][] minutesBetween,
+                                                        int[] minutesFromOrigin) {
+        if (items == null || items.isEmpty()) {
+            return new ArrayList<>();
+        }
+        int n = items.size();
+        if (n == 1) {
+            return new ArrayList<>(items);
+        }
+        boolean useOrigin = minutesFromOrigin != null && minutesFromOrigin.length >= n;
+        if (n <= BRUTE_FORCE_LIMIT) {
+            return bruteForceMinutes(items, minutesBetween, useOrigin ? minutesFromOrigin : null);
+        }
+        return nearestNeighborMinutes(items, minutesBetween, useOrigin ? minutesFromOrigin : null);
+    }
+
+    private static <T> List<T> bruteForceMinutes(List<T> points, int[][] minutes, int[] fromOrigin) {
+        int n = points.size();
+        int[] perm = new int[n];
+        for (int i = 0; i < n; i++) {
+            perm[i] = i;
+        }
+        double bestCost = Double.POSITIVE_INFINITY;
+        int[] bestPerm = perm.clone();
+        do {
+            double cost = 0;
+            if (fromOrigin != null) {
+                cost += fromOrigin[perm[0]];
+            }
+            for (int i = 1; i < n; i++) {
+                cost += minutes[perm[i - 1]][perm[i]];
+            }
+            if (cost < bestCost) {
+                bestCost = cost;
+                bestPerm = perm.clone();
+            }
+        } while (nextPermutation(perm));
+
+        List<T> ordered = new ArrayList<>(n);
+        for (int idx : bestPerm) {
+            ordered.add(points.get(idx));
+        }
+        return ordered;
+    }
+
+    private static <T> List<T> nearestNeighborMinutes(List<T> points, int[][] minutes, int[] fromOrigin) {
+        int n = points.size();
+        boolean[] used = new boolean[n];
+        List<T> ordered = new ArrayList<>(n);
+        int current;
+        if (fromOrigin != null) {
+            current = argMin(fromOrigin, used);
+        } else {
+            current = 0;
+        }
+        used[current] = true;
+        ordered.add(points.get(current));
+        for (int k = 1; k < n; k++) {
+            int next = -1;
+            int best = Integer.MAX_VALUE;
+            for (int j = 0; j < n; j++) {
+                if (used[j]) {
+                    continue;
+                }
+                int d = minutes[current][j];
+                if (d < best) {
+                    best = d;
+                    next = j;
+                }
+            }
+            if (next < 0) {
+                break;
+            }
+            used[next] = true;
+            ordered.add(points.get(next));
+            current = next;
+        }
+        return ordered;
+    }
+
+    private static int argMin(int[] values, boolean[] used) {
+        int best = -1;
+        int bestV = Integer.MAX_VALUE;
+        for (int i = 0; i < values.length; i++) {
+            if (used[i]) {
+                continue;
+            }
+            if (values[i] < bestV) {
+                bestV = values[i];
+                best = i;
+            }
+        }
+        return best < 0 ? 0 : best;
     }
 
     /**

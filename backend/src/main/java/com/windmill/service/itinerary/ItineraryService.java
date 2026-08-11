@@ -11,14 +11,18 @@ import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.util.ClosingTimeGate;
+import com.windmill.util.GeoUtils;
 import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.VisitOrderOptimizer;
+import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -36,6 +40,7 @@ public class ItineraryService {
     private final ItineraryRepository itineraryRepository;
     private final TripRecordRepository tripRecordRepository;
     private final RegionCodeService regionCodeService;
+    private final RouteRecalculationService routeRecalculationService;
 
     @Transactional
     public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
@@ -122,6 +127,8 @@ public class ItineraryService {
                     .useFeeText(src.getUseFeeText())
                     .isFree(src.getIsFree())
                     .restDateText(src.getRestDateText())
+                    .closeTime(src.getCloseTime())
+                    .useTimeText(src.getUseTimeText())
                     .category(src.getCategory())
                     .isAlternate(src.isAlternate())
                     .mapX(src.getMapX())
@@ -154,8 +161,8 @@ public class ItineraryService {
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);
         int nextOrder = itinerary.getItems().size();
-        // visitDate 미지정(예: 기존 단일 일자 플로우)이면 여행 시작일로 채운다 - 일자별 페이지 그룹핑 기준
         LocalDate visitDate = request.getVisitDate() != null ? request.getVisitDate() : itinerary.getStartDate();
+        assertClosingGate(itinerary, request, visitDate);
         List<String> tags = PlaceTagSanitizer.sanitizeStored(
                 request.getTags(), request.getContentTypeId(), request.getPlaceName(), request.getCategory());
         ItineraryItem item = ItineraryItem.builder()
@@ -174,6 +181,8 @@ public class ItineraryService {
                 .useFeeText(request.getUseFeeText())
                 .isFree(request.getIsFree())
                 .restDateText(request.getRestDateText())
+                .closeTime(request.getCloseTime())
+                .useTimeText(request.getUseTimeText())
                 .category(request.getCategory())
                 .isAlternate(request.isAlternate())
                 .mapX(request.getMapX())
@@ -181,6 +190,67 @@ public class ItineraryService {
                 .build();
         itinerary.getItems().add(item);
         return itineraryRepository.save(itinerary);
+    }
+
+    /**
+     * close 시간이 있으면 도착 예상(또는 지정 scheduledTime)이 마감 임박 이내인지 검사.
+     * 이동시간은 TarRlte에 없어 Haversine 추정(또는 기본 20분)을 사용한다.
+     */
+    private void assertClosingGate(Itinerary itinerary, AddItineraryItemRequest request, LocalDate visitDate) {
+        LocalTime close = ClosingTimeGate.parseHhMm(request.getCloseTime());
+        if (close == null) {
+            close = BusinessHoursEvaluator.extractCloseTimeFromText(request.getUseTimeText());
+        }
+        if (close == null) {
+            return;
+        }
+        LocalTime arrival = ClosingTimeGate.parseHhMm(request.getScheduledTime());
+        if (arrival == null) {
+            arrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
+        }
+        ClosingTimeGate.CheckResult check = ClosingTimeGate.check(close, arrival);
+        if (check.blocked()) {
+            throw new IllegalArgumentException(check.message());
+        }
+    }
+
+    private LocalTime estimateArrivalTime(Itinerary itinerary, LocalDate visitDate, String mapX, String mapY) {
+        List<ItineraryItem> dayItems = itinerary.getItems().stream()
+                .filter(i -> visitDate == null
+                        || visitDate.equals(i.getVisitDate())
+                        || (i.getVisitDate() == null && visitDate.equals(itinerary.getStartDate())))
+                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
+                .toList();
+        LocalTime cursor;
+        ItineraryItem last = dayItems.isEmpty() ? null : dayItems.get(dayItems.size() - 1);
+        if (last != null && last.getScheduledTime() != null) {
+            LocalTime lastStart = ClosingTimeGate.parseHhMm(last.getScheduledTime());
+            cursor = lastStart != null ? lastStart.plusMinutes(75) : LocalTime.of(9, 0);
+        } else if (visitDate != null && visitDate.equals(LocalDate.now())) {
+            LocalTime soon = LocalTime.now().plusMinutes(30).withSecond(0).withNano(0);
+            int m = soon.getMinute();
+            if (m == 0) {
+                cursor = soon;
+            } else if (m <= 30) {
+                cursor = soon.withMinute(30);
+            } else {
+                cursor = soon.plusHours(1).withMinute(0);
+            }
+            if (cursor.isBefore(LocalTime.of(9, 0))) {
+                cursor = LocalTime.of(9, 0);
+            }
+        } else {
+            cursor = LocalTime.of(9, 0);
+        }
+        int travel = 20;
+        if (last != null && last.getMapX() != null && mapX != null) {
+            Double km = GeoUtils.distanceKmSafe(last.getMapX(), last.getMapY(), mapX, mapY);
+            if (km != null) {
+                travel = (int) Math.ceil(km * 12.0);
+                travel = Math.max(10, Math.min(travel, 90));
+            }
+        }
+        return cursor.plusMinutes(travel);
     }
 
     @Transactional
@@ -272,8 +342,8 @@ public class ItineraryService {
     }
 
     /**
-     * 동선 최단 재배치 — Haversine 순열 전수조사(소수 n).
-     * originLon/Lat(WGS84)가 있으면 GPS를 0번 시작점으로 두고 나머지를 재정렬한다.
+     * 동선 재계산 — 카카오 이동시간 매트릭스 TSP + 체류·이동·휴무 반영 시간표.
+     * originLon/Lat(WGS84)가 있으면 GPS를 시작점으로 둔다. 키 없으면 직선거리 폴백.
      */
     @Transactional
     public OptimizeRouteResult optimizeRoute(Long itineraryId, LocalDate date,
@@ -288,10 +358,9 @@ public class ItineraryService {
             return new OptimizeRouteResult(itinerary, null, null);
         }
 
-        String oLon = originLon != null ? String.valueOf(originLon) : null;
-        String oLat = originLat != null ? String.valueOf(originLat) : null;
-        List<ItineraryItem> finalOrder = RouteTangleDetector.optimizeOrderFromOrigin(targets, oLon, oLat);
-        assignOptimizedSchedule(finalOrder);
+        RouteRecalculationService.Result recalc =
+                routeRecalculationService.recalculate(targets, originLon, originLat);
+        List<ItineraryItem> finalOrder = recalc.ordered();
 
         int orderBase = itinerary.getItems().stream()
                 .filter(i -> targets.stream().noneMatch(t -> t.getId().equals(i.getId())))
@@ -303,14 +372,13 @@ public class ItineraryService {
         }
         Itinerary saved = itineraryRepository.save(itinerary);
 
+        String oLon = originLon != null ? String.valueOf(originLon) : null;
+        String oLat = originLat != null ? String.valueOf(originLat) : null;
         double km = VisitOrderOptimizer.pathDistanceKm(
                 finalOrder.stream().filter(this::itemHasCoords).toList(),
                 oLon, oLat,
                 ItineraryItem::getMapX, ItineraryItem::getMapY);
-        String message = oLon != null && oLat != null
-                ? String.format("현재 위치를 시작점으로, 총 이동거리 약 %.1fkm가 최소인 순서로 바꿨어요.", km)
-                : String.format("이 순서가 총 이동거리를 최소화한 순서예요 (약 %.1fkm).", km);
-        return new OptimizeRouteResult(saved, message, km);
+        return new OptimizeRouteResult(saved, recalc.message(), km);
     }
 
     /** 하위 호환 */
@@ -377,56 +445,6 @@ public class ItineraryService {
             return h * 60 + m;
         } catch (NumberFormatException e) {
             return null;
-        }
-    }
-
-    /** 09:00(또는 오늘이면 지금+버퍼)부터 체류·이동을 반영해 HH:mm 재배정 */
-    private void assignOptimizedSchedule(List<ItineraryItem> ordered) {
-        final int baseStayMinutes = 75;
-        final int minutesPerKm = 12;
-        final java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
-        java.time.LocalTime latestStart = java.time.LocalTime.of(20, 0);
-        java.time.LocalTime cursor = java.time.LocalTime.of(9, 0);
-        // 오늘 일정이면 이미 지난 오전 시각으로 두지 않음
-        ItineraryItem first = ordered.isEmpty() ? null : ordered.get(0);
-        java.time.LocalDate visit = first != null && first.getVisitDate() != null
-                ? first.getVisitDate()
-                : (first != null && first.getItinerary() != null ? first.getItinerary().getStartDate() : null);
-        if (visit != null && visit.equals(java.time.LocalDate.now())) {
-            java.time.LocalTime soon = java.time.LocalTime.now().plusMinutes(30).withSecond(0).withNano(0);
-            int m = soon.getMinute();
-            if (m == 0) {
-                cursor = soon;
-            } else if (m <= 30) {
-                cursor = soon.withMinute(30);
-            } else {
-                cursor = soon.plusHours(1).withMinute(0);
-            }
-            if (cursor.isBefore(java.time.LocalTime.of(9, 0))) {
-                cursor = java.time.LocalTime.of(9, 0);
-            }
-        }
-
-        for (int i = 0; i < ordered.size(); i++) {
-            ItineraryItem item = ordered.get(i);
-            if (cursor.isAfter(latestStart)) {
-                cursor = latestStart;
-            }
-            item.setScheduledTime(cursor.format(fmt));
-
-            int travel = 20;
-            if (i + 1 < ordered.size()) {
-                ItineraryItem next = ordered.get(i + 1);
-                Double km = com.windmill.util.GeoUtils.distanceKmSafe(
-                        item.getMapX(), item.getMapY(), next.getMapX(), next.getMapY());
-                if (km != null) {
-                    travel = (int) Math.ceil(km * minutesPerKm);
-                    travel = Math.max(10, Math.min(travel, 90));
-                }
-            } else {
-                travel = 0;
-            }
-            cursor = cursor.plusMinutes(baseStayMinutes + travel);
         }
     }
 

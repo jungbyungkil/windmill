@@ -134,6 +134,8 @@ public class Stage4TagMatchingService {
                 .isFree(c.getIsFree())
                 .useFeeText(c.getUseFeeText())
                 .restDateText(c.getRestDateText())
+                .closeTime(c.getCloseTime())
+                .useTimeText(c.getUseTimeText())
                 .distanceKm(c.getDistanceKm())
                 .mapX(c.getMapX())
                 .mapY(c.getMapY())

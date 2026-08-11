@@ -59,7 +59,7 @@ public class MidTermForecastService {
 
             boolean rainRisk = (amRn != null && amRn >= 40) || (pmRn != null && pmRn >= 40)
                     || containsRain(amWf) || containsRain(pmWf);
-            boolean heatRisk = maxT != null && maxT >= TriggerThresholds.HEAT_TEMP_THRESHOLD;
+            boolean heatRisk = maxT != null && maxT >= TriggerThresholds.HEAT_ADVISORY_TMX;
             if (rainRisk) rainDays++;
             if (heatRisk) heatDays++;
 

@@ -10,6 +10,7 @@ import com.windmill.dto.TriggerResult;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.OutdoorActivityClassifier;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
@@ -91,7 +92,8 @@ public class TriggerDetectionService {
             if (result.getLevel() == TriggerLevel.NORMAL) {
                 result.setLevel(TriggerLevel.WARNING);
             } else if (result.getLevel() == TriggerLevel.WARNING
-                    && (result.isWeatherTrigger() || result.isHeatTrigger() || result.getTriggerCount() >= 2)) {
+                    && (result.isWeatherTrigger() || result.isHeatUrgent() || result.isCrowdUrgent()
+                    || result.getTriggerCount() >= 2)) {
                 result.setLevel(TriggerLevel.DANGER);
             }
         }
@@ -106,39 +108,47 @@ public class TriggerDetectionService {
         LocalDate day = visitDate != null ? visitDate : LocalDate.now();
         boolean rainWave = condition.getCurrentPop() != null
                 && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
-        boolean heatWave = condition.getCurrentTemp() != null
-                && condition.getCurrentTemp() >= TriggerThresholds.HEAT_TEMP_THRESHOLD;
+
+        Double heatTemp = condition.heatProxyTemp();
+        boolean heatAdvisory = heatTemp != null && heatTemp >= TriggerThresholds.HEAT_ADVISORY_TMX;
+        boolean heatWarning = heatTemp != null && heatTemp >= TriggerThresholds.HEAT_WARNING_TMX;
         boolean outdoor = OutdoorActivityClassifier.isOutdoor(item);
 
         boolean weatherTrigger = rainWave && outdoor;
-        boolean heatTrigger = heatWave && outdoor;
+        boolean heatTrigger = heatAdvisory && outdoor;
+        boolean heatUrgent = heatTrigger && heatWarning;
 
-        Double crowdRate = condition.getCrowdRate(item.getPlaceName());
-        boolean crowdTrigger = crowdRate != null && crowdRate >= TriggerThresholds.CROWD_RATE_THRESHOLD;
+        CrowdCongestionEvaluator.Level crowdLevel = CrowdCongestionEvaluator.evaluate(
+                condition.getCrowdCategory(item.getPlaceName()),
+                condition.getCrowdRelativePercent(item.getPlaceName()),
+                condition.getCrowdRate(item.getPlaceName()));
+        boolean crowdTrigger = crowdLevel.isTriggered();
+        boolean crowdUrgent = crowdLevel.isUrgent();
 
-        // 카드에 저장된 정기휴무 문구를 방문일 기준으로 먼저 판정 (오탐 줄임)
         boolean closedBySnapshot = BusinessHoursEvaluator.isClosedOnRestDate(item.getRestDateText(), day);
 
         if (closedBySnapshot) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, crowdTrigger, true));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, true));
         }
 
         if (item.getContentId() == null || item.getContentTypeId() == null) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, crowdTrigger, false));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
         }
 
         LocalDateTime at = LocalDateTime.of(day, LocalTime.now());
         return tourAttractionService.getDetail(item.getContentId(), item.getContentTypeId())
                 .map(TourAttractionDetail::getIntroFields)
                 .map(fields -> !BusinessHoursEvaluator.isOpenAt(fields, at))
-                .map(closed -> buildResult(weatherTrigger, heatTrigger, crowdTrigger, closed))
-                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, crowdTrigger, false));
+                .map(closed -> buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, closed))
+                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
     }
 
     private TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem) {
         boolean weather = perItem.stream().anyMatch(e -> e.getValue().isWeatherTrigger());
         boolean heat = perItem.stream().anyMatch(e -> e.getValue().isHeatTrigger());
+        boolean heatUrgent = perItem.stream().anyMatch(e -> e.getValue().isHeatUrgent());
         boolean crowd = perItem.stream().anyMatch(e -> e.getValue().isCrowdTrigger());
+        boolean crowdUrgent = perItem.stream().anyMatch(e -> e.getValue().isCrowdUrgent());
         boolean business = perItem.stream().anyMatch(e -> e.getValue().isBusinessTrigger());
 
         List<Long> weatherIds = perItem.stream()
@@ -158,44 +168,62 @@ public class TriggerDetectionService {
         businessIds.forEach(id -> { if (!affected.contains(id)) affected.add(id); });
         crowdIds.forEach(id -> { if (!affected.contains(id)) affected.add(id); });
 
-        return buildResult(weather, heat, crowd, business, affected, weatherIds, businessIds, crowdIds);
+        return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, business,
+                affected, weatherIds, businessIds, crowdIds);
     }
 
-    private TriggerResult buildResult(boolean weather, boolean heat, boolean crowd, boolean business) {
-        return buildResult(weather, heat, crowd, business, List.of(), List.of(), List.of(), List.of());
+    private TriggerResult buildResult(boolean weather, boolean heat, boolean heatUrgent,
+                                      boolean crowd, boolean crowdUrgent, boolean business) {
+        return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, business,
+                List.of(), List.of(), List.of(), List.of());
     }
 
-    private TriggerResult buildResult(boolean weather, boolean heat, boolean crowd, boolean business,
-                                        List<Long> affectedItemIds,
-                                        List<Long> weatherAffectedItemIds,
-                                        List<Long> businessAffectedItemIds,
-                                        List<Long> crowdAffectedItemIds) {
+    private TriggerResult buildResult(boolean weather, boolean heat, boolean heatUrgent,
+                                      boolean crowd, boolean crowdUrgent, boolean business,
+                                      List<Long> affectedItemIds,
+                                      List<Long> weatherAffectedItemIds,
+                                      List<Long> businessAffectedItemIds,
+                                      List<Long> crowdAffectedItemIds) {
         int count = (weather ? 1 : 0) + (heat ? 1 : 0) + (crowd ? 1 : 0) + (business ? 1 : 0);
         List<String> details = new ArrayList<>();
         if (weather) {
             details.add("비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요.");
         }
         if (heat) {
-            details.add("폭염 소식이에요. 야외 활동을 실내 코스로 바꿔보세요.");
+            if (heatUrgent) {
+                details.add("최고기온 35℃ 이상(폭염경보 수준)이에요. 야외는 짧게, 실내 코스로 바꿔 보세요.");
+            } else {
+                details.add("최고기온 33℃ 이상(폭염주의보 수준)이에요. 야외는 짧게, 그늘·실내 코스로 바꿔 보세요.");
+            }
         }
         if (crowd) {
-            details.add("혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?");
+            if (crowdUrgent) {
+                details.add("평소보다 매우 붐벼요(긴급). 여유로운 곳으로 바꿔볼까요?");
+            } else {
+                details.add("혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?");
+            }
         }
         if (business) {
             details.add("오늘(방문일) 정기휴무·영업종료인 장소가 있어요. 대체 장소를 골라보세요.");
         }
-        TriggerLevel level;
-        if (count == 0) {
-            level = TriggerLevel.NORMAL;
-        } else if (weather || heat || count >= 2) {
-            level = TriggerLevel.DANGER;
-        } else {
-            level = TriggerLevel.WARNING;
+
+        TriggerLevel level = TriggerLevel.NORMAL;
+        if (count > 0) {
+            // 비 / 폭염경보(35) / 혼잡 긴급 / 트리거 2개 이상 → DANGER
+            // 폭염주의보(33) 단독·혼잡 주의·휴무 단독 → WARNING
+            if (weather || heatUrgent || crowdUrgent || count >= 2) {
+                level = TriggerLevel.DANGER;
+            } else {
+                level = TriggerLevel.WARNING;
+            }
         }
+
         return TriggerResult.builder()
                 .weatherTrigger(weather)
                 .heatTrigger(heat)
+                .heatUrgent(heatUrgent)
                 .crowdTrigger(crowd)
+                .crowdUrgent(crowdUrgent)
                 .businessTrigger(business)
                 .triggerCount(count)
                 .level(level)

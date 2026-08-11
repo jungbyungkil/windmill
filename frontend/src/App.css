@@ -2532,6 +2532,10 @@
   color: var(--level-warning);
 }
 
+.reco-close {
+  color: var(--ink, #1e293b);
+}
+
 .reco-distance {
   font-size: 12px;
   font-weight: 700;
@@ -3517,20 +3521,23 @@
   border: 1px solid var(--sand-border);
   background: white;
   border-radius: 999px;
-  width: 32px;
   height: 32px;
-  font-size: 15px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink, #1e293b);
   line-height: 1;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease, background 0.2s ease;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .day-route-gps-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sea) 10%, white);
-  transform: rotate(-30deg);
+  border-color: color-mix(in srgb, var(--sea) 35%, var(--sand-border));
 }
 
 .day-route-gps-btn:disabled {
@@ -3729,6 +3736,23 @@
   font-size: 12px;
   color: var(--muted);
   line-height: 1.4;
+}
+
+.day-route-map-hint code {
+  display: inline-block;
+  margin: 6px 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.day-route-map-hint-sub {
+  margin: 4px 0 0;
+  font-size: 11px;
+  opacity: 0.9;
 }
 
 .day-route-map-pin {
@@ -4016,5 +4040,62 @@
     font-size: 14px;
     line-height: 1.55;
   }
+}
+
+.closing-gate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.closing-gate-modal {
+  width: min(100%, 360px);
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+}
+
+.closing-gate-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--level-danger, #dc2626);
+}
+
+.closing-gate-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.closing-gate-message {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink, #1e293b);
+}
+
+.closing-gate-hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.closing-gate-ok {
+  width: 100%;
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: var(--sea, #1d6b8a);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
 

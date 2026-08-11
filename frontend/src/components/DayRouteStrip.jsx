@@ -3,7 +3,7 @@ import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 
 /**
  * 당일치기 동선 스트립 — 장소 순서·상태 색을 한 줄로 표시.
- * 🔄 로 GPS를 다시 받아 현재 위치를 시작점으로 순서를 재계산한다.
+ * 「동선 재계산」: GPS(가능 시) 시작점 + 서버에서 이동시간 TSP·시간표 재생성.
  * 장소 탭 → 카카오맵 좌표 이동.
  */
 export default function DayRouteStrip({
@@ -30,10 +30,10 @@ export default function DayRouteStrip({
             className="day-route-gps-btn"
             onClick={onOptimizeFromGps}
             disabled={gpsOptimizing}
-            title="현재 위치를 시작점으로 순서 다시 잡기"
-            aria-label="GPS로 동선 다시 잡기"
+            title="이동시간·체류를 반영해 방문 순서와 시간표를 다시 잡습니다"
+            aria-label="동선 재계산"
           >
-            {gpsOptimizing ? '…' : '🔄'}
+            {gpsOptimizing ? '재계산…' : '동선 재계산'}
           </button>
         )}
       </div>

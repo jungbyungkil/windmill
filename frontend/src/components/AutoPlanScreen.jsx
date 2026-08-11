@@ -77,7 +77,9 @@ export default function AutoPlanScreen({ onGenerate, onConfirm, onSkip }) {
   return (
     <div className="auto-plan-screen">
       <h2 className="section-title">AI 추천 일정 초안</h2>
-      <p className="auto-plan-desc">체크된 장소만 일정에 담겨요. 필요 없는 곳은 체크를 해제하세요.</p>
+      <p className="auto-plan-desc">
+        체크된 장소만 일정에 담겨요. 마감 시간이 있는 곳은 자동으로 맞춰 두었어요.
+      </p>
 
       <div className="auto-plan-draft-list">
         {draft.map((c) => (
@@ -91,6 +93,7 @@ export default function AutoPlanScreen({ onGenerate, onConfirm, onSkip }) {
             <span className="draft-time">{c.suggestedTime}</span>
             <span className="draft-body">
               <span className="draft-name">{c.placeName}</span>
+              {c.closeTime && <span className="draft-oneliner">마감 {c.closeTime} · 자동 반영</span>}
               {c.oneLiner && <span className="draft-oneliner">{c.oneLiner}</span>}
             </span>
           </label>

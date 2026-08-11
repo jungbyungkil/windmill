@@ -27,6 +27,8 @@ public final class BusinessHoursEvaluator {
     private static final List<String> PHONE_FIELDS = List.of(
             "infocenter", "infocenterculture", "infocenterleports", "infocenterfood", "infocenterfestival", "infocenterlodging");
     private static final Pattern TIME_RANGE = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[~-]\\s*(\\d{1,2}):(\\d{2})");
+    /** 마감 임박 버퍼(분) — close 1시간 전부터 선택 불가 */
+    public static final int CLOSE_BUFFER_MINUTES = 60;
     /** 매월 마지막 (주) X요일 */
     private static final Pattern LAST_WEEKDAY = Pattern.compile(
             "매월\\s*마지막\\s*(?:주\\s*)?([월화수목금토일])요일");
@@ -175,6 +177,60 @@ public final class BusinessHoursEvaluator {
             return tel;
         }
         return firstNonBlank(introFields, PHONE_FIELDS);
+    }
+
+    /** 이용시간 원문 (usetime/opentime 계열 첫 non-blank) */
+    public static String extractUseTimeText(Map<String, String> introFields) {
+        return firstNonBlank(introFields, USETIME_FIELDS);
+    }
+
+    /**
+     * 영업 종료(close) 시각. "09:00 ~ 17:00" 형태에서 끝 시각.
+     * 야간 영업(종료&lt;시작)도 종료 시각 자체를 반환한다.
+     */
+    public static LocalTime extractCloseTime(Map<String, String> introFields) {
+        String text = extractUseTimeText(introFields);
+        return extractCloseTimeFromText(text);
+    }
+
+    public static LocalTime extractCloseTimeFromText(String useTimeText) {
+        if (useTimeText == null || useTimeText.isBlank()) {
+            return null;
+        }
+        Matcher m = TIME_RANGE.matcher(useTimeText);
+        if (!m.find()) {
+            return null;
+        }
+        int h = Integer.parseInt(m.group(3));
+        int min = Integer.parseInt(m.group(4));
+        if (h > 23 || min > 59) {
+            return null;
+        }
+        return LocalTime.of(h, min);
+    }
+
+    public static LocalTime extractOpenTimeFromText(String useTimeText) {
+        if (useTimeText == null || useTimeText.isBlank()) {
+            return null;
+        }
+        Matcher m = TIME_RANGE.matcher(useTimeText);
+        if (!m.find()) {
+            return null;
+        }
+        int h = Integer.parseInt(m.group(1));
+        int min = Integer.parseInt(m.group(2));
+        if (h > 23 || min > 59) {
+            return null;
+        }
+        return LocalTime.of(h, min);
+    }
+
+    /** "HH:mm" 스냅샷용 */
+    public static String formatHhMm(LocalTime time) {
+        if (time == null) {
+            return null;
+        }
+        return String.format("%02d:%02d", time.getHour(), time.getMinute());
     }
 
     private static String firstNonBlank(Map<String, String> introFields, List<String> fields) {

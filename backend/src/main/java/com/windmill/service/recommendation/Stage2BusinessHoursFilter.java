@@ -56,14 +56,24 @@ public class Stage2BusinessHoursFilter {
     private RelatedCandidate applyDetail(RelatedCandidate candidate, TourAttractionDetail detail) {
         candidate.setAddr1(detail.getAddr1());
         candidate.setTel(detail.getTel());
-        candidate.setMapX(detail.getMapX());
-        candidate.setMapY(detail.getMapY());
+        // 목록에 이미 좌표가 있으면 유지. 상세가 비어 있어도 덮어쓰지 않음.
+        if (detail.getMapX() != null && !detail.getMapX().isBlank()) {
+            candidate.setMapX(detail.getMapX().trim());
+        }
+        if (detail.getMapY() != null && !detail.getMapY().isBlank()) {
+            candidate.setMapY(detail.getMapY().trim());
+        }
 
         String useFeeText = BusinessHoursEvaluator.extractUseFeeText(detail.getIntroFields());
         candidate.setUseFeeText(useFeeText);
         candidate.setIsFree(BusinessHoursEvaluator.isFree(useFeeText));
         candidate.setRestDateText(BusinessHoursEvaluator.extractRestDateText(detail.getIntroFields()));
         candidate.setTel(BusinessHoursEvaluator.extractPhone(detail.getTel(), detail.getIntroFields()));
+
+        String useTimeText = BusinessHoursEvaluator.extractUseTimeText(detail.getIntroFields());
+        candidate.setUseTimeText(useTimeText);
+        var close = BusinessHoursEvaluator.extractCloseTime(detail.getIntroFields());
+        candidate.setCloseTime(BusinessHoursEvaluator.formatHhMm(close));
 
         candidate.setBusinessOpen(BusinessHoursEvaluator.isCurrentlyOpen(detail.getIntroFields()));
         return candidate;

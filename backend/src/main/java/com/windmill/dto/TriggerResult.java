@@ -11,7 +11,11 @@ public class TriggerResult {
     private boolean weatherTrigger;
     /** 폭염 + 야외 일정 조합 - 실내 전환 권고. 바람개비 경고(빨강)에 반영 */
     private boolean heatTrigger;
+    /** TMX ≥ 35℃(경보 프록시) */
+    private boolean heatUrgent;
     private boolean crowdTrigger;
+    /** 평시 대비 200%·매우붐빔 등 — 바람개비 DANGER 승격 */
+    private boolean crowdUrgent;
     private boolean businessTrigger;
     /** 동선 꼬임(비효율 경로) - 자동 재배치 제안 */
     private boolean routeTangleTrigger;

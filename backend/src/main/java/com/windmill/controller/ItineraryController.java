@@ -153,8 +153,8 @@ public class ItineraryController {
     }
 
     /**
-     * 동선 최단 재배치(순열 TSP / Haversine).
-     * originLon·originLat(WGS84)를 주면 GPS를 0번 시작점으로 두고 나머지를 재정렬한다.
+     * 동선 재계산(카카오 이동시간 매트릭스 TSP + 시간표 재생성).
+     * originLon·originLat(WGS84)를 주면 GPS를 시작점으로 둔다.
      */
     @PostMapping("/{id}/optimize-route")
     public Mono<ResponseEntity<ItineraryResponse>> optimizeRoute(

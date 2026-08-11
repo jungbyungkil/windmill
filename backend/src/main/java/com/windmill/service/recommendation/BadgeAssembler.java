@@ -3,6 +3,7 @@ package com.windmill.service.recommendation;
 import com.windmill.dto.Badge;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.service.trigger.RegionCondition;
+import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.TriggerThresholds;
 import org.springframework.stereotype.Component;
 
@@ -10,33 +11,33 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 추천 카드별 실시간 상태 배지(날씨/혼잡/영업) 조립 - 새 API 호출 없이 파이프라인이 이미 가진 정보만 재사용한다.
- * 혼잡 배지는 절대 임계치(TriggerDetectionService와 동일 기준)뿐 아니라, 이 지역에서 이미 조회된 관광지들의
- * 평균 집중률(RegionCondition.crowdRateByPlaceName) 대비 상대적으로 붐비는 곳도 함께 표시한다 -
- * "행정동 단위 방문자수"는 확보한 API로 지원 불가하다는 조사 결과에 따라, 관광지별 상대 비교로 대체한 것이다.
+ * 추천 카드별 실시간 상태 배지(날씨/혼잡/영업) 조립.
+ * 폭염은 TMX(없으면 TMP) 33/35℃ B안. 혼잡은 카테고리 → 평시대비% → 피크상대 폴백.
  */
 @Component
 public class BadgeAssembler {
 
-    /** 상대 비교 시 "평소보다 혼잡"으로 볼 최소 편차(percentage point) */
-    private static final double RELATIVE_CROWD_GAP = 15.0;
-
     public void attach(List<RecommendationCandidate> candidates, RegionCondition condition) {
-        Double regionAverageCrowdRate = averageCrowdRate(condition);
         for (RecommendationCandidate c : candidates) {
-            c.setBadges(buildBadges(c, condition, regionAverageCrowdRate));
+            c.setBadges(buildBadges(c, condition));
         }
     }
 
-    private List<Badge> buildBadges(RecommendationCandidate c, RegionCondition condition, Double regionAverage) {
+    private List<Badge> buildBadges(RecommendationCandidate c, RegionCondition condition) {
         List<Badge> badges = new ArrayList<>();
 
-        if (condition != null && condition.getCurrentTemp() != null
-                && condition.getCurrentTemp() >= TriggerThresholds.HEAT_TEMP_THRESHOLD) {
+        Double heatTemp = condition == null ? null : condition.heatProxyTemp();
+        if (heatTemp != null && heatTemp >= TriggerThresholds.HEAT_WARNING_TMX) {
             badges.add(Badge.builder()
                     .type(Badge.BadgeType.WEATHER)
-                    .label(String.format("폭염 %.0f℃ · 실내 추천", condition.getCurrentTemp()))
+                    .label(String.format("폭염경보 수준 %.0f℃ · 실내 추천", heatTemp))
                     .severity(Badge.Severity.DANGER)
+                    .build());
+        } else if (heatTemp != null && heatTemp >= TriggerThresholds.HEAT_ADVISORY_TMX) {
+            badges.add(Badge.builder()
+                    .type(Badge.BadgeType.WEATHER)
+                    .label(String.format("폭염주의보 수준 %.0f℃ · 실내 추천", heatTemp))
+                    .severity(Badge.Severity.WARNING)
                     .build());
         } else if (condition != null && condition.getCurrentPop() != null
                 && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD) {
@@ -47,21 +48,29 @@ public class BadgeAssembler {
                     .build());
         }
 
-        Double crowdRate = c.getCrowdRate();
-        if (crowdRate != null) {
-            if (crowdRate >= TriggerThresholds.CROWD_RATE_THRESHOLD) {
-                badges.add(Badge.builder()
-                        .type(Badge.BadgeType.CONGESTION)
-                        .label("혼잡 예상")
-                        .severity(Badge.Severity.WARNING)
-                        .build());
-            } else if (regionAverage != null && crowdRate - regionAverage >= RELATIVE_CROWD_GAP) {
-                badges.add(Badge.builder()
-                        .type(Badge.BadgeType.CONGESTION)
-                        .label(String.format("평소보다 혼잡해요 (%.0f%%)", crowdRate))
-                        .severity(Badge.Severity.WARNING)
-                        .build());
-            }
+        String placeName = c.getPlaceName();
+        String category = condition == null ? null : condition.getCrowdCategory(placeName);
+        Double relative = condition == null ? null : condition.getCrowdRelativePercent(placeName);
+        Double rate = c.getCrowdRate() != null ? c.getCrowdRate()
+                : (condition == null ? null : condition.getCrowdRate(placeName));
+        CrowdCongestionEvaluator.Level crowdLevel =
+                CrowdCongestionEvaluator.evaluate(category, relative, rate);
+        if (crowdLevel.isUrgent()) {
+            badges.add(Badge.builder()
+                    .type(Badge.BadgeType.CONGESTION)
+                    .label(relative != null
+                            ? String.format("평소 대비 %.0f%% · 매우 붐빔", relative)
+                            : "매우 붐빔")
+                    .severity(Badge.Severity.DANGER)
+                    .build());
+        } else if (crowdLevel.isTriggered()) {
+            badges.add(Badge.builder()
+                    .type(Badge.BadgeType.CONGESTION)
+                    .label(relative != null && relative >= TriggerThresholds.CROWD_RELATIVE_WARNING_PCT
+                            ? String.format("평소 대비 %.0f%% · 혼잡", relative)
+                            : (category != null ? category + " · 혼잡" : "혼잡 예상"))
+                    .severity(Badge.Severity.WARNING)
+                    .build());
         }
 
         if (Boolean.TRUE.equals(c.getBusinessOpen())) {
@@ -88,16 +97,5 @@ public class BadgeAssembler {
             return "비 예보 " + hour + "시";
         }
         return "비 예보";
-    }
-
-    private Double averageCrowdRate(RegionCondition condition) {
-        if (condition == null || condition.getCrowdRateByPlaceName() == null
-                || condition.getCrowdRateByPlaceName().isEmpty()) {
-            return null;
-        }
-        return condition.getCrowdRateByPlaceName().values().stream()
-                .mapToDouble(Double::doubleValue)
-                .average()
-                .orElse(Double.NaN);
     }
 }

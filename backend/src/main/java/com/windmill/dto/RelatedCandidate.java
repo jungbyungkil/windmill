@@ -27,6 +27,10 @@ public class RelatedCandidate {
     private String useFeeText;     // 이용요금 원문 텍스트 (예: "무료", "성인 3,000원")
     private Boolean isFree;        // useFeeText로 추정한 무료 여부 - 모르면 null
     private String restDateText;   // 정기휴무 원문 텍스트 (예: "매주 월요일")
+    /** Stage2: "HH:mm" 영업 종료 시각. 파싱 실패 시 null */
+    private String closeTime;
+    /** Stage2: 이용시간 원문 */
+    private String useTimeText;
     private Double distanceKm;     // RecommendationPipeline에서 origin이 있을 때만 채워짐
 
     private Double crowdRate;      // Stage3 결과 (원본, 0~100)

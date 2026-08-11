@@ -10,11 +10,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 카카오 모빌리티 자동차 길찾기 프록시.
@@ -216,5 +219,175 @@ public class KakaoDirectionsClient {
                 .roadBased(false)
                 .message(message)
                 .build();
+    }
+
+    /**
+     * 지점 간 자동차 이동시간(분) 매트릭스.
+     * n≤8 당일치기 기준 n(n-1)회 길찾기. 실패·미설정 시 Haversine×분/km 폴백.
+     *
+     * @param points lon/lat 순서 동일 인덱스
+     * @return minutes[i][j] = i→j 분 (대각 0). roadBasedRatio는 카카오 성공 비율 힌트용
+     */
+    public TravelTimeMatrix buildTravelTimeMatrix(List<MapRouteRequest.MapPoint> points) {
+        int n = points == null ? 0 : points.size();
+        int[][] minutes = new int[n][n];
+        if (n == 0) {
+            return new TravelTimeMatrix(minutes, 0, 0, false);
+        }
+        if (!isConfigured() || n == 1) {
+            fillHaversineMinutes(points, minutes);
+            return new TravelTimeMatrix(minutes, 0, 0, false);
+        }
+
+        List<int[]> pairs = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (i != j) {
+                    pairs.add(new int[]{i, j});
+                }
+            }
+        }
+        AtomicInteger ok = new AtomicInteger();
+        Flux.fromIterable(pairs)
+                .flatMap(pair -> {
+                    int i = pair[0];
+                    int j = pair[1];
+                    return durationSeconds(points.get(i), points.get(j))
+                            .map(sec -> {
+                                minutes[i][j] = Math.max(1, (int) Math.ceil(sec / 60.0));
+                                ok.incrementAndGet();
+                                return true;
+                            })
+                            .onErrorResume(e -> {
+                                minutes[i][j] = haversineMinutes(points.get(i), points.get(j));
+                                return Mono.just(false);
+                            });
+                }, 4)
+                .blockLast(Duration.ofSeconds(45));
+
+        int totalPairs = pairs.size();
+        int roadOk = ok.get();
+        if (roadOk == 0) {
+            fillHaversineMinutes(points, minutes);
+            return new TravelTimeMatrix(minutes, 0, totalPairs, false);
+        }
+        // 빠진 칸만 직선 폴백
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (i != j && minutes[i][j] <= 0) {
+                    minutes[i][j] = haversineMinutes(points.get(i), points.get(j));
+                }
+            }
+        }
+        log.info("[KakaoDirections] travel matrix {}x{} roadOk={}/{}", n, n, roadOk, totalPairs);
+        return new TravelTimeMatrix(minutes, roadOk, totalPairs, roadOk > 0);
+    }
+
+    /**
+     * GPS 등 외부 시작점 → 각 지점 이동시간(분).
+     */
+    public int[] minutesFromOrigin(MapRouteRequest.MapPoint origin, List<MapRouteRequest.MapPoint> points) {
+        int n = points == null ? 0 : points.size();
+        int[] out = new int[n];
+        if (origin == null || n == 0) {
+            return out;
+        }
+        if (!isConfigured()) {
+            for (int i = 0; i < n; i++) {
+                out[i] = haversineMinutes(origin, points.get(i));
+            }
+            return out;
+        }
+        Flux.range(0, n)
+                .flatMap(i -> durationSeconds(origin, points.get(i))
+                        .map(sec -> {
+                            out[i] = Math.max(1, (int) Math.ceil(sec / 60.0));
+                            return i;
+                        })
+                        .onErrorResume(e -> {
+                            out[i] = haversineMinutes(origin, points.get(i));
+                            return Mono.just(i);
+                        }), 4)
+                .blockLast(Duration.ofSeconds(30));
+        for (int i = 0; i < n; i++) {
+            if (out[i] <= 0) {
+                out[i] = haversineMinutes(origin, points.get(i));
+            }
+        }
+        return out;
+    }
+
+    private Mono<Integer> durationSeconds(MapRouteRequest.MapPoint from, MapRouteRequest.MapPoint to) {
+        URI uri = UriComponentsBuilder
+                .fromUriString(DIRECTIONS_URL)
+                .queryParam("origin", formatPoint(from))
+                .queryParam("destination", formatPoint(to))
+                .queryParam("priority", "RECOMMEND")
+                .queryParam("car_fuel", "GASOLINE")
+                .queryParam("car_hipass", "false")
+                .queryParam("summary", "true")
+                .encode()
+                .build()
+                .toUri();
+        return webClient.get()
+                .uri(uri)
+                .header(HttpHeaders.AUTHORIZATION, "KakaoAK " + restApiKey)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(root -> {
+                    JsonNode routes = root.path("routes");
+                    if (!routes.isArray() || routes.isEmpty()) {
+                        throw new IllegalStateException("no routes");
+                    }
+                    JsonNode route = routes.get(0);
+                    if (route.path("result_code").asInt(-1) != 0) {
+                        throw new IllegalStateException(route.path("result_msg").asText("kakao error"));
+                    }
+                    JsonNode summary = route.path("summary");
+                    if (!summary.has("duration")) {
+                        throw new IllegalStateException("no duration");
+                    }
+                    return summary.get("duration").asInt();
+                });
+    }
+
+    private static void fillHaversineMinutes(List<MapRouteRequest.MapPoint> points, int[][] minutes) {
+        for (int i = 0; i < points.size(); i++) {
+            for (int j = 0; j < points.size(); j++) {
+                if (i == j) {
+                    minutes[i][j] = 0;
+                } else {
+                    minutes[i][j] = haversineMinutes(points.get(i), points.get(j));
+                }
+            }
+        }
+    }
+
+    /** 직선거리 → 분 (약 12분/km, 10~90 클램프) */
+    static int haversineMinutes(MapRouteRequest.MapPoint a, MapRouteRequest.MapPoint b) {
+        Double km = GeoUtils.distanceKmSafe(
+                String.valueOf(a.getLon()), String.valueOf(a.getLat()),
+                String.valueOf(b.getLon()), String.valueOf(b.getLat()));
+        if (km == null) {
+            return 20;
+        }
+        int m = (int) Math.ceil(km * 12.0);
+        return Math.max(10, Math.min(m, 90));
+    }
+
+    public record TravelTimeMatrix(int[][] minutes, int roadOkPairs, int totalPairs, boolean roadBased) {
+        public int pathMinutes(int[] order, int[] fromOrigin) {
+            if (order == null || order.length == 0) {
+                return 0;
+            }
+            int sum = 0;
+            if (fromOrigin != null && fromOrigin.length > order[0]) {
+                sum += fromOrigin[order[0]];
+            }
+            for (int i = 1; i < order.length; i++) {
+                sum += minutes[order[i - 1]][order[i]];
+            }
+            return sum;
+        }
     }
 }
