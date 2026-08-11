@@ -1,4 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+let publicConfigCache = null;
 
 async function request(path, { method = 'GET', sessionId, body, headers } = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -34,6 +35,14 @@ function qs(params) {
 
 export function getRegions() {
   return request('/regions');
+}
+
+/** 런타임 공개 설정 (민감정보 제외) */
+export async function getPublicConfig() {
+  if (publicConfigCache) return publicConfigCache;
+  publicConfigCache = request('/public-config')
+    .catch(() => ({}));
+  return publicConfigCache;
 }
 
 export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet }) {

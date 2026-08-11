@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-maps-sdk';
-import { getMapRoute } from '../api/windmillApi';
+import { getMapRoute, getPublicConfig } from '../api/windmillApi';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 
-const JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
+const BUILD_TIME_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
 
 const MARKER_COLOR = {
   NORMAL: '#2f9e6a',
@@ -31,9 +31,9 @@ function statusText(item, weather, business, crowd) {
   return parts.join(' · ');
 }
 
-function DayRouteMapCanvas({ stops, center }) {
+function DayRouteMapCanvas({ stops, center, jsKey }) {
   const [loading, error] = useKakaoLoader({
-    appkey: JS_KEY,
+    appkey: jsKey,
     libraries: ['services'],
   });
   const [selectedId, setSelectedId] = useState(null);
@@ -178,6 +178,26 @@ export default function DayRouteMap({
   crowdAffectedItemIds = [],
 }) {
   const [open, setOpen] = useState(true);
+  const [jsKey, setJsKey] = useState(BUILD_TIME_JS_KEY);
+  const [keyChecked, setKeyChecked] = useState(Boolean(BUILD_TIME_JS_KEY));
+
+  useEffect(() => {
+    let cancelled = false;
+    if (BUILD_TIME_JS_KEY) return undefined;
+    getPublicConfig()
+      .then((cfg) => {
+        if (cancelled) return;
+        if (cfg?.kakaoJsKey) {
+          setJsKey(cfg.kakaoJsKey);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setKeyChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const weather = useMemo(() => new Set((weatherAffectedItemIds || []).map(Number)), [weatherAffectedItemIds]);
   const business = useMemo(() => new Set((businessAffectedItemIds || []).map(Number)), [businessAffectedItemIds]);
@@ -234,17 +254,17 @@ export default function DayRouteMap({
 
       {open && (
         <div className="day-route-map-body">
-          {!JS_KEY && (
+          {!jsKey && keyChecked && (
             <p className="day-route-map-hint">
-              VITE_KAKAO_JS_KEY가 없어 지도를 표시할 수 없어요. 카카오 개발자 콘솔에서 JavaScript 키를
-              발급하고 Web 도메인(localhost·배포 주소)을 등록하세요.
+              카카오 JS 키를 찾지 못했어요. Render 환경변수 `VITE_KAKAO_JS_KEY` 또는 `KAKAO_JS_KEY`를
+              확인하고, 카카오 개발자 콘솔 Web 도메인에 배포 주소를 등록해 주세요.
             </p>
           )}
-          {JS_KEY && stops.length === 0 && (
+          {jsKey && stops.length === 0 && (
             <p className="day-route-map-hint">좌표가 있는 장소가 아직 없어요.</p>
           )}
-          {JS_KEY && stops.length > 0 && (
-            <DayRouteMapCanvas stops={stops} center={center} />
+          {jsKey && stops.length > 0 && (
+            <DayRouteMapCanvas stops={stops} center={center} jsKey={jsKey} />
           )}
         </div>
       )}
