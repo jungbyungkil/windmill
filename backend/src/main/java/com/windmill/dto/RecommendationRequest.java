@@ -13,6 +13,10 @@ public class RecommendationRequest {
     private String regionCode;
     /** true면 Stage1이 TarRlteTarService1 대신 반려동물 동반여행 전용 API를 후보 소스로 사용 */
     private boolean withPet;
+    /** true면 유모차 이용 가능 확인된 후보를 앞으로 당김(AccessibilityRanking) - 소스 자체는 바꾸지 않음(전용 API 없음) */
+    private boolean strollerFriendly;
+    /** true면 무장애 키워드 매칭된 후보를 앞으로 당김(AccessibilityRanking) - 구조화 필드 없어 휴리스틱 */
+    private boolean accessibleFriendly;
     /** 동반유형별 카테고리 가중치(LLM 미사용, CompanionCategoryRanking 참고) 적용 기준 */
     private CompanionType companionType;
     /** 연관관광지 조회 기준이 되는 장소명 (예: 이미 담은 일정 중 한 곳, 혹은 자연어검색 키워드). null이면 지역 전체 기준 */

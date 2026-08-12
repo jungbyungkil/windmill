@@ -146,6 +146,8 @@ public class SmartPlanService {
         return RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
+                .strollerFriendly(itinerary.isStrollerFriendly())
+                .accessibleFriendly(itinerary.isAccessibleFriendly())
                 .companionType(itinerary.getCompanionType())
                 .tags(tags)
                 .excludeContentIds(excludeContentIds)

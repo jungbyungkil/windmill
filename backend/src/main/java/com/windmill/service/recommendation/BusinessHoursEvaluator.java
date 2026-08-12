@@ -26,6 +26,12 @@ public final class BusinessHoursEvaluator {
             "usefee", "usefeeculture", "usefeeleports", "usefeefestival");
     private static final List<String> PHONE_FIELDS = List.of(
             "infocenter", "infocenterculture", "infocenterleports", "infocenterfood", "infocenterfestival", "infocenterlodging");
+    /** detailIntro2 유모차 대여정보 필드(contentType별 접미사) - 자유텍스트("가능"/"불가능"/공란 등) */
+    private static final List<String> STROLLER_FIELDS = List.of(
+            "chkbabycarriage", "chkbabycarriageculture", "chkbabycarriageleports", "chkbabycarriageshopping");
+    /** 무장애/휠체어 관련 구조화 필드가 API에 없어, overview·카테고리 텍스트 키워드 매칭으로 근사한다 */
+    private static final List<String> ACCESSIBLE_KEYWORDS = List.of(
+            "무장애", "배리어프리", "휠체어", "장애인", "저상", "경사로", "점자");
     private static final Pattern TIME_RANGE = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[~-]\\s*(\\d{1,2}):(\\d{2})");
     /** 마감 임박 버퍼(분) — close 1시간 전부터 선택 불가 */
     public static final int CLOSE_BUFFER_MINUTES = 60;
@@ -231,6 +237,44 @@ public final class BusinessHoursEvaluator {
             return null;
         }
         return String.format("%02d:%02d", time.getHour(), time.getMinute());
+    }
+
+    /** 유모차 대여정보 원문 (chkbabycarriage 계열 첫 non-blank) */
+    public static String extractStrollerText(Map<String, String> introFields) {
+        return firstNonBlank(introFields, STROLLER_FIELDS);
+    }
+
+    /**
+     * 유모차 이용 가능 여부 추정. "불가능"/"불가" 명시 시 false, "가능" 포함 시 true,
+     * 그 외(공란·정보없음 등)는 모르므로 null - isFree와 동일하게 단정하지 않는다.
+     */
+    public static Boolean isStrollerFriendly(String strollerText) {
+        if (strollerText == null || strollerText.isBlank()) {
+            return null;
+        }
+        if (strollerText.contains("불가능") || strollerText.contains("불가")) {
+            return false;
+        }
+        if (strollerText.contains("가능")) {
+            return true;
+        }
+        return null;
+    }
+
+    /**
+     * 무장애(장애인 편의) 여부 근사 - 구조화 필드가 없어 overview/카테고리 텍스트에서 키워드를 찾는다.
+     * 키워드가 없다고 실제로 무장애 시설이 없다는 뜻은 아니므로(휴리스틱), 항상 false만 반환하고 단정은 안 한다.
+     */
+    public static boolean matchesAccessibleKeyword(String... texts) {
+        if (texts == null) {
+            return false;
+        }
+        for (String text : texts) {
+            if (text != null && ACCESSIBLE_KEYWORDS.stream().anyMatch(text::contains)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String firstNonBlank(Map<String, String> introFields, List<String> fields) {

@@ -172,6 +172,8 @@ export default function ItineraryItemCard({
                 <div className="reco-info-row">🎫 {item.isFree ? '무료' : item.useFeeText}</div>
               )}
               {item.tel && <div className="reco-info-row">☎️ {item.tel}</div>}
+              {item.strollerFriendly === true && <div className="reco-info-row">🍼 유모차 이용 가능</div>}
+              {item.accessibleFriendly && <div className="reco-info-row">♿ 무장애 시설</div>}
               {item.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {item.restDateText}</div>}
               {item.homepageUrl && (
                 <button

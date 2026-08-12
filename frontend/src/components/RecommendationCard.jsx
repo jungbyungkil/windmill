@@ -45,6 +45,8 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
           <div className="reco-info-row">🎫 {candidate.isFree ? '무료' : candidate.useFeeText}</div>
         )}
         {candidate.tel && <div className="reco-info-row">☎️ {candidate.tel}</div>}
+        {candidate.strollerFriendly === true && <div className="reco-info-row">🍼 유모차 이용 가능</div>}
+        {candidate.accessibleFriendly && <div className="reco-info-row">♿ 무장애 시설</div>}
         {candidate.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {candidate.restDateText}</div>}
         {candidate.closeTime && (
           <div className="reco-info-row reco-close">🕐 마감 {candidate.closeTime}{candidate.useTimeText ? ` · ${candidate.useTimeText}` : ''}</div>

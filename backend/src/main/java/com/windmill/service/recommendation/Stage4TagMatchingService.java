@@ -141,6 +141,9 @@ public class Stage4TagMatchingService {
                 .mapX(c.getMapX())
                 .mapY(c.getMapY())
                 .businessOpen(c.getBusinessOpen())
+                .strollerText(c.getStrollerText())
+                .strollerFriendly(c.getStrollerFriendly())
+                .accessibleFriendly(c.isAccessibleFriendly())
                 .build();
     }
 }

@@ -85,6 +85,7 @@ public class RecommendationPipeline {
                             .map(list -> attachDistance(list, origin))
                             .flatMap(list -> stage3.filter(list, region))
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
+                            .map(list -> AccessibilityRanking.rank(list, request.isStrollerFriendly(), request.isAccessibleFriendly()))
                             .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
                             .map(list -> enrichThemeTags(list, themes))
                             .doOnNext(list -> badgeAssembler.attach(list, condition));

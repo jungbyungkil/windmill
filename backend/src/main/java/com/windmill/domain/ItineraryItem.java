@@ -59,6 +59,13 @@ public class ItineraryItem {
     private String useTimeText;
     private String homepageUrl;
 
+    /** 담는 시점의 RecommendationCandidate 스냅샷 - 유모차/무장애 배지 표시용 */
+    private Boolean strollerFriendly;
+    @Builder.Default
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean accessibleFriendly = false;
+
     /** RecommendationCandidate.category 스냅샷 - 여행기록 집계(CommunityScheduleService)에서 슬롯별 카테고리 표시에 사용 */
     private String category;
     /** "자동 재배치"/"대안 추천" 경로로 담겼는지 - 여행기록에 그대로 스냅샷되어 실시간 대응 사례로 집계됨.

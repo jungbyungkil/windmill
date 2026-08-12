@@ -20,6 +20,8 @@ public class CreateItineraryRequest {
     @NotNull
     private CompanionType companionType;
     private boolean withPet;
+    private boolean strollerFriendly;
+    private boolean accessibleFriendly;
 
     @AssertTrue(message = "당일치기만 가능합니다. 여행 날짜는 하루만 선택해 주세요.")
     public boolean isDayTrip() {

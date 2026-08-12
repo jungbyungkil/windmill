@@ -45,11 +45,11 @@ export async function getPublicConfig() {
   return publicConfigCache;
 }
 
-export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet }) {
+export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly }) {
   return request('/itineraries', {
     method: 'POST',
     sessionId,
-    body: { signguFullCode, startDate, endDate, companionType, withPet },
+    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly },
   });
 }
 
@@ -96,8 +96,8 @@ export function getSmartPlan(itineraryId, { placeCount, date } = {}) {
   return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date })}`);
 }
 
-export function getRecommendations({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
-  return request(`/recommendations${qs({ regionCode, withPet, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
+export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
+  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
 /** 카테고리별 장소 추천 (식당/박물관/키즈카페/카페) - 방문자(집중률) 우선 */

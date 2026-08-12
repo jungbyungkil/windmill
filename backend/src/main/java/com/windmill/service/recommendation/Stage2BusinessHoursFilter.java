@@ -77,6 +77,12 @@ public class Stage2BusinessHoursFilter {
         candidate.setCloseTime(BusinessHoursEvaluator.formatHhMm(close));
 
         candidate.setBusinessOpen(BusinessHoursEvaluator.isCurrentlyOpen(detail.getIntroFields()));
+
+        String strollerText = BusinessHoursEvaluator.extractStrollerText(detail.getIntroFields());
+        candidate.setStrollerText(strollerText);
+        candidate.setStrollerFriendly(BusinessHoursEvaluator.isStrollerFriendly(strollerText));
+        candidate.setAccessibleFriendly(BusinessHoursEvaluator.matchesAccessibleKeyword(
+                detail.getOverview(), candidate.getCategoryLcls(), candidate.getCategoryMcls(), candidate.getCategoryScls()));
         return candidate;
     }
 

@@ -45,6 +45,8 @@ public class RecommendationController {
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
             @RequestParam String regionCode,
             @RequestParam(required = false, defaultValue = "false") boolean withPet,
+            @RequestParam(required = false, defaultValue = "false") boolean strollerFriendly,
+            @RequestParam(required = false, defaultValue = "false") boolean accessibleFriendly,
             @RequestParam(required = false) CompanionType companionType,
             @RequestParam(required = false) String seedPlaceName,
             @RequestParam(required = false) List<String> tags,
@@ -63,6 +65,8 @@ public class RecommendationController {
             RecommendationRequest request = RecommendationRequest.builder()
                     .regionCode(regionCode)
                     .withPet(withPet)
+                    .strollerFriendly(strollerFriendly)
+                    .accessibleFriendly(accessibleFriendly)
                     .companionType(companionType)
                     .seedPlaceName(seedPlaceName)
                     .tags(tags)

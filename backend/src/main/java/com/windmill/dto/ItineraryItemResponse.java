@@ -31,6 +31,8 @@ public class ItineraryItemResponse {
     private String closeTime;
     private String useTimeText;
     private String homepageUrl;
+    private Boolean strollerFriendly;
+    private boolean accessibleFriendly;
     private String mapX;
     private String mapY;
     private boolean isAlternate;
@@ -60,6 +62,8 @@ public class ItineraryItemResponse {
                 .closeTime(item.getCloseTime())
                 .useTimeText(item.getUseTimeText())
                 .homepageUrl(item.getHomepageUrl())
+                .strollerFriendly(item.getStrollerFriendly())
+                .accessibleFriendly(item.isAccessibleFriendly())
                 .mapX(item.getMapX())
                 .mapY(item.getMapY())
                 .isAlternate(item.isAlternate())

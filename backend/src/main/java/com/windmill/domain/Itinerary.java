@@ -48,6 +48,16 @@ public class Itinerary {
     @Column(nullable = false)
     private boolean withPet = false;
 
+    /** 유모차 동반 - true면 추천 파이프라인이 유모차 이용 가능 여부를 후보 순위에 반영한다 */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean strollerFriendly = false;
+
+    /** 무장애(장애인 동반) - 구조화된 API 필드가 없어 키워드 매칭 휴리스틱으로 후보 순위에 반영한다 */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean accessibleFriendly = false;
+
     // EAGER: open-in-view=false라 트랜잭션(서비스 메서드) 밖에서 DTO로 변환하는 컨트롤러 계층에서
     // LAZY 컬렉션에 접근하면 LazyInitializationException이 발생함 - 일정당 항목 수가 적어 EAGER가 안전
     @Builder.Default

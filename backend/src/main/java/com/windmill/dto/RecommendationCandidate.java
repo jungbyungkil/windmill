@@ -32,6 +32,9 @@ public class RecommendationCandidate {
     private String useTimeText;
     private String homepageUrl;     // 공식 홈페이지 URL, 없으면 null
     private Double distanceKm;      // 이전 장소와의 구간 거리(스마트 플랜) 또는 origin 기준 거리
+    private String strollerText;    // 유모차 대여정보 원문, 없으면 null
+    private Boolean strollerFriendly; // 유모차 이용 가능 추정, 모르면 null(단정하지 않음)
+    private boolean accessibleFriendly; // 무장애 키워드 매칭 근사(휴리스틱) - 데이터 없다고 false로 단정하지 않도록 순위에만 반영
     private String mapX;            // 경도 - 동선 최적화용
     private String mapY;            // 위도 - 동선 최적화용
     private String visitDate;       // 스마트 플랜 다일 배정용 "YYYY-MM-DD"

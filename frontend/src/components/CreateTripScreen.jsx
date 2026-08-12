@@ -40,6 +40,8 @@ export default function CreateTripScreen({
   const [dateTouched, setDateTouched] = useState(false);
   const [companionType, setCompanionType] = useState('SOLO');
   const [withPet, setWithPet] = useState(false);
+  const [strollerFriendly, setStrollerFriendly] = useState(false);
+  const [accessibleFriendly, setAccessibleFriendly] = useState(false);
   const [situation, setSituation] = useState(null);
   const [situationLoading, setSituationLoading] = useState(true);
   const [situationDismissed, setSituationDismissed] = useState(false);
@@ -139,6 +141,8 @@ export default function CreateTripScreen({
       endDate: tripDate,
       companionType,
       withPet,
+      strollerFriendly,
+      accessibleFriendly,
     });
   }
 
@@ -282,6 +286,22 @@ export default function CreateTripScreen({
           <label className="trip-form-checkbox">
             <input type="checkbox" checked={withPet} onChange={(e) => setWithPet(e.target.checked)} />
             🐾 반려동물과 함께해요
+          </label>
+          <label className="trip-form-checkbox">
+            <input
+              type="checkbox"
+              checked={strollerFriendly}
+              onChange={(e) => setStrollerFriendly(e.target.checked)}
+            />
+            🍼 유모차 동반 (유모차 이용 가능한 곳 우선 추천)
+          </label>
+          <label className="trip-form-checkbox">
+            <input
+              type="checkbox"
+              checked={accessibleFriendly}
+              onChange={(e) => setAccessibleFriendly(e.target.checked)}
+            />
+            ♿ 무장애 이동 (장애인 동반 - 무장애 시설 우선 추천)
           </label>
         </div>
 

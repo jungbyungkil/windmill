@@ -33,6 +33,9 @@ public class RelatedCandidate {
     private String useTimeText;
     private String homepageUrl;    // detailCommon2 homepage에서 추출(HomepageUrlExtractor), 없으면 null
     private Double distanceKm;     // RecommendationPipeline에서 origin이 있을 때만 채워짐
+    private String strollerText;   // chkbabycarriage 계열 원문
+    private Boolean strollerFriendly; // "가능"/"불가능" 추정 - 모르면 null
+    private boolean accessibleFriendly; // overview/카테고리 텍스트 키워드 매칭 근사(휴리스틱, 단정 아님)
 
     private Double crowdRate;      // Stage3 결과 (원본, 0~100)
 }

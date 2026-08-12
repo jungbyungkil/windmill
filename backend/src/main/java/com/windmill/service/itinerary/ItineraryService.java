@@ -63,6 +63,8 @@ public class ItineraryService {
                 .endDate(request.getStartDate()) // 당일치기: 종료일 = 시작일
                 .companionType(request.getCompanionType())
                 .withPet(request.isWithPet())
+                .strollerFriendly(request.isStrollerFriendly())
+                .accessibleFriendly(request.isAccessibleFriendly())
                 .build();
         return itineraryRepository.save(itinerary);
     }
@@ -101,6 +103,8 @@ public class ItineraryService {
                 .endDate(startDate)
                 .companionType(source.getCompanionType())
                 .withPet(source.isWithPet())
+                .strollerFriendly(source.isStrollerFriendly())
+                .accessibleFriendly(source.isAccessibleFriendly())
                 .build();
 
         List<ItineraryItem> ordered = source.getItems().stream()
@@ -130,6 +134,8 @@ public class ItineraryService {
                     .closeTime(src.getCloseTime())
                     .useTimeText(src.getUseTimeText())
                     .homepageUrl(src.getHomepageUrl())
+                    .strollerFriendly(src.getStrollerFriendly())
+                    .accessibleFriendly(src.isAccessibleFriendly())
                     .category(src.getCategory())
                     .isAlternate(src.isAlternate())
                     .mapX(src.getMapX())
@@ -185,6 +191,8 @@ public class ItineraryService {
                 .closeTime(request.getCloseTime())
                 .useTimeText(request.getUseTimeText())
                 .homepageUrl(request.getHomepageUrl())
+                .strollerFriendly(request.getStrollerFriendly())
+                .accessibleFriendly(Boolean.TRUE.equals(request.getAccessibleFriendly()))
                 .category(request.getCategory())
                 .isAlternate(Boolean.TRUE.equals(request.getIsAlternate()))
                 .mapX(request.getMapX())
