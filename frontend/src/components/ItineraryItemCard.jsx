@@ -2,12 +2,8 @@ import { useEffect, useState } from 'react';
 import { TAG_OPTIONS } from '../constants';
 import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLevel';
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
+import { openExternalLink } from '../utils/externalLink';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
-
-function openHomepage(url) {
-  if (!url) return;
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
 
 function draftFromItem(src) {
   return {
@@ -179,7 +175,7 @@ export default function ItineraryItemCard({
                 <button
                   type="button"
                   className="reco-info-row reco-info-link"
-                  onClick={() => openHomepage(item.homepageUrl)}
+                  onClick={() => openExternalLink(item.homepageUrl)}
                 >
                   🔗 홈페이지
                 </button>

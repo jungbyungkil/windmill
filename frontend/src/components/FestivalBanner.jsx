@@ -1,11 +1,8 @@
+import { openExternalLink } from '../utils/externalLink';
+
 function formatDate(yyyyMMdd) {
   if (!yyyyMMdd || yyyyMMdd.length !== 8) return yyyyMMdd;
   return `${yyyyMMdd.slice(4, 6)}.${yyyyMMdd.slice(6, 8)}`;
-}
-
-function openFestivalUrl(url) {
-  if (!url) return;
-  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 /** 본문 흐름과 분리된 하단 참고 영역 - 축제 정보는 선택 사항 */
@@ -28,7 +25,7 @@ export default function FestivalBanner({ festivals, onAdd, addingId }) {
               <button
                 type="button"
                 className="festival-thumb-btn"
-                onClick={() => openFestivalUrl(f.homepageUrl)}
+                onClick={() => openExternalLink(f.homepageUrl)}
                 disabled={!f.homepageUrl}
                 aria-label={f.homepageUrl ? `${f.placeName} 축제 페이지 열기` : undefined}
               >
@@ -40,7 +37,7 @@ export default function FestivalBanner({ festivals, onAdd, addingId }) {
                 <button
                   type="button"
                   className="festival-name festival-name-link"
-                  onClick={() => openFestivalUrl(f.homepageUrl)}
+                  onClick={() => openExternalLink(f.homepageUrl)}
                 >
                   {f.placeName}
                   <span className="festival-ext" aria-hidden="true">↗</span>

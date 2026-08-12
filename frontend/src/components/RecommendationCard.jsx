@@ -1,9 +1,6 @@
-const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
+import { openExternalLink } from '../utils/externalLink';
 
-function openHomepage(url) {
-  if (!url) return;
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
+const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
 export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [] }) {
   return (
@@ -58,7 +55,7 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
           <button
             type="button"
             className="reco-info-row reco-info-link"
-            onClick={() => openHomepage(candidate.homepageUrl)}
+            onClick={() => openExternalLink(candidate.homepageUrl)}
           >
             🔗 홈페이지
           </button>
