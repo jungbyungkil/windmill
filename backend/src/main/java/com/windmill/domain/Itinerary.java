@@ -2,6 +2,7 @@ package com.windmill.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,13 +49,19 @@ public class Itinerary {
     @Column(nullable = false)
     private boolean withPet = false;
 
-    /** 유모차 동반 - true면 추천 파이프라인이 유모차 이용 가능 여부를 후보 순위에 반영한다 */
+    /**
+     * 유모차 동반 - true면 추천 파이프라인이 유모차 이용 가능 여부를 후보 순위에 반영한다.
+     * ColumnDefault: 이미 행이 있는 테이블에 NOT NULL 컬럼을 추가할 때 기존 행을 false로 채우기 위함
+     * (isAlternate와 동일 이유 - 없으면 프로덕션에서 ALTER TABLE 자체가 실패한다).
+     */
     @Builder.Default
+    @ColumnDefault("false")
     @Column(nullable = false)
     private boolean strollerFriendly = false;
 
     /** 무장애(장애인 동반) - 구조화된 API 필드가 없어 키워드 매칭 휴리스틱으로 후보 순위에 반영한다 */
     @Builder.Default
+    @ColumnDefault("false")
     @Column(nullable = false)
     private boolean accessibleFriendly = false;
 
