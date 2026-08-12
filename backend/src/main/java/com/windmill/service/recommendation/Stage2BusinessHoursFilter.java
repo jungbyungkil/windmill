@@ -56,6 +56,7 @@ public class Stage2BusinessHoursFilter {
     private RelatedCandidate applyDetail(RelatedCandidate candidate, TourAttractionDetail detail) {
         candidate.setAddr1(detail.getAddr1());
         candidate.setTel(detail.getTel());
+        candidate.setHomepageUrl(detail.getHomepage());
         // 목록에 이미 좌표가 있으면 유지. 상세가 비어 있어도 덮어쓰지 않음.
         if (detail.getMapX() != null && !detail.getMapX().isBlank()) {
             candidate.setMapX(detail.getMapX().trim());

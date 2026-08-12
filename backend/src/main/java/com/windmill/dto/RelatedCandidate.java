@@ -31,6 +31,7 @@ public class RelatedCandidate {
     private String closeTime;
     /** Stage2: 이용시간 원문 */
     private String useTimeText;
+    private String homepageUrl;    // detailCommon2 homepage에서 추출(HomepageUrlExtractor), 없으면 null
     private Double distanceKm;     // RecommendationPipeline에서 origin이 있을 때만 채워짐
 
     private Double crowdRate;      // Stage3 결과 (원본, 0~100)

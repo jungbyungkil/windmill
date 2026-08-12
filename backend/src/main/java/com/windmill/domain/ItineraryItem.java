@@ -57,6 +57,7 @@ public class ItineraryItem {
     /** TourAPI usetime 파싱 스냅샷 "HH:mm" — 선택 시 마감 게이트에 사용 */
     private String closeTime;
     private String useTimeText;
+    private String homepageUrl;
 
     /** RecommendationCandidate.category 스냅샷 - 여행기록 집계(CommunityScheduleService)에서 슬롯별 카테고리 표시에 사용 */
     private String category;

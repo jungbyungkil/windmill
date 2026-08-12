@@ -4,6 +4,11 @@ import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLev
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 
+function openHomepage(url) {
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function draftFromItem(src) {
   return {
     placeName: src.placeName || '',
@@ -168,6 +173,15 @@ export default function ItineraryItemCard({
               )}
               {item.tel && <div className="reco-info-row">☎️ {item.tel}</div>}
               {item.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {item.restDateText}</div>}
+              {item.homepageUrl && (
+                <button
+                  type="button"
+                  className="reco-info-row reco-info-link"
+                  onClick={() => openHomepage(item.homepageUrl)}
+                >
+                  🔗 홈페이지
+                </button>
+              )}
             </div>
 
             {item.crowdRate !== null && item.crowdRate !== undefined && (

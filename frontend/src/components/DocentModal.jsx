@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import useModalHistory from '../hooks/useModalHistory';
 
 const LANGS = [
   { value: 'ko', label: '한국어', speech: 'ko-KR' },
@@ -96,12 +97,14 @@ export default function DocentModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, loading, error, audioUrl, script, language, speechSupported]);
 
-  if (!open) return null;
-
   function handleClose() {
     stopSpeech();
     onClose?.();
   }
+
+  useModalHistory(open, handleClose);
+
+  if (!open) return null;
 
   const showBrowserSpeech = !loading && !error && script && !audioUrl && speechSupported;
 

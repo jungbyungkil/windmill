@@ -1,4 +1,5 @@
 import RecommendationCard from './RecommendationCard';
+import useModalHistory from '../hooks/useModalHistory';
 
 const REASON_COPY = {
   RAIN_ALTERNATIVE: {
@@ -22,6 +23,7 @@ export default function AlternativesPanel({
   onApplyAll,
   applyLoading,
 }) {
+  useModalHistory(open, onClose);
   if (!open) return null;
 
   const copy = REASON_COPY[reason] || {

@@ -1,5 +1,6 @@
 package com.windmill.service.recommendation;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.client.CrowdRateClient;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;

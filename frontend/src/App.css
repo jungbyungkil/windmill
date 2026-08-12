@@ -1,5 +1,38 @@
 /* ---------- Layout ---------- */
 
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.back-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 2px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding-left: calc(16px + env(safe-area-inset-left, 0));
+  padding-right: calc(16px + env(safe-area-inset-right, 0));
+  padding-top: calc(10px + env(safe-area-inset-top, 0));
+}
+
+.back-btn {
+  border-color: transparent;
+  background: var(--sand);
+  font-size: 18px;
+}
+
+.back-header-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
 .app {
   display: flex;
   flex-direction: column;

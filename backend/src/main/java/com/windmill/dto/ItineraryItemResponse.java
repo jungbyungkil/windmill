@@ -30,6 +30,7 @@ public class ItineraryItemResponse {
     private String restDateText;
     private String closeTime;
     private String useTimeText;
+    private String homepageUrl;
     private String mapX;
     private String mapY;
     private boolean isAlternate;
@@ -58,6 +59,7 @@ public class ItineraryItemResponse {
                 .restDateText(item.getRestDateText())
                 .closeTime(item.getCloseTime())
                 .useTimeText(item.getUseTimeText())
+                .homepageUrl(item.getHomepageUrl())
                 .mapX(item.getMapX())
                 .mapY(item.getMapY())
                 .isAlternate(item.isAlternate())

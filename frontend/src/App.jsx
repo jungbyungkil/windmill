@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import useSession from './hooks/useSession';
 import * as api from './api/windmillApi';
 import CreateTripScreen from './components/CreateTripScreen';
 import SmartPlanScreen from './components/SmartPlanScreen';
 import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
+import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
@@ -45,6 +47,7 @@ function scheduleMinutes(scheduledTime) {
 }
 
 export default function App() {
+  const navigate = useNavigate();
   const { sessionId, itineraryId, setItineraryId, draftItineraryId, leaveItineraryView, resumeDraftItinerary } = useSession();
 
   const [shareToken, setShareToken] = useState(() => readShareTokenFromHash());
@@ -53,10 +56,7 @@ export default function App() {
   const [startingStoryId, setStartingStoryId] = useState(null);
   const [createError, setCreateError] = useState(null);
   /** 핵심: 혼잡↓·동선최적화 스마트 일정 우선 노출 */
-  const [showSmartPlan, setShowSmartPlan] = useState(false);
   const [smartPlanDate, setSmartPlanDate] = useState(null);
-  const [showCategoryReco, setShowCategoryReco] = useState(false);
-  const [showAutoPlan, setShowAutoPlan] = useState(false);
 
   const [trigger, setTrigger] = useState(null);
   const [weatherItems, setWeatherItems] = useState(null);
@@ -111,9 +111,6 @@ export default function App() {
       setTrigger(null);
       setWeatherItems(null);
       setMidWeather(null);
-      setShowSmartPlan(false);
-      setShowCategoryReco(false);
-      setShowAutoPlan(false);
       setActiveDate(null);
       return;
     }
@@ -123,12 +120,18 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itineraryId]);
 
+  // itineraryId는 설정됐지만(초안 재개 등) 아직 itinerary를 못 불러온 사이 - 이 동안엔 라우트 가드가
+  // "/"로 튕겼다가 로드 완료 후 다시 "/trip"으로 튕기는 깜빡임을 피하기 위한 로딩 상태
+  const restoring = itineraryId != null && !itinerary;
+
   function handleGoHome() {
     leaveItineraryView();
+    navigate('/');
   }
 
   function handleResumeDraft(id) {
     resumeDraftItinerary(id);
+    navigate('/trip');
   }
 
   // 일정이 새로 로드되면 여행 시작일을 기본 활성 날짜로
@@ -157,9 +160,7 @@ export default function App() {
     : [];
   function openSmartPlanForDate(date) {
     setSmartPlanDate(date || itinerary?.startDate || null);
-    setShowSmartPlan(true);
-    setShowCategoryReco(false);
-    setShowAutoPlan(false);
+    navigate('/smart-plan');
   }
 
   const refreshTrigger = useCallback(() => {
@@ -192,9 +193,7 @@ export default function App() {
       setItineraryId(result.itineraryId);
       setActiveDate(result.startDate);
       setSmartPlanDate(result.startDate);
-      setShowSmartPlan(true);
-      setShowCategoryReco(false);
-      setShowAutoPlan(false);
+      navigate('/smart-plan');
     } catch (e) {
       setCreateError(e.message);
     } finally {
@@ -213,9 +212,7 @@ export default function App() {
       setItineraryId(result.itineraryId);
       setActiveDate(result.startDate);
       setSmartPlanDate(null);
-      setShowSmartPlan(false);
-      setShowCategoryReco(false);
-      setShowAutoPlan(false);
+      navigate('/trip');
     } catch (e) {
       setCreateError(e.message);
     } finally {
@@ -293,6 +290,7 @@ export default function App() {
       restDateText: candidate.restDateText,
       closeTime: candidate.closeTime,
       useTimeText: candidate.useTimeText,
+      homepageUrl: candidate.homepageUrl,
       category: candidate.category,
       mapX: candidate.mapX,
       mapY: candidate.mapY,
@@ -387,6 +385,7 @@ export default function App() {
           restDateText: top.restDateText,
           closeTime: top.closeTime,
           useTimeText: top.useTimeText,
+          homepageUrl: top.homepageUrl,
           category: top.category,
           mapX: top.mapX,
           mapY: top.mapY,
@@ -472,6 +471,7 @@ export default function App() {
           useFeeText: next.useFeeText,
           isFree: next.isFree,
           restDateText: next.restDateText,
+          homepageUrl: next.homepageUrl,
           category: next.category,
           mapX: next.mapX,
           mapY: next.mapY,
@@ -499,7 +499,8 @@ export default function App() {
     });
   }
 
-  async function handleConfirmSmartPlan(selected) {
+  /** 스마트 일정 확정 공통 로직 - 목적지(대시보드/카테고리 추천)는 호출자가 navigate()로 결정 */
+  async function confirmSmartPlanCore(selected) {
     let result = itinerary;
     const fallbackDate = smartPlanDate || activeDate || itinerary.startDate;
     for (const candidate of selected) {
@@ -535,20 +536,23 @@ export default function App() {
       setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
     setItinerary(result);
-    setShowSmartPlan(false);
     setSmartPlanDate(null);
     if (result?.startDate) setActiveDate(result.startDate);
+  }
+
+  async function handleConfirmSmartPlan(selected) {
+    await confirmSmartPlanCore(selected);
+    navigate('/trip');
   }
 
   /** 스마트 동선에서 고른 장소를 먼저 담은 뒤 카테고리 추천으로 이동 */
   async function handleBrowseCategoriesFromSmartPlan(selected = []) {
     if (selected.length > 0) {
-      await handleConfirmSmartPlan(selected);
+      await confirmSmartPlanCore(selected);
     } else {
-      setShowSmartPlan(false);
       setSmartPlanDate(null);
     }
-    setShowCategoryReco(true);
+    navigate('/category');
   }
 
   function handleGenerateAutoPlan(tags) {
@@ -579,7 +583,7 @@ export default function App() {
       setAutoReplaceNotice(`마감 시간 때문에 ${skipped}곳은 자동으로 건너뛰었어요.`);
       setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
-    setShowAutoPlan(false);
+    navigate('/trip');
   }
 
   async function fetchDocent(item, lang) {
@@ -729,6 +733,7 @@ export default function App() {
       setTrigger(null);
       setRecoResults(null);
       setRerouteCount(0);
+      navigate('/');
     } catch (e) {
       alert(e.message);
     } finally {
@@ -748,189 +753,220 @@ export default function App() {
     );
   }
 
-  if (!itinerary) {
-    return (
-      <CreateTripScreen
-        sessionId={sessionId}
-        onCreate={handleCreate}
-        onStartFromStory={handleStartFromStory}
-        loading={creating}
-        startingStoryId={startingStoryId}
-        error={createError}
-        draftItineraryId={draftItineraryId}
-        onResumeDraft={handleResumeDraft}
-      />
-    );
-  }
-
-  if (showSmartPlan) {
-    return (
-      <SmartPlanScreen
-        key={smartPlanDate || itinerary.startDate || 'day-trip'}
-        dayLabel={null}
-        onGenerate={handleGenerateSmartPlan}
-        onConfirm={handleConfirmSmartPlan}
-        onBrowseCategories={handleBrowseCategoriesFromSmartPlan}
-        onSkip={() => {
-          setShowSmartPlan(false);
-          setSmartPlanDate(null);
-        }}
-      />
-    );
-  }
-
-  if (showCategoryReco) {
-    return (
-      <CategoryRecommendScreen
-        regionCode={itinerary.signguFullCode}
-        excludeContentIds={itinerary.items.map((i) => i.contentId).filter(Boolean)}
-        onAdd={async (place) => {
-          setAddingContentId(place.contentId);
-          try {
-            await addCandidateToItinerary(place);
-          } finally {
-            setAddingContentId(null);
-          }
-        }}
-        addingId={addingContentId}
-        onContinue={() => setShowCategoryReco(false)}
-        onTryAi={() => {
-          setShowCategoryReco(false);
-          setShowAutoPlan(true);
-        }}
-      />
-    );
-  }
-
-  if (showAutoPlan) {
-    return (
-      <AutoPlanScreen
-        onGenerate={handleGenerateAutoPlan}
-        onConfirm={handleConfirmAutoPlan}
-        onSkip={() => setShowAutoPlan(false)}
-      />
-    );
+  if (restoring) {
+    return <div className="app-loading">🌬️ 불러오는 중...</div>;
   }
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="header-inner">
-          <button type="button" className="logo logo-btn" onClick={handleGoHome} title="메인으로">
-            🌬️ 바람따라
-          </button>
-          <div className="header-actions">
-            <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
-              {shareBusy ? '링크 준비 중...' : '🔗 일정 공유'}
-            </button>
-            <button className="btn-finish" type="button" onClick={() => setTripRecordOpen(true)}>🏁 여행 마무리</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="app-main">
-        <PinwheelHero
-          trigger={trigger}
-          onRequestAlternatives={handleRequestAlternatives}
-          loading={altLoading}
-          onAutoReplace={handleAutoReplace}
-          autoLoading={autoReplacing}
-          onRerouteSchedule={handleRerouteSchedule}
-          rerouteLoading={rerouteLoading}
-          onOptimizeRoute={() => handleOptimizeRoute()}
-          optimizeLoading={optimizeLoading}
-        />
-
-        {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
-
-        <WeatherBanner items={weatherItems} />
-
-        <div className="daytrip-chip-row">
-          <span className="daytrip-chip">당일치기</span>
-          {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
-          <span className="daytrip-count">{visibleItems.length}곳</span>
-        </div>
-
-        <ItineraryList
-          items={visibleItems}
-          affectedItemIds={trigger?.affectedItemIds}
-          weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
-          businessAffectedItemIds={trigger?.businessAffectedItemIds}
-          crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
-          weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
-          trigger={trigger}
-          dayLabel="오늘"
-          onUpdateTime={handleUpdateTime}
-          onUpdateItem={handleUpdateItem}
-          onTogglePin={handleTogglePin}
-          onDelete={handleDeleteItem}
-          onOpenDocent={handleOpenDocent}
-          onPlanDay={() => openSmartPlanForDate(tripDate)}
-          onSortByTime={handleSortByTime}
-          sortByTimeLoading={sortByTimeLoading}
-          onOptimizeFromGps={handleOptimizeFromGps}
-          gpsOptimizing={optimizeLoading}
-        />
-
-        <RecommendationSearch
-          onSearch={handleSearch}
-          onAdd={handleAddRecommendation}
-          results={recoResults}
-          loading={recoLoading}
-          addingId={addingContentId}
-        />
-
-        <FestivalBanner
-          festivals={trigger?.festivalSuggestions}
-          onAdd={handleAddFestival}
-          addingId={addingFestivalId}
-        />
-
-        <MidWeatherBanner forecast={midWeather} />
-      </main>
-
-      <footer className="app-footer">
-        <p>바람따라 · 바람이 알려주는 실시간 여행</p>
-      </footer>
-
-      <AlternativesPanel
-        open={altOpen}
-        candidates={altCandidates}
-        loading={altLoading}
-        reason={altReason}
-        onAdd={handleAddAlternative}
-        addingId={addingContentId}
-        onApplyAll={() => handleRerouteSchedule(trigger?.heatTrigger ? 'HEAT' : trigger?.weatherTrigger ? 'WEATHER' : undefined)}
-        applyLoading={rerouteLoading}
-        onClose={() => setAltOpen(false)}
+    <Routes>
+      <Route
+        path="/"
+        element={
+          itinerary
+            ? <Navigate to="/trip" replace />
+            : (
+              <CreateTripScreen
+                sessionId={sessionId}
+                onCreate={handleCreate}
+                onStartFromStory={handleStartFromStory}
+                loading={creating}
+                startingStoryId={startingStoryId}
+                error={createError}
+                draftItineraryId={draftItineraryId}
+                onResumeDraft={handleResumeDraft}
+              />
+            )
+        }
       />
-
-      <DocentModal
-        open={docentOpen}
-        placeName={docentPlaceName}
-        script={docentScript}
-        audioUrl={docentAudioUrl}
-        loading={docentLoading}
-        error={docentError}
-        language={docentLang}
-        onLanguageChange={handleDocentLangChange}
-        onClose={() => setDocentOpen(false)}
+      <Route
+        path="/smart-plan"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <>
+              <BackHeader title="스마트 일정" />
+              <SmartPlanScreen
+                key={smartPlanDate || itinerary.startDate || 'day-trip'}
+                dayLabel={null}
+                onGenerate={handleGenerateSmartPlan}
+                onConfirm={handleConfirmSmartPlan}
+                onBrowseCategories={handleBrowseCategoriesFromSmartPlan}
+                onSkip={() => {
+                  setSmartPlanDate(null);
+                  navigate('/trip');
+                }}
+              />
+            </>
+          )
+        }
       />
-
-      <ClosingGateModal
-        open={Boolean(closingGate)}
-        placeName={closingGate?.placeName}
-        message={closingGate?.message}
-        onClose={() => setClosingGate(null)}
+      <Route
+        path="/category"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <>
+              <BackHeader title="카테고리 추천" />
+              <CategoryRecommendScreen
+                regionCode={itinerary.signguFullCode}
+                excludeContentIds={itinerary.items.map((i) => i.contentId).filter(Boolean)}
+                onAdd={async (place) => {
+                  setAddingContentId(place.contentId);
+                  try {
+                    await addCandidateToItinerary(place);
+                  } finally {
+                    setAddingContentId(null);
+                  }
+                }}
+                addingId={addingContentId}
+                onContinue={() => navigate('/trip')}
+                onTryAi={() => navigate('/auto-plan')}
+              />
+            </>
+          )
+        }
       />
-
-      <TripRecordModal
-        open={tripRecordOpen}
-        items={itinerary.items}
-        submitting={tripSubmitting}
-        onSubmit={handleSubmitTripRecord}
-        onClose={() => setTripRecordOpen(false)}
+      <Route
+        path="/auto-plan"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <>
+              <BackHeader title="AI 일정 짜기" />
+              <AutoPlanScreen
+                onGenerate={handleGenerateAutoPlan}
+                onConfirm={handleConfirmAutoPlan}
+                onSkip={() => navigate('/trip')}
+              />
+            </>
+          )
+        }
       />
-    </div>
+      <Route
+        path="/trip"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <div className="app">
+              <BackHeader title="바람따라" />
+              <header className="app-header">
+                <div className="header-inner">
+                  <button type="button" className="logo logo-btn" onClick={handleGoHome} title="메인으로">
+                    🌬️ 바람따라
+                  </button>
+                  <div className="header-actions">
+                    <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
+                      {shareBusy ? '링크 준비 중...' : '🔗 일정 공유'}
+                    </button>
+                    <button className="btn-finish" type="button" onClick={() => setTripRecordOpen(true)}>🏁 여행 마무리</button>
+                  </div>
+                </div>
+              </header>
+
+              <main className="app-main">
+                <PinwheelHero
+                  trigger={trigger}
+                  onRequestAlternatives={handleRequestAlternatives}
+                  loading={altLoading}
+                  onAutoReplace={handleAutoReplace}
+                  autoLoading={autoReplacing}
+                  onRerouteSchedule={handleRerouteSchedule}
+                  rerouteLoading={rerouteLoading}
+                  onOptimizeRoute={() => handleOptimizeRoute()}
+                  optimizeLoading={optimizeLoading}
+                />
+
+                {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
+
+                <WeatherBanner items={weatherItems} />
+
+                <div className="daytrip-chip-row">
+                  <span className="daytrip-chip">당일치기</span>
+                  {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
+                  <span className="daytrip-count">{visibleItems.length}곳</span>
+                </div>
+
+                <ItineraryList
+                  items={visibleItems}
+                  affectedItemIds={trigger?.affectedItemIds}
+                  weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
+                  businessAffectedItemIds={trigger?.businessAffectedItemIds}
+                  crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
+                  weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
+                  trigger={trigger}
+                  dayLabel="오늘"
+                  onUpdateTime={handleUpdateTime}
+                  onUpdateItem={handleUpdateItem}
+                  onTogglePin={handleTogglePin}
+                  onDelete={handleDeleteItem}
+                  onOpenDocent={handleOpenDocent}
+                  onPlanDay={() => openSmartPlanForDate(tripDate)}
+                  onSortByTime={handleSortByTime}
+                  sortByTimeLoading={sortByTimeLoading}
+                  onOptimizeFromGps={handleOptimizeFromGps}
+                  gpsOptimizing={optimizeLoading}
+                />
+
+                <RecommendationSearch
+                  onSearch={handleSearch}
+                  onAdd={handleAddRecommendation}
+                  results={recoResults}
+                  loading={recoLoading}
+                  addingId={addingContentId}
+                />
+
+                <FestivalBanner
+                  festivals={trigger?.festivalSuggestions}
+                  onAdd={handleAddFestival}
+                  addingId={addingFestivalId}
+                />
+
+                <MidWeatherBanner forecast={midWeather} />
+              </main>
+
+              <footer className="app-footer">
+                <p>바람따라 · 바람이 알려주는 실시간 여행</p>
+              </footer>
+
+              <AlternativesPanel
+                open={altOpen}
+                candidates={altCandidates}
+                loading={altLoading}
+                reason={altReason}
+                onAdd={handleAddAlternative}
+                addingId={addingContentId}
+                onApplyAll={() => handleRerouteSchedule(trigger?.heatTrigger ? 'HEAT' : trigger?.weatherTrigger ? 'WEATHER' : undefined)}
+                applyLoading={rerouteLoading}
+                onClose={() => setAltOpen(false)}
+              />
+
+              <DocentModal
+                open={docentOpen}
+                placeName={docentPlaceName}
+                script={docentScript}
+                audioUrl={docentAudioUrl}
+                loading={docentLoading}
+                error={docentError}
+                language={docentLang}
+                onLanguageChange={handleDocentLangChange}
+                onClose={() => setDocentOpen(false)}
+              />
+
+              <ClosingGateModal
+                open={Boolean(closingGate)}
+                placeName={closingGate?.placeName}
+                message={closingGate?.message}
+                onClose={() => setClosingGate(null)}
+              />
+
+              <TripRecordModal
+                open={tripRecordOpen}
+                items={itinerary.items}
+                submitting={tripSubmitting}
+                onSubmit={handleSubmitTripRecord}
+                onClose={() => setTripRecordOpen(false)}
+              />
+            </div>
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

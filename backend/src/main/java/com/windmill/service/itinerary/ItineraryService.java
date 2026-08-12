@@ -129,6 +129,7 @@ public class ItineraryService {
                     .restDateText(src.getRestDateText())
                     .closeTime(src.getCloseTime())
                     .useTimeText(src.getUseTimeText())
+                    .homepageUrl(src.getHomepageUrl())
                     .category(src.getCategory())
                     .isAlternate(src.isAlternate())
                     .mapX(src.getMapX())
@@ -183,8 +184,9 @@ public class ItineraryService {
                 .restDateText(request.getRestDateText())
                 .closeTime(request.getCloseTime())
                 .useTimeText(request.getUseTimeText())
+                .homepageUrl(request.getHomepageUrl())
                 .category(request.getCategory())
-                .isAlternate(request.isAlternate())
+                .isAlternate(Boolean.TRUE.equals(request.getIsAlternate()))
                 .mapX(request.getMapX())
                 .mapY(request.getMapY())
                 .build();

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useModalHistory from '../hooks/useModalHistory';
 
 /** 간편 태깅 3종 - 후기 대신 아이콘으로 기록 → 추천 정확도(BAD 제외)에 반영 */
 const RATINGS = [
@@ -11,6 +12,8 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
   const [ratings, setRatings] = useState({});
   const [overallRating, setOverallRating] = useState(null);
   const [overallNote, setOverallNote] = useState('');
+
+  useModalHistory(open, onClose);
 
   if (!open) return null;
 

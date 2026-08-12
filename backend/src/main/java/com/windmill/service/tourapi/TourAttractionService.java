@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.NullNode;
 import com.windmill.client.KorServiceClient;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.TourAttractionSummary;
+import com.windmill.util.HomepageUrlExtractor;
 import com.windmill.util.SimpleTtlCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,7 +79,7 @@ public class TourAttractionService {
         if (!common.isNull()) {
             builder.title(common.path("title").asText(null))
                     .overview(common.path("overview").asText(null))
-                    .homepage(common.path("homepage").asText(null))
+                    .homepage(HomepageUrlExtractor.extract(common.path("homepage").asText(null)))
                     .addr1(common.path("addr1").asText(null))
                     .addr2(common.path("addr2").asText(null))
                     .mapX(common.path("mapx").asText(null))

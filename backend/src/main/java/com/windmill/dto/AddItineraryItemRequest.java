@@ -27,8 +27,11 @@ public class AddItineraryItemRequest {
     /** "HH:mm" 영업 종료 스냅샷 */
     private String closeTime;
     private String useTimeText;
+    private String homepageUrl;
     private String category;
-    private boolean isAlternate;
+    /** boolean(원시타입)이면 Lombok의 isXxx() getter를 Jackson이 "alternate"로 인식해 JSON 키
+     *  "isAlternate"를 조용히 무시한다(isPinned와 동일 문제) - Boolean(래퍼)로 회피 */
+    private Boolean isAlternate;
     private String mapX;
     private String mapY;
 }

@@ -30,6 +30,7 @@ public class RecommendationCandidate {
     /** "HH:mm" 영업 종료. 선택 게이트·카드 표시용 */
     private String closeTime;
     private String useTimeText;
+    private String homepageUrl;     // 공식 홈페이지 URL, 없으면 null
     private Double distanceKm;      // 이전 장소와의 구간 거리(스마트 플랜) 또는 origin 기준 거리
     private String mapX;            // 경도 - 동선 최적화용
     private String mapY;            // 위도 - 동선 최적화용

@@ -136,6 +136,7 @@ public class Stage4TagMatchingService {
                 .restDateText(c.getRestDateText())
                 .closeTime(c.getCloseTime())
                 .useTimeText(c.getUseTimeText())
+                .homepageUrl(c.getHomepageUrl())
                 .distanceKm(c.getDistanceKm())
                 .mapX(c.getMapX())
                 .mapY(c.getMapY())

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.client.KorServiceClient;
 import com.windmill.dto.FestivalSuggestion;
 import com.windmill.dto.RegionCode;
+import com.windmill.util.HomepageUrlExtractor;
 import com.windmill.util.SimpleTtlCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,8 +16,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 여행 기간(미래 날짜 포함)과 겹치는 지역 축제/행사를 찾아 "이 날짜에 이 축제 어때요?" 제안을 만든다.
@@ -31,8 +30,6 @@ public class FestivalTriggerService {
     private static final int MAX_SUGGESTIONS = 3;
     /** 축제 정보는 정적 데이터에 가까워 짧은 트리거 폴링(1~5분) 주기마다 재조회할 필요가 없다 - 1,000 call/일 한도 보호 */
     private static final Duration CACHE_TTL = Duration.ofHours(6);
-    private static final Pattern HREF = Pattern.compile(
-            "href\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
 
     private final KorServiceClient korServiceClient;
     private final SimpleTtlCache<String, List<FestivalSuggestion>> cache = new SimpleTtlCache<>(CACHE_TTL);
@@ -83,7 +80,7 @@ public class FestivalTriggerService {
             String typeId = item.path("contenttypeid").asText(null);
             String thumbnail = item.path("firstimage").asText(null);
             // searchFestival2에 homepage가 있으면 우선 사용
-            String homepageUrl = extractHomepageUrl(item.path("homepage").asText(null));
+            String homepageUrl = HomepageUrlExtractor.extract(item.path("homepage").asText(null));
             result.add(FestivalSuggestion.builder()
                     .contentId(contentId)
                     .contentTypeId(typeId == null || typeId.isBlank() ? null : Integer.valueOf(typeId))
@@ -117,7 +114,7 @@ public class FestivalTriggerService {
         }
         return korServiceClient.detailCommon(festival.getContentId())
                 .map(common -> {
-                    String url = extractHomepageUrl(common.path("homepage").asText(null));
+                    String url = HomepageUrlExtractor.extract(common.path("homepage").asText(null));
                     if (url != null) {
                         festival.setHomepageUrl(url);
                     }
@@ -125,43 +122,6 @@ public class FestivalTriggerService {
                 })
                 .defaultIfEmpty(festival)
                 .onErrorReturn(festival);
-    }
-
-    /** TourAPI homepage는 HTML 앵커이거나 순수 URL일 수 있다 */
-    static String extractHomepageUrl(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String text = raw.trim();
-        Matcher href = HREF.matcher(text);
-        if (href.find()) {
-            return normalizeUrl(href.group(1).trim());
-        }
-        // HTML 태그 제거 후 http 추출
-        String plain = text.replaceAll("<[^>]+>", " ").trim();
-        int http = plain.toLowerCase().indexOf("http");
-        if (http >= 0) {
-            String rest = plain.substring(http).split("[\\s\"'<>]+")[0];
-            return normalizeUrl(rest);
-        }
-        return null;
-    }
-
-    private static String normalizeUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return null;
-        }
-        String u = url.trim();
-        if (u.startsWith("//")) {
-            return "https:" + u;
-        }
-        if (u.startsWith("http://") || u.startsWith("https://")) {
-            return u;
-        }
-        if (u.contains(".") && !u.contains(" ")) {
-            return "https://" + u;
-        }
-        return null;
     }
 
     private LocalDate parseDate(String yyyyMMdd) {

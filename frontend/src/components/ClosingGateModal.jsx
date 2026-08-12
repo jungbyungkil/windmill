@@ -1,7 +1,10 @@
+import useModalHistory from '../hooks/useModalHistory';
+
 /**
  * 마감 임박/마감으로 장소 선택 불가 안내.
  */
 export default function ClosingGateModal({ open, message, placeName, onClose }) {
+  useModalHistory(open, onClose);
   if (!open) return null;
   return (
     <div className="closing-gate-backdrop" role="presentation" onClick={onClose}>

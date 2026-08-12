@@ -1,5 +1,10 @@
 const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
+function openHomepage(url) {
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [] }) {
   return (
     <article className="reco-card">
@@ -46,6 +51,15 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         )}
         {!candidate.closeTime && candidate.useTimeText && (
           <div className="reco-info-row reco-close">🕐 {candidate.useTimeText}</div>
+        )}
+        {candidate.homepageUrl && (
+          <button
+            type="button"
+            className="reco-info-row reco-info-link"
+            onClick={() => openHomepage(candidate.homepageUrl)}
+          >
+            🔗 홈페이지
+          </button>
         )}
       </div>
 
