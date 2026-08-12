@@ -11,6 +11,7 @@ import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.util.CrowdCongestionEvaluator;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.OutdoorActivityClassifier;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,6 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +76,7 @@ public class TriggerDetectionService {
         if (item.getVisitDate() != null) {
             return item.getVisitDate();
         }
-        return itinerary.getStartDate() != null ? itinerary.getStartDate() : LocalDate.now();
+        return itinerary.getStartDate() != null ? itinerary.getStartDate() : KoreaClock.today();
     }
 
     private void attachRouteTangle(TriggerResult result, Itinerary itinerary) {
@@ -101,11 +101,11 @@ public class TriggerDetectionService {
 
     /** 단일 일정 항목 기준 트리거 판정 */
     public Mono<TriggerResult> detect(ItineraryItem item, RegionCondition condition) {
-        return detect(item, condition, item.getVisitDate() != null ? item.getVisitDate() : LocalDate.now());
+        return detect(item, condition, item.getVisitDate() != null ? item.getVisitDate() : KoreaClock.today());
     }
 
     public Mono<TriggerResult> detect(ItineraryItem item, RegionCondition condition, LocalDate visitDate) {
-        LocalDate day = visitDate != null ? visitDate : LocalDate.now();
+        LocalDate day = visitDate != null ? visitDate : KoreaClock.today();
         boolean rainWave = condition.getCurrentPop() != null
                 && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
 
@@ -135,7 +135,7 @@ public class TriggerDetectionService {
             return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
         }
 
-        LocalDateTime at = LocalDateTime.of(day, LocalTime.now());
+        LocalDateTime at = LocalDateTime.of(day, KoreaClock.nowTime());
         return tourAttractionService.getDetail(item.getContentId(), item.getContentTypeId())
                 .map(TourAttractionDetail::getIntroFields)
                 .map(fields -> !BusinessHoursEvaluator.isOpenAt(fields, at))

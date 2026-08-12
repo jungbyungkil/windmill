@@ -1,6 +1,7 @@
 package com.windmill.service.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.util.KoreaClock;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,14 +51,14 @@ public final class BusinessHoursEvaluator {
         if (intro == null) {
             return true;
         }
-        return isOpenAt(field -> intro.path(field).asText(""), LocalDateTime.now());
+        return isOpenAt(field -> intro.path(field).asText(""), KoreaClock.now());
     }
 
     public static boolean isCurrentlyOpen(Map<String, String> introFields) {
         if (introFields == null || introFields.isEmpty()) {
             return true;
         }
-        return isOpenAt(field -> introFields.getOrDefault(field, ""), LocalDateTime.now());
+        return isOpenAt(field -> introFields.getOrDefault(field, ""), KoreaClock.now());
     }
 
     /** 방문 예정일·시각 기준 영업 여부 (일정 트리거용) */
@@ -65,7 +66,7 @@ public final class BusinessHoursEvaluator {
         if (introFields == null || introFields.isEmpty()) {
             return true;
         }
-        return isOpenAt(field -> introFields.getOrDefault(field, ""), at == null ? LocalDateTime.now() : at);
+        return isOpenAt(field -> introFields.getOrDefault(field, ""), at == null ? KoreaClock.now() : at);
     }
 
     /**
