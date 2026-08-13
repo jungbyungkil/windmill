@@ -18,6 +18,7 @@ import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
 import SharedItineraryScreen from './components/SharedItineraryScreen';
 import ClosingGateModal from './components/ClosingGateModal';
+import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import { checkClosingGate } from './utils/closingTime';
 import './App.css';
 
@@ -55,6 +56,8 @@ export default function App() {
   const [creating, setCreating] = useState(false);
   const [startingStoryId, setStartingStoryId] = useState(null);
   const [createError, setCreateError] = useState(null);
+  const [duplicateConflict, setDuplicateConflict] = useState(null);
+  const [overwritingDuplicate, setOverwritingDuplicate] = useState(false);
   /** 핵심: 혼잡↓·동선최적화 스마트 일정 우선 노출 */
   const [smartPlanDate, setSmartPlanDate] = useState(null);
 
@@ -193,11 +196,38 @@ export default function App() {
       setItineraryId(result.itineraryId);
       setActiveDate(result.startDate);
       setSmartPlanDate(result.startDate);
+      setDuplicateConflict(null);
       navigate('/smart-plan');
     } catch (e) {
-      setCreateError(e.message);
+      if (e.status === 409 && e.data) {
+        setDuplicateConflict({ existing: e.data, formData });
+      } else {
+        setCreateError(e.message);
+      }
     } finally {
       setCreating(false);
+    }
+  }
+
+  /** 중복 안내 모달 - "기존 일정 수정" 선택 시 그 일정으로 이동해 편집 */
+  function handleEditExistingItinerary() {
+    const id = duplicateConflict?.existing?.itineraryId;
+    setDuplicateConflict(null);
+    if (id != null) {
+      resumeDraftItinerary(id);
+      navigate('/trip');
+    }
+  }
+
+  /** 중복 안내 모달 - "새로 만들기" 선택 시 기존 일정을 지우고 같은 입력값으로 재생성 */
+  async function handleOverwriteDuplicate() {
+    const formData = duplicateConflict?.formData;
+    if (!formData) return;
+    setOverwritingDuplicate(true);
+    try {
+      await handleCreate({ ...formData, force: true });
+    } finally {
+      setOverwritingDuplicate(false);
     }
   }
 
@@ -771,16 +801,27 @@ export default function App() {
           itinerary
             ? <Navigate to="/trip" replace />
             : (
-              <CreateTripScreen
-                sessionId={sessionId}
-                onCreate={handleCreate}
-                onStartFromStory={handleStartFromStory}
-                loading={creating}
-                startingStoryId={startingStoryId}
-                error={createError}
-                draftItineraryId={draftItineraryId}
-                onResumeDraft={handleResumeDraft}
-              />
+              <>
+                <CreateTripScreen
+                  sessionId={sessionId}
+                  onCreate={handleCreate}
+                  onStartFromStory={handleStartFromStory}
+                  loading={creating}
+                  startingStoryId={startingStoryId}
+                  error={createError}
+                  draftItineraryId={draftItineraryId}
+                  onResumeDraft={handleResumeDraft}
+                />
+                <DuplicateItineraryModal
+                  open={Boolean(duplicateConflict)}
+                  existing={duplicateConflict?.existing}
+                  dateLabel={formatTripDate(duplicateConflict?.existing?.startDate)}
+                  overwriting={overwritingDuplicate}
+                  onEditExisting={handleEditExistingItinerary}
+                  onOverwrite={handleOverwriteDuplicate}
+                  onClose={() => setDuplicateConflict(null)}
+                />
+              </>
             )
         }
       />

@@ -22,6 +22,8 @@ public class CreateItineraryRequest {
     private boolean withPet;
     private boolean strollerFriendly;
     private boolean accessibleFriendly;
+    /** true면 같은 날짜의 기존 진행 중 일정을 덮어쓰기(삭제 후 신규 생성) 확인한 것으로 간주 */
+    private boolean force;
 
     @AssertTrue(message = "당일치기만 가능합니다. 여행 날짜는 하루만 선택해 주세요.")
     public boolean isDayTrip() {

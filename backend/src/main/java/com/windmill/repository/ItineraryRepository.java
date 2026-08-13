@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface ItineraryRepository extends JpaRepository<Itinerary, Long> {
@@ -28,4 +29,20 @@ public interface ItineraryRepository extends JpaRepository<Itinerary, Long> {
             ORDER BY i.startDate ASC, i.createdAt ASC
             """)
     List<Itinerary> findOngoingDayTripsBySession(@Param("sessionUuid") String sessionUuid);
+
+    /**
+     * 같은 세션·같은 날짜에 이미 진행 중인(TripRecord 없는) 당일치기 - 신규 생성 시 중복 판정에 사용.
+     * 여러 건이 있을 수 있어 가장 최근 생성분을 기준으로 안내한다.
+     */
+    @Query("""
+            SELECT i FROM Itinerary i
+            WHERE i.sessionUuid = :sessionUuid
+              AND i.startDate = :startDate
+              AND NOT EXISTS (
+                SELECT t FROM TripRecord t WHERE t.itinerary = i
+              )
+            ORDER BY i.createdAt DESC
+            """)
+    List<Itinerary> findActiveBySessionUuidAndStartDate(
+            @Param("sessionUuid") String sessionUuid, @Param("startDate") LocalDate startDate);
 }

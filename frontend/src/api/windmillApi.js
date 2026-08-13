@@ -13,7 +13,16 @@ async function request(path, { method = 'GET', sessionId, body, headers } = {}) 
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(text || `요청 실패 (${res.status})`);
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      // JSON이 아닌 에러 본문 (예: 서버 기본 에러 페이지) - text만 사용
+    }
+    const err = new Error((data && data.message) || text || `요청 실패 (${res.status})`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
   if (res.status === 204) return null;
   return res.json();
@@ -45,11 +54,11 @@ export async function getPublicConfig() {
   return publicConfigCache;
 }
 
-export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly }) {
+export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, force }) {
   return request('/itineraries', {
     method: 'POST',
     sessionId,
-    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly },
+    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, force },
   });
 }
 

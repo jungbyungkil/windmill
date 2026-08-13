@@ -8,6 +8,7 @@ import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SharedItineraryResponse;
 import com.windmill.dto.UpdateItineraryItemRequest;
+import com.windmill.exception.DuplicateActiveItineraryException;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
@@ -53,6 +54,16 @@ public class ItineraryService {
         }
         RegionCode region = regionCodeService.find(request.getSignguFullCode())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + request.getSignguFullCode()));
+
+        List<Itinerary> duplicates = itineraryRepository.findActiveBySessionUuidAndStartDate(
+                sessionUuid, request.getStartDate());
+        if (!duplicates.isEmpty()) {
+            if (!request.isForce()) {
+                throw new DuplicateActiveItineraryException(duplicates.get(0));
+            }
+            itineraryRepository.deleteAll(duplicates);
+        }
+
         Itinerary itinerary = Itinerary.builder()
                 .sessionUuid(sessionUuid)
                 .signguFullCode(region.getSignguFullCode())
