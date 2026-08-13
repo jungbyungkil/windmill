@@ -227,16 +227,18 @@ export default function App() {
     setCreating(true);
     setCreateError(null);
     try {
-      const result = await api.createItinerary(sessionId, {
+      const created = await api.createItinerary(sessionId, {
         ...formData,
         endDate: formData.startDate, // 당일치기 고정
       });
-      setItinerary(result);
-      setItineraryId(result.itineraryId);
-      setActiveDate(result.startDate);
-      setSmartPlanDate(result.startDate);
+      setItineraryId(created.itineraryId);
+      setActiveDate(created.startDate);
       setDuplicateConflict(null);
-      navigate('/smart-plan');
+
+      const finalItinerary = await autoApplySmartPlan(created);
+      setItinerary(finalItinerary);
+      setSmartPlanDate(null);
+      navigate('/trip');
     } catch (e) {
       if (e.status === 409 && e.data) {
         setDuplicateConflict({ existing: e.data, formData });
@@ -246,6 +248,61 @@ export default function App() {
     } finally {
       setCreating(false);
     }
+  }
+
+  /**
+   * 여행 생성 직후 - 리뷰 화면 없이 스마트 일정을 바로 만들어 담는다.
+   * 생성된 itinerary 자체를 인자로 받아 처리한다(아직 리렌더 전이라 state의 itinerary/itineraryId는 못 씀).
+   */
+  async function autoApplySmartPlan(created) {
+    let stops = [];
+    try {
+      const plan = await api.getSmartPlan(created.itineraryId, { placeCount: 5, date: created.startDate });
+      stops = plan?.stops || [];
+    } catch {
+      setAutoReplaceNotice('스마트 일정을 만들지 못했어요. 직접 담아보세요.');
+      setTimeout(() => setAutoReplaceNotice(null), 6000);
+      return created;
+    }
+    if (stops.length === 0) {
+      return created;
+    }
+    for (const stop of stops) {
+      try {
+        await api.addItem(created.itineraryId, {
+          contentId: stop.contentId,
+          contentTypeId: stop.contentTypeId,
+          placeName: stop.placeName,
+          thumbnailUrl: stop.thumbnailUrl,
+          scheduledTime: stop.suggestedTime,
+          tags: stop.matchedTags,
+          crowdRate: stop.crowdRate,
+          visitDate: stop.visitDate || created.startDate,
+          addr1: stop.addr1,
+          tel: stop.tel,
+          useFeeText: stop.useFeeText,
+          isFree: stop.isFree,
+          restDateText: stop.restDateText,
+          closeTime: stop.closeTime,
+          useTimeText: stop.useTimeText,
+          homepageUrl: stop.homepageUrl,
+          strollerFriendly: stop.strollerFriendly,
+          accessibleFriendly: stop.accessibleFriendly,
+          category: stop.category,
+          mapX: stop.mapX,
+          mapY: stop.mapY,
+        });
+      } catch {
+        // 마감 임박 등으로 담기 실패한 곳은 건너뛰고 계속 - 이미 생성 단계에서 대부분 걸러짐
+      }
+    }
+    let finalItinerary = await api.getItinerary(created.itineraryId);
+    if (stops.length >= 2 && (finalItinerary.items || []).length >= 2) {
+      finalItinerary = await api.optimizeRoute(created.itineraryId, created.startDate);
+      setAutoReplaceNotice(finalItinerary.routeHint || '스마트 일정을 자동으로 담았어요 - 이동거리를 최소화한 순서예요.');
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+    }
+    return finalItinerary;
   }
 
   /** 중복 안내 모달 - "기존 일정 수정" 선택 시 그 일정으로 이동해 편집 */
