@@ -235,6 +235,20 @@
   width: 100%;
 }
 
+.draft-resume-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.draft-resume-delete {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
 .btn-finish {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;

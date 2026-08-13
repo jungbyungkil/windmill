@@ -47,6 +47,7 @@ export default function CreateTripScreen({
   const [situationDismissed, setSituationDismissed] = useState(false);
   const [ongoingTrips, setOngoingTrips] = useState([]);
   const [ongoingLoading, setOngoingLoading] = useState(Boolean(sessionId));
+  const [deletingDraftId, setDeletingDraftId] = useState(null);
 
   useEffect(() => {
     api.getRegions()
@@ -146,6 +147,22 @@ export default function CreateTripScreen({
     });
   }
 
+  async function handleDeleteDraft(trip) {
+    const label = trip.regionDisplayName
+      ? `${formatDraftDate(trip.startDate)} ${trip.regionDisplayName}`
+      : '이 일정';
+    if (!window.confirm(`${label}을(를) 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setDeletingDraftId(trip.itineraryId);
+    try {
+      await api.deleteItinerary(trip.itineraryId);
+      setOngoingTrips((prev) => prev.filter((t) => t.itineraryId !== trip.itineraryId));
+    } catch (e) {
+      alert(`삭제 실패: ${e.message}`);
+    } finally {
+      setDeletingDraftId(null);
+    }
+  }
+
   function handleStartFromStory(story) {
     setDateTouched(true);
     if (dateInvalid || !onStartFromStory) return;
@@ -195,13 +212,24 @@ export default function CreateTripScreen({
                       : ''}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => onResumeDraft?.(trip.itineraryId)}
-                >
-                  이어하기
-                </button>
+                <div className="draft-resume-row-actions">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => onResumeDraft?.(trip.itineraryId)}
+                  >
+                    이어하기
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn danger draft-resume-delete"
+                    aria-label="일정 삭제"
+                    disabled={deletingDraftId === trip.itineraryId}
+                    onClick={() => handleDeleteDraft(trip)}
+                  >
+                    {deletingDraftId === trip.itineraryId ? '…' : '🗑️'}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

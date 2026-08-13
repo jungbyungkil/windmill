@@ -16,6 +16,7 @@ import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.GeoUtils;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.VisitOrderOptimizer;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
@@ -212,10 +213,10 @@ public class ItineraryService {
         itineraryRepository.delete(itinerary);
     }
 
-    /** 여행 마무리(TripRecord) 전인 당일치기만 - 메인 "진행 중인 여행" 목록 */
+    /** 여행 마무리(TripRecord) 전이면서 오늘(KST) 이후인 당일치기만 - 메인 "진행 중인 여행" 목록 */
     @Transactional(readOnly = true)
     public List<Itinerary> findOngoingDayTrips(String sessionUuid) {
-        return itineraryRepository.findOngoingDayTripsBySession(sessionUuid);
+        return itineraryRepository.findOngoingDayTripsBySession(sessionUuid, KoreaClock.today());
     }
 
     @Transactional
