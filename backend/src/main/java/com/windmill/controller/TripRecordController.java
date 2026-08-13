@@ -7,6 +7,7 @@ import com.windmill.dto.RecommendedScheduleResponse;
 import com.windmill.dto.RegionTripHighlightResponse;
 import com.windmill.dto.StartFromTripRecordRequest;
 import com.windmill.dto.TripRecordResponse;
+import com.windmill.dto.TripRecordSummaryResponse;
 import com.windmill.dto.TripStoryFeedResponse;
 import com.windmill.service.itinerary.ItineraryService;
 import com.windmill.service.trip.CommunityScheduleService;
@@ -39,6 +40,16 @@ public class TripRecordController {
         return Mono.fromCallable(() -> tripRecordService.create(sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(TripRecordResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
+    /** GNB "여행 기록" - 완료한 당일치기를 여행일 최신순으로 목록 조회 */
+    @GetMapping
+    public Mono<ResponseEntity<List<TripRecordSummaryResponse>>> list(
+            @RequestHeader("X-Session-Id") String sessionId,
+            @RequestParam(defaultValue = "30") int limit) {
+        return Mono.fromCallable(() -> tripRecordService.listSummaries(sessionId, limit))
+                .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
     }
 

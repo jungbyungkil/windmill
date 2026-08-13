@@ -76,6 +76,11 @@ export function listItineraries(sessionId, { status, limit } = {}) {
   return request(`/itineraries${qs({ status, limit })}`, { sessionId });
 }
 
+/** GNB "여행 기록" - 완료한 당일치기를 여행일 최신순으로 조회 */
+export function listTripRecords(sessionId, { limit } = {}) {
+  return request(`/trip-records${qs({ limit })}`, { sessionId });
+}
+
 /** GNB "내 여행 관리" 정리 - 마무리 기록까지 함께 삭제됨(백엔드) */
 export function deleteItinerary(itineraryId) {
   return request(`/itineraries/${itineraryId}`, { method: 'DELETE' });

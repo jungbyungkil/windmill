@@ -23,6 +23,7 @@ import ClosingGateModal from './components/ClosingGateModal';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
 import MyTripsScreen from './components/MyTripsScreen';
+import TripRecordsScreen from './components/TripRecordsScreen';
 import HistoryScreen from './components/HistoryScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
@@ -157,6 +158,11 @@ export default function App() {
   function handleOpenMyTrips() {
     setMenuOpen(false);
     navigate('/my-trips');
+  }
+
+  function handleOpenTripRecords() {
+    setMenuOpen(false);
+    navigate('/trip-records');
   }
 
   function handleOpenHistory() {
@@ -905,6 +911,7 @@ export default function App() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigateMyTrips={handleOpenMyTrips}
+        onNavigateTripRecords={handleOpenTripRecords}
         onNavigateHistory={handleOpenHistory}
         onNavigateGuide={handleOpenGuide}
       />
@@ -1149,6 +1156,15 @@ export default function App() {
           <>
             <BackHeader title="내 여행 관리" onMenuClick={() => setMenuOpen(true)} />
             <MyTripsScreen sessionId={sessionId} onResume={handleResumeDraft} />
+          </>
+        }
+      />
+      <Route
+        path="/trip-records"
+        element={
+          <>
+            <BackHeader title="여행 기록" onMenuClick={() => setMenuOpen(true)} />
+            <TripRecordsScreen sessionId={sessionId} onView={handleResumeDraft} onStartNew={handleGoHome} />
           </>
         }
       />

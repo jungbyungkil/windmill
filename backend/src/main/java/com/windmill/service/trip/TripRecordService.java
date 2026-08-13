@@ -6,6 +6,7 @@ import com.windmill.domain.TripRecord;
 import com.windmill.domain.VisitFeedback;
 import com.windmill.domain.VisitRating;
 import com.windmill.dto.CreateTripRecordRequest;
+import com.windmill.dto.TripRecordSummaryResponse;
 import com.windmill.dto.TripStoryFeedResponse;
 import com.windmill.dto.VisitFeedbackRequest;
 import com.windmill.repository.ItineraryRepository;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +59,20 @@ public class TripRecordService {
     @Transactional(readOnly = true)
     public List<TripRecord> findBySession(String sessionUuid) {
         return tripRecordRepository.findBySessionUuid(sessionUuid);
+    }
+
+    /** GNB "여행 기록" 목록 - 완료한 당일치기를 여행일 기준 최신순으로, limit건까지만 */
+    @Transactional(readOnly = true)
+    public List<TripRecordSummaryResponse> listSummaries(String sessionUuid, int limit) {
+        return tripRecordRepository.findBySessionUuid(sessionUuid).stream()
+                .filter(t -> t.getItinerary() != null && t.getItinerary().getStartDate() != null)
+                .sorted(Comparator
+                        .comparing((TripRecord t) -> t.getItinerary().getStartDate())
+                        .thenComparing(TripRecord::getCompletedAt)
+                        .reversed())
+                .limit(Math.max(1, limit))
+                .map(TripRecordSummaryResponse::from)
+                .collect(Collectors.toList());
     }
 
     /** 이 지역 당일치기 "엄지척(GOOD)" 최근 기록 상위 5건 */
