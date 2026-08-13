@@ -39,6 +39,21 @@ public class Stage1RelatedAttractionService {
     private final KorServiceClient korServiceClient;
     private final PetFriendlyAttractionClient petFriendlyAttractionClient;
 
+    /**
+     * 장소명 직접 검색 - 가고 싶은 곳을 이미 알고 있을 때, 연관/추천 로직 없이 그 지역 안에서
+     * 이름으로 바로 찾는다("청룡사(안성)" 검색 → 담기). LLM/집중률 필터 없이 KorService2
+     * searchKeyword2 결과를 이름 관련도 순 그대로 사용한다.
+     */
+    public Mono<List<RelatedCandidate>> searchByName(RegionCode region, String query) {
+        if (query == null || query.isBlank()) {
+            return Mono.just(List.of());
+        }
+        return korServiceClient
+                .searchKeyword(query.trim(), null, region.getLDongRegnCd(), region.getLDongSignguCd(),
+                        MAX_CANDIDATES, 1)
+                .map(items -> mapKorItems(items, null));
+    }
+
     public Mono<List<RelatedCandidate>> fetch(RegionCode region, String seedPlaceName, boolean withPet) {
         if (withPet) {
             return fetchPetFriendly(region, seedPlaceName);

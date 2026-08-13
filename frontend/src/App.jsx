@@ -14,6 +14,7 @@ import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
 import RecommendationSearch from './components/RecommendationSearch';
+import PlaceNameSearch from './components/PlaceNameSearch';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
@@ -76,6 +77,8 @@ export default function App() {
 
   const [recoResults, setRecoResults] = useState(null);
   const [recoLoading, setRecoLoading] = useState(false);
+  const [nameSearchResults, setNameSearchResults] = useState(null);
+  const [nameSearchLoading, setNameSearchLoading] = useState(false);
   const [addingContentId, setAddingContentId] = useState(null);
   const [addingFestivalId, setAddingFestivalId] = useState(null);
 
@@ -378,6 +381,22 @@ export default function App() {
       setRecoResults([]);
     } finally {
       setRecoLoading(false);
+    }
+  }
+
+  /** 가고 싶은 곳이 이미 정해진 경우 - 이름으로 직접 검색해 바로 담기 */
+  async function handleSearchByName(query) {
+    setNameSearchLoading(true);
+    try {
+      const results = await api.searchPlacesByName({
+        regionCode: itinerary.signguFullCode,
+        query,
+      });
+      setNameSearchResults(results);
+    } catch {
+      setNameSearchResults([]);
+    } finally {
+      setNameSearchLoading(false);
     }
   }
 
@@ -1051,6 +1070,14 @@ export default function App() {
                   sortByTimeLoading={sortByTimeLoading}
                   onOptimizeFromGps={handleOptimizeFromGps}
                   gpsOptimizing={optimizeLoading}
+                />
+
+                <PlaceNameSearch
+                  onSearch={handleSearchByName}
+                  onAdd={handleAddRecommendation}
+                  results={nameSearchResults}
+                  loading={nameSearchLoading}
+                  addingId={addingContentId}
                 />
 
                 <RecommendationSearch

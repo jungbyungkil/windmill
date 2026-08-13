@@ -119,6 +119,11 @@ export function getRecommendations({ regionCode, withPet, strollerFriendly, acce
   return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
+/** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(취향 추천이 아닌 정확한 이름 매칭) */
+export function searchPlacesByName({ regionCode, query } = {}) {
+  return request(`/recommendations/search${qs({ regionCode, query })}`);
+}
+
 /** 카테고리별 장소 추천 (식당/박물관/키즈카페/카페) - 방문자(집중률) 우선 */
 export function getCategoryRecommendations({ regionCode, excludeContentIds } = {}) {
   return request(`/recommendations/by-category${qs({ regionCode, excludeContentIds })}`);

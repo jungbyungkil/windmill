@@ -97,6 +97,52 @@ public class RecommendationPipeline {
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
     }
 
+    /**
+     * 장소명 직접 검색 - "이미 가려는 곳이 정해진" 사용자를 위한 경로. 연관추천(Stage1 seed)이 아니라
+     * KorService2 키워드 검색으로 그 이름 자체를 찾는다. Stage3(집중률 정렬)·Stage4(LLM 태그/문장)는
+     * 건너뛴다 - 사용자가 정확한 이름으로 찾는 결과이지 취향 추천이 아니라 굳이 LLM이 필요 없다.
+     */
+    public Mono<List<RecommendationCandidate>> searchByName(String regionCode, String query) {
+        RegionCode region = regionCodeService.find(regionCode)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + regionCode));
+        return stage1.searchByName(region, query)
+                .flatMap(stage2::filter)
+                .flatMap(list -> resolveCondition(region).map(condition -> {
+                    List<RecommendationCandidate> mapped = list.stream()
+                            .map(RecommendationPipeline::toSearchCandidate)
+                            .collect(Collectors.toList());
+                    badgeAssembler.attach(mapped, condition);
+                    return mapped;
+                }));
+    }
+
+    private static RecommendationCandidate toSearchCandidate(RelatedCandidate c) {
+        return RecommendationCandidate.builder()
+                .contentId(c.getContentId())
+                .contentTypeId(c.getContentTypeId())
+                .placeName(c.getPlaceName())
+                .category(c.getCategoryLcls())
+                .thumbnailUrl(c.getThumbnailUrl())
+                .matchedTags(List.of())
+                .rank(c.getRank())
+                .addr1(c.getAddr1())
+                .tel(c.getTel())
+                .isFree(c.getIsFree())
+                .useFeeText(c.getUseFeeText())
+                .restDateText(c.getRestDateText())
+                .closeTime(c.getCloseTime())
+                .useTimeText(c.getUseTimeText())
+                .homepageUrl(c.getHomepageUrl())
+                .mapX(c.getMapX())
+                .mapY(c.getMapY())
+                .businessOpen(c.getBusinessOpen())
+                .businessStatus(c.getBusinessStatus())
+                .strollerText(c.getStrollerText())
+                .strollerFriendly(c.getStrollerFriendly())
+                .accessibleFriendly(c.isAccessibleFriendly())
+                .build();
+    }
+
     /** origin이 없을 때(또는 조회 실패) 쓰는 빈 상세 - Reactor Mono는 null을 emit할 수 없어 null 대신 빈 객체로 흘린다 */
     private static final TourAttractionDetail NO_ORIGIN = TourAttractionDetail.builder().build();
     /** 날씨/집중률 조회 실패 시 배지를 그냥 생략하기 위한 빈 상태 - TriggerScheduler와 동일한 no-null 관례 */

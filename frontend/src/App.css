@@ -1579,6 +1579,12 @@
   margin-bottom: 12px;
 }
 
+.place-name-search-hint {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .reco-search-form {
   display: flex;
   flex-direction: column;
