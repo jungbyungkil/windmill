@@ -3,15 +3,8 @@ import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-map
 import { getMapRoute, getPublicConfig } from '../api/windmillApi';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
 import { canOpenInKakaoMap, geocodePlaceWithKakaoServices, openInKakaoMap } from '../utils/kakaoMap';
-import useTransportMode from '../hooks/useTransportMode';
 
 const BUILD_TIME_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
-
-const TRANSPORT_MODES = [
-  { value: 'CAR', label: '🚗 자차' },
-  { value: 'WALK', label: '🚶 도보' },
-  { value: 'TRANSIT', label: '🚌 대중교통' },
-];
 
 const MARKER_COLOR = {
   NORMAL: '#2f9e6a',
@@ -298,7 +291,6 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
  * TourAPI 좌표가 없어도 주소/장소명으로 카카오 지오코딩해 표시한다.
  */
 export default function DayRouteMap({
-  itineraryId,
   items = [],
   weatherAffectedItemIds = [],
   businessAffectedItemIds = [],
@@ -307,7 +299,7 @@ export default function DayRouteMap({
   const [open, setOpen] = useState(true);
   const [jsKey, setJsKey] = useState(BUILD_TIME_JS_KEY);
   const [keyChecked, setKeyChecked] = useState(Boolean(BUILD_TIME_JS_KEY));
-  const [mode, setMode] = useTransportMode(itineraryId);
+  const mode = 'CAR';
 
   useEffect(() => {
     let cancelled = false;
@@ -378,21 +370,7 @@ export default function DayRouteMap({
             <p className="day-route-map-hint">좌표·주소가 있는 장소가 아직 없어요.</p>
           )}
           {jsKey && draftStops.length > 0 && (
-            <>
-              <div className="transport-mode-toggle" role="group" aria-label="이동수단 선택">
-                {TRANSPORT_MODES.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    className={`transport-mode-btn ${mode === m.value ? 'active' : ''}`}
-                    onClick={() => setMode(m.value)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} mode={mode} />
-            </>
+            <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} mode={mode} />
           )}
         </div>
       )}

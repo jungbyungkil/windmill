@@ -1031,7 +1031,6 @@ export default function App() {
                 </div>
 
                 <ItineraryList
-                  itineraryId={itineraryId}
                   items={visibleItems}
                   affectedItemIds={trigger?.affectedItemIds}
                   weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
