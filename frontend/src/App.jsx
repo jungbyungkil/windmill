@@ -19,6 +19,8 @@ import TripRecordModal from './components/TripRecordModal';
 import SharedItineraryScreen from './components/SharedItineraryScreen';
 import ClosingGateModal from './components/ClosingGateModal';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
+import GlobalMenu from './components/GlobalMenu';
+import MyTripsScreen from './components/MyTripsScreen';
 import { checkClosingGate } from './utils/closingTime';
 import './App.css';
 
@@ -98,6 +100,7 @@ export default function App() {
   const autoOptimizedRef = useRef(false);
 
   const [activeDate, setActiveDate] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     function onHash() {
@@ -135,6 +138,16 @@ export default function App() {
   function handleResumeDraft(id) {
     resumeDraftItinerary(id);
     navigate('/trip');
+  }
+
+  function handleOpenMyTrips() {
+    setMenuOpen(false);
+    navigate('/my-trips');
+  }
+
+  function handleMenuNewTrip() {
+    setMenuOpen(false);
+    handleGoHome();
   }
 
   // 일정이 새로 로드되면 여행 시작일을 기본 활성 날짜로
@@ -794,7 +807,14 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <>
+      <GlobalMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavigateMyTrips={handleOpenMyTrips}
+        onNavigateHome={handleMenuNewTrip}
+      />
+      <Routes>
       <Route
         path="/"
         element={
@@ -802,6 +822,7 @@ export default function App() {
             ? <Navigate to="/trip" replace />
             : (
               <>
+                <BackHeader showBack={false} onMenuClick={() => setMenuOpen(true)} />
                 <CreateTripScreen
                   sessionId={sessionId}
                   onCreate={handleCreate}
@@ -830,7 +851,7 @@ export default function App() {
         element={
           !itinerary ? <Navigate to="/" replace /> : (
             <>
-              <BackHeader title="스마트 일정" />
+              <BackHeader title="스마트 일정" onMenuClick={() => setMenuOpen(true)} />
               <SmartPlanScreen
                 key={smartPlanDate || itinerary.startDate || 'day-trip'}
                 dayLabel={null}
@@ -851,7 +872,7 @@ export default function App() {
         element={
           !itinerary ? <Navigate to="/" replace /> : (
             <>
-              <BackHeader title="카테고리 추천" />
+              <BackHeader title="카테고리 추천" onMenuClick={() => setMenuOpen(true)} />
               <CategoryRecommendScreen
                 regionCode={itinerary.signguFullCode}
                 excludeContentIds={itinerary.items.map((i) => i.contentId).filter(Boolean)}
@@ -876,7 +897,7 @@ export default function App() {
         element={
           !itinerary ? <Navigate to="/" replace /> : (
             <>
-              <BackHeader title="AI 일정 짜기" />
+              <BackHeader title="AI 일정 짜기" onMenuClick={() => setMenuOpen(true)} />
               <AutoPlanScreen
                 onGenerate={handleGenerateAutoPlan}
                 onConfirm={handleConfirmAutoPlan}
@@ -891,7 +912,7 @@ export default function App() {
         element={
           !itinerary ? <Navigate to="/" replace /> : (
             <div className="app">
-              <BackHeader title="바람따라" />
+              <BackHeader title="바람따라" onMenuClick={() => setMenuOpen(true)} />
               <header className="app-header">
                 <div className="header-inner">
                   <button type="button" className="logo logo-btn" onClick={handleGoHome} title="메인으로">
@@ -1013,7 +1034,17 @@ export default function App() {
           )
         }
       />
+      <Route
+        path="/my-trips"
+        element={
+          <>
+            <BackHeader title="내 여행 관리" onMenuClick={() => setMenuOpen(true)} />
+            <MyTripsScreen sessionId={sessionId} onResume={handleResumeDraft} />
+          </>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

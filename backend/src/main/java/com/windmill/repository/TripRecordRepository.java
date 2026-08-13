@@ -13,6 +13,12 @@ import java.util.List;
 public interface TripRecordRepository extends JpaRepository<TripRecord, Long> {
     List<TripRecord> findBySessionUuid(String sessionUuid);
 
+    /** 일정 상태(ACTIVE/ENDED) 판정 - 이미 여행 마무리 기록을 남겼는지 */
+    boolean existsByItinerary_Id(Long itineraryId);
+
+    /** 일정 삭제 시 함께 지울 마무리 기록 조회 */
+    List<TripRecord> findByItinerary_Id(Long itineraryId);
+
     List<TripRecord> findTop5ByItinerary_SignguFullCodeAndOverallRatingOrderByCompletedAtDesc(
             String signguFullCode, VisitRating overallRating);
 

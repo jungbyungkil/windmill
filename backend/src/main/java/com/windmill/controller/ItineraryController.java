@@ -6,7 +6,9 @@ import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
+import com.windmill.dto.ItineraryListItemResponse;
 import com.windmill.dto.ItineraryResponse;
+import com.windmill.dto.ItineraryStatus;
 import com.windmill.dto.OngoingItineraryResponse;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
@@ -49,7 +51,7 @@ public class ItineraryController {
             @Valid @RequestBody CreateItineraryRequest request) {
         return Mono.fromCallable(() -> itineraryService.create(sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
@@ -63,12 +65,31 @@ public class ItineraryController {
                 .map(ResponseEntity::ok);
     }
 
+    /** GNB "내 여행 관리" 전체 목록 - ACTIVE/ENDED 통합, status로 필터, limit으로 최근 N건만 */
+    @GetMapping
+    public Mono<ResponseEntity<List<ItineraryListItemResponse>>> listAll(
+            @RequestHeader("X-Session-Id") String sessionId,
+            @RequestParam(required = false) ItineraryStatus status,
+            @RequestParam(defaultValue = "50") int limit) {
+        return Mono.fromCallable(() -> itineraryService.listAll(sessionId, status, limit))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
     @GetMapping("/{id}")
     public Mono<ResponseEntity<ItineraryResponse>> get(@PathVariable Long id) {
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
+    }
+
+    /** GNB "내 여행 관리" 정리(중복 정리 등) - 마무리 기록이 있으면 함께 삭제 */
+    @DeleteMapping("/{id}")
+    public Mono<ResponseEntity<Void>> delete(@PathVariable Long id) {
+        return Mono.<Void>fromRunnable(() -> itineraryService.delete(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(ResponseEntity.noContent().build());
     }
 
     @PostMapping("/{id}/items")
@@ -76,7 +97,7 @@ public class ItineraryController {
                                                             @Valid @RequestBody AddItineraryItemRequest request) {
         return Mono.fromCallable(() -> itineraryService.addItem(id, request))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
@@ -85,7 +106,7 @@ public class ItineraryController {
                                                                @RequestBody UpdateItineraryItemRequest request) {
         return Mono.fromCallable(() -> itineraryService.updateItem(id, itemId, request))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
@@ -93,7 +114,7 @@ public class ItineraryController {
     public Mono<ResponseEntity<ItineraryResponse>> deleteItem(@PathVariable Long id, @PathVariable Long itemId) {
         return Mono.fromCallable(() -> itineraryService.deleteItem(id, itemId))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
@@ -103,7 +124,7 @@ public class ItineraryController {
                                                                 @RequestBody ConfirmDayRequest request) {
         return Mono.fromCallable(() -> itineraryService.confirmDay(id, date, request.isConfirmed()))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
@@ -165,7 +186,7 @@ public class ItineraryController {
         return Mono.fromCallable(() -> {
                     ItineraryService.OptimizeRouteResult result =
                             itineraryService.optimizeRoute(id, date, originLon, originLat);
-                    ItineraryResponse body = ItineraryResponse.from(result.itinerary());
+                    ItineraryResponse body = toResponse(result.itinerary());
                     body.setRouteHint(result.message());
                     body.setOptimizedDistanceKm(result.totalDistanceKm());
                     return body;
@@ -181,7 +202,7 @@ public class ItineraryController {
             @RequestParam(required = false) LocalDate date) {
         return Mono.fromCallable(() -> itineraryService.sortByScheduledTime(id, date))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(ItineraryResponse::from)
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
@@ -251,6 +272,11 @@ public class ItineraryController {
                 .originContentId(origin == null ? null : origin.getContentId())
                 .originContentTypeId(origin == null ? null : origin.getContentTypeId())
                 .build();
+    }
+
+    /** 응답 변환 - 상태(ACTIVE/ENDED)를 함께 계산해 내려준다 */
+    private ItineraryResponse toResponse(Itinerary itinerary) {
+        return ItineraryResponse.from(itinerary, itineraryService.statusOf(itinerary));
     }
 
     /** 거리(km) 표시 기준점 - "지금 있는 곳"을 대신할 정보가 없어 이미 담긴 마지막 장소를 기준으로 삼는다 */

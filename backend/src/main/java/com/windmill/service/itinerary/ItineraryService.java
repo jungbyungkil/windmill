@@ -5,6 +5,8 @@ import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.TripRecord;
 import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.CreateItineraryRequest;
+import com.windmill.dto.ItineraryListItemResponse;
+import com.windmill.dto.ItineraryStatus;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SharedItineraryResponse;
 import com.windmill.dto.UpdateItineraryItemRequest;
@@ -27,6 +29,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -167,6 +170,46 @@ public class ItineraryService {
     @Transactional(readOnly = true)
     public List<Itinerary> findBySession(String sessionUuid) {
         return itineraryRepository.findBySessionUuid(sessionUuid);
+    }
+
+    @Transactional(readOnly = true)
+    public ItineraryStatus statusOf(Itinerary itinerary) {
+        return ItineraryStatus.of(itinerary.getStartDate(),
+                tripRecordRepository.existsByItinerary_Id(itinerary.getId()));
+    }
+
+    /**
+     * GNB "내 여행 관리" 전체 목록 - ACTIVE(진행 중)/ENDED(종료) 통합, 최신순(여행일→생성일) 정렬.
+     * statusFilter가 있으면 그 상태만, limit으로 최근 N건만 반환(계속 쌓이는 구조라 무제한 조회 방지).
+     */
+    @Transactional(readOnly = true)
+    public List<ItineraryListItemResponse> listAll(String sessionUuid, ItineraryStatus statusFilter, int limit) {
+        Set<Long> endedByRecord = tripRecordRepository.findBySessionUuid(sessionUuid).stream()
+                .map(TripRecord::getItinerary)
+                .filter(java.util.Objects::nonNull)
+                .map(Itinerary::getId)
+                .collect(Collectors.toSet());
+
+        return itineraryRepository.findBySessionUuid(sessionUuid).stream()
+                .sorted(Comparator
+                        .comparing(Itinerary::getStartDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Itinerary::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(i -> ItineraryListItemResponse.from(i,
+                        ItineraryStatus.of(i.getStartDate(), endedByRecord.contains(i.getId()))))
+                .filter(r -> statusFilter == null || r.getStatus() == statusFilter)
+                .limit(Math.max(1, limit))
+                .collect(Collectors.toList());
+    }
+
+    /** 일정 삭제 - 정리(중복 정리 등) 용도. 마무리 기록(TripRecord/VisitFeedback)이 있으면 먼저 지워 FK 제약을 피한다. */
+    @Transactional
+    public void delete(Long itineraryId) {
+        Itinerary itinerary = get(itineraryId);
+        List<TripRecord> records = tripRecordRepository.findByItinerary_Id(itineraryId);
+        if (!records.isEmpty()) {
+            tripRecordRepository.deleteAll(records);
+        }
+        itineraryRepository.delete(itinerary);
     }
 
     /** 여행 마무리(TripRecord) 전인 당일치기만 - 메인 "진행 중인 여행" 목록 */

@@ -27,11 +27,19 @@ public class ItineraryResponse {
     private List<ItineraryItemResponse> items;
     /** 확정된 날짜 목록 - 프론트 일자별 페이지 탭에서 체크표시/다음날 이동 가능 여부 판단에 사용 */
     private Set<LocalDate> confirmedDates;
+    /** ACTIVE | ENDED - 종료된 일정은 프론트에서 수정 액션을 막는 데 쓰인다 */
+    private ItineraryStatus status;
 
     /** 동선 최적화 직후 안내 문구(선택) */
     private String routeHint;
     /** 동선 최적화 직후 총 이동거리 km(선택, Haversine) */
     private Double optimizedDistanceKm;
+
+    public static ItineraryResponse from(Itinerary itinerary, ItineraryStatus status) {
+        ItineraryResponse response = from(itinerary);
+        response.setStatus(status);
+        return response;
+    }
 
     public static ItineraryResponse from(Itinerary itinerary) {
         return ItineraryResponse.builder()
