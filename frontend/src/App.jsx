@@ -151,29 +151,14 @@ export default function App() {
     navigate('/trip');
   }
 
-  function handleOpenMyTrips() {
-    setMenuOpen(false);
-    navigate('/my-trips');
-  }
-
   function handleOpenHistory() {
     setMenuOpen(false);
     navigate('/history');
   }
 
-  function handleOpenSettings() {
-    setMenuOpen(false);
-    navigate('/settings');
-  }
-
   function handleOpenGuide() {
     setMenuOpen(false);
     navigate('/guide');
-  }
-
-  function handleMenuNewTrip() {
-    setMenuOpen(false);
-    handleGoHome();
   }
 
   // 일정이 새로 로드되면 여행 시작일을 기본 활성 날짜로
@@ -895,10 +880,7 @@ export default function App() {
       <GlobalMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        onNavigateMyTrips={handleOpenMyTrips}
         onNavigateHistory={handleOpenHistory}
-        onNavigateHome={handleMenuNewTrip}
-        onNavigateSettings={handleOpenSettings}
         onNavigateGuide={handleOpenGuide}
       />
       <ExitConfirmModal
