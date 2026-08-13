@@ -175,17 +175,6 @@ export default function CreateTripScreen({
       <h1 className="brand-title">바람따라</h1>
       <p className="brand-tagline">당일치기 여행의 날씨·혼잡·동선 변수를 미리 알려주고, 대안을 쌓아 모두가 참고하는 가이드</p>
 
-      {!situationDismissed && (
-        <NudgeCard
-          situation={situation}
-          loading={situationLoading}
-          onDismiss={() => setSituationDismissed(true)}
-          onAction={() => {
-            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
-      )}
-
       <form id="trip-form" className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">
           <label className="trip-form-label">여행 지역</label>
@@ -346,6 +335,17 @@ export default function CreateTripScreen({
           </button>
         </div>
       ) : null}
+
+      {!situationDismissed && (
+        <NudgeCard
+          situation={situation}
+          loading={situationLoading}
+          onDismiss={() => setSituationDismissed(true)}
+          onAction={() => {
+            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      )}
     </div>
   );
 }
