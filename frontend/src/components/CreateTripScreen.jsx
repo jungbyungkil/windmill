@@ -186,66 +186,6 @@ export default function CreateTripScreen({
         />
       )}
 
-      {ongoingLoading ? (
-        <div className="draft-resume-banner draft-resume-loading">
-          <p>진행 중인 당일치기를 확인하는 중…</p>
-        </div>
-      ) : ongoingTrips.length > 0 ? (
-        <div className="draft-resume-panel">
-          <div className="draft-resume-panel-head">
-            <strong>진행 중인 여행이 있어요</strong>
-            <p>날짜별 당일치기를 이어 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
-          </div>
-          <ul className="draft-resume-list">
-            {ongoingTrips.map((trip, index) => (
-              <li key={trip.itineraryId} className="draft-resume-row">
-                <div className="draft-resume-row-main">
-                  <span className="draft-resume-day">당일치기 {index + 1}</span>
-                  <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
-                  {trip.regionDisplayName && (
-                    <span className="draft-resume-region">{trip.regionDisplayName}</span>
-                  )}
-                  <span className="draft-resume-meta">
-                    {trip.placeCount ?? 0}곳
-                    {trip.companionType && COMPANION_LABEL[trip.companionType]
-                      ? ` · ${COMPANION_LABEL[trip.companionType]}`
-                      : ''}
-                  </span>
-                </div>
-                <div className="draft-resume-row-actions">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => onResumeDraft?.(trip.itineraryId)}
-                  >
-                    이어하기
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn danger draft-resume-delete"
-                    aria-label="일정 삭제"
-                    disabled={deletingDraftId === trip.itineraryId}
-                    onClick={() => handleDeleteDraft(trip)}
-                  >
-                    {deletingDraftId === trip.itineraryId ? '…' : '🗑️'}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : draftItineraryId && onResumeDraft ? (
-        <div className="draft-resume-banner">
-          <div>
-            <strong>진행 중인 여행이 있어요</strong>
-            <p>이어서 일정을 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => onResumeDraft(draftItineraryId)}>
-            이어하기
-          </button>
-        </div>
-      ) : null}
-
       <form id="trip-form" className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">
           <label className="trip-form-label">여행 지역</label>
@@ -263,16 +203,6 @@ export default function CreateTripScreen({
             </select>
           </div>
         </div>
-
-        {/* 지역 선택 직후: 해당 지역 우선 · 카드 클릭 시 그 일정 그대로 시작 (아래 여행 날짜 적용) */}
-        <TripStoryFeed
-          signguFullCode={signguFullCode}
-          regionLabel={regionLabel}
-          tripDate={tripDate}
-          onStartFromStory={handleStartFromStory}
-          startingStoryId={startingStoryId}
-          startDisabled={dateInvalid || loading}
-        />
 
         <div className="trip-form-row">
           <label className="trip-form-label" htmlFor="trip-date">
@@ -336,6 +266,16 @@ export default function CreateTripScreen({
           </label>
         </div>
 
+        {/* 지역·날짜·동반유형을 다 고른 뒤 - 기존 추천 기록을 참고하거나 아래 버튼으로 새로 시작 */}
+        <TripStoryFeed
+          signguFullCode={signguFullCode}
+          regionLabel={regionLabel}
+          tripDate={tripDate}
+          onStartFromStory={handleStartFromStory}
+          startingStoryId={startingStoryId}
+          startDisabled={dateInvalid || loading}
+        />
+
         <button className="btn-primary btn-start" type="submit" disabled={loading || !canSubmit}>
           {loading ? '일정 준비 중...' : '🌬️ 당일치기 시작하기'}
         </button>
@@ -346,6 +286,66 @@ export default function CreateTripScreen({
       <p className="create-trip-hint">
         당일치기 중심으로, 날씨·혼잡·동선 변수를 미리 알려주고 대안을 고르면 그 기록이 다른 여행자 참고가 됩니다.
       </p>
+
+      {ongoingLoading ? (
+        <div className="draft-resume-banner draft-resume-loading">
+          <p>진행 중인 당일치기를 확인하는 중…</p>
+        </div>
+      ) : ongoingTrips.length > 0 ? (
+        <div className="draft-resume-panel">
+          <div className="draft-resume-panel-head">
+            <strong>진행 중인 여행이 있어요</strong>
+            <p>날짜별 당일치기를 이어 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
+          </div>
+          <ul className="draft-resume-list">
+            {ongoingTrips.map((trip, index) => (
+              <li key={trip.itineraryId} className="draft-resume-row">
+                <div className="draft-resume-row-main">
+                  <span className="draft-resume-day">당일치기 {index + 1}</span>
+                  <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
+                  {trip.regionDisplayName && (
+                    <span className="draft-resume-region">{trip.regionDisplayName}</span>
+                  )}
+                  <span className="draft-resume-meta">
+                    {trip.placeCount ?? 0}곳
+                    {trip.companionType && COMPANION_LABEL[trip.companionType]
+                      ? ` · ${COMPANION_LABEL[trip.companionType]}`
+                      : ''}
+                  </span>
+                </div>
+                <div className="draft-resume-row-actions">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => onResumeDraft?.(trip.itineraryId)}
+                  >
+                    이어하기
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn danger draft-resume-delete"
+                    aria-label="일정 삭제"
+                    disabled={deletingDraftId === trip.itineraryId}
+                    onClick={() => handleDeleteDraft(trip)}
+                  >
+                    {deletingDraftId === trip.itineraryId ? '…' : '🗑️'}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : draftItineraryId && onResumeDraft ? (
+        <div className="draft-resume-banner">
+          <div>
+            <strong>진행 중인 여행이 있어요</strong>
+            <p>이어서 일정을 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
+          </div>
+          <button type="button" className="btn-primary" onClick={() => onResumeDraft(draftItineraryId)}>
+            이어하기
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

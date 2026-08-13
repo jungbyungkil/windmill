@@ -1,47 +1,102 @@
-const SECTIONS = [
+const PAGE1_STEPS = [
+  { icon: '📍', title: '여행 지역 선택', body: '시/도 → 시/군/구 순서로 다녀올 지역을 골라요.' },
+  { icon: '📅', title: '여행 날짜 선택', body: '바람따라는 당일치기만 지원해요. 하루 날짜만 고르면 돼요.' },
+  { icon: '🧑‍🤝‍🧑', title: '누구와 함께하나요?', body: '1인·2인·4인 가족·대가족 중 고르고, 필요하면 반려동물·유모차 동반·무장애 이동 옵션도 함께 체크해요.' },
+];
+
+const PAGE1_BRANCH = [
   {
+    tag: 'A',
+    icon: '📖',
+    title: '당일치기 추천 기록 참고',
+    body: '다른 여행자가 다녀온 일정 카드를 보고 "이 일정으로 시작"을 누르면, 같은 장소·순서 그대로 내 일정으로 복제돼요.',
+  },
+  {
+    tag: 'B',
     icon: '🌬️',
-    title: '1. 여행 시작하기',
-    body: '지역·여행 날짜(당일치기)·동반유형을 고르고 "당일치기 시작하기"를 누르면 준비가 시작돼요. 반려동물·유모차·무장애 이동 옵션은 해당하는 곳만 우선 추천해드려요.',
-  },
-  {
-    icon: '🧭',
-    title: '2. 스마트 일정',
-    body: '혼잡이 덜하고 동선이 짧은 순서로 자동 구성된 코스를 먼저 보여드려요. 마음에 들면 그대로 담고, 더 둘러보고 싶으면 카테고리 추천이나 AI 일정 짜기로 넘어갈 수 있어요.',
-  },
-  {
-    icon: '🍽️',
-    title: '3. 카테고리 추천 · AI 일정 짜기',
-    body: '식당·카페·박물관 등 원하는 종류만 골라 더 담거나, 태그·자연어로 원하는 분위기를 알려주면 AI가 후보를 추려드려요. 실제로 검증된 장소 정보만 사용해요.',
-  },
-  {
-    icon: '🌀',
-    title: '4. 실시간 변수 대응(바람개비)',
-    body: '일정 화면 위쪽 바람개비가 지금 날씨·혼잡·영업 상황을 알려줘요. 비/폭염/혼잡이 감지되면 대안 코스를 추천받거나, 영향받은 장소만 자동으로 바꿀 수 있어요.',
-  },
-  {
-    icon: '🔗',
-    title: '5. 일정 공유 · 여행 마무리',
-    body: '"일정 공유"로 링크를 만들어 함께 가는 사람에게 보내보세요. 여행을 다녀온 뒤 "여행 마무리"에서 별점과 후기를 남기면 같은 지역을 찾는 다른 여행자에게 추천으로 쓰여요.',
+    title: '"당일치기 시작하기" 버튼',
+    body: '혼잡이 덜하고 동선이 짧은 스마트 동선을 새로 만들어 자동으로 담아드려요.',
   },
 ];
 
-/** 전체 메뉴 > 이용 가이드 - 전체 흐름 요약. 화면별 개별 도움말(?)은 이번 스코프에서 제외했어요. */
+const PAGE2_STEPS = [
+  {
+    icon: '🧭',
+    title: '스마트 동선으로 시작 또는 직접 구성',
+    body: '자동으로 담긴 스마트 동선을 그대로 쓰거나, 마음에 안 들면 하나씩 지우고 직접 장소를 골라 채울 수 있어요.',
+  },
+  {
+    icon: '🏷️',
+    title: '태그 선택 → 추천받기',
+    body: '#자연 #실내 #맛집 #아이동반 #액티비티 #역사 중 원하는 태그를 고르고 "추천받기"를 누르면 어울리는 장소 목록이 떠요. 마음에 드는 곳을 일정에 담고 방문 시간을 정해요.',
+  },
+  {
+    icon: '🌀',
+    title: '실제 여행 진행 - 바람개비',
+    body: '일정 화면 위쪽 바람개비가 지금 날씨·혼잡·영업 상황을 알려줘요. 비/폭염/혼잡이 감지되면 대안 코스를 추천받거나, 영향받은 장소만 자동으로 바꿀 수 있어요.',
+  },
+  {
+    icon: '✅',
+    title: '여행 마무리 작성(완료 기록)',
+    body: '다녀온 뒤 "여행 마무리"에서 별점과 후기를 남기면, 같은 지역을 찾는 다른 여행자의 추천 기록으로 쓰여요. "일정 공유"로 링크를 만들어 함께 가는 사람에게 미리 보낼 수도 있어요.',
+  },
+];
+
+function StepList({ steps, startNumber = 1 }) {
+  return (
+    <ol className="guide-list" start={startNumber}>
+      {steps.map((s, i) => (
+        <li key={s.title} className="guide-item">
+          <span className="guide-item-icon" aria-hidden="true">{s.icon}</span>
+          <div>
+            <h3 className="guide-item-title">{startNumber + i}. {s.title}</h3>
+            <p className="guide-item-body">{s.body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** 전체 메뉴 > 이용 가이드 - 실제 화면 흐름(PAGE1 온보딩 → PAGE2 여행 진행) 그대로 정리 */
 export default function GuideScreen() {
   return (
     <div className="guide-screen">
       <p className="guide-intro">바람따라는 이런 순서로 쓰면 편해요.</p>
-      <ol className="guide-list">
-        {SECTIONS.map((s) => (
-          <li key={s.title} className="guide-item">
-            <span className="guide-item-icon" aria-hidden="true">{s.icon}</span>
-            <div>
-              <h2 className="guide-item-title">{s.title}</h2>
-              <p className="guide-item-body">{s.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+
+      <section className="guide-page">
+        <h2 className="guide-page-title">
+          <span className="guide-page-badge">PAGE 1</span>
+          여행 준비 (온보딩)
+        </h2>
+        <StepList steps={PAGE1_STEPS} startNumber={1} />
+
+        <div className="guide-branch">
+          <span className="guide-branch-label">4. 여기서 둘 중 하나를 골라요</span>
+          <div className="guide-branch-options">
+            {PAGE1_BRANCH.map((b) => (
+              <div key={b.tag} className="guide-item guide-branch-item">
+                <span className="guide-item-icon" aria-hidden="true">{b.icon}</span>
+                <div>
+                  <h3 className="guide-item-title">
+                    <span className="guide-branch-tag">{b.tag}</span>
+                    {b.title}
+                  </h3>
+                  <p className="guide-item-body">{b.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="guide-page">
+        <h2 className="guide-page-title">
+          <span className="guide-page-badge">PAGE 2</span>
+          여행 진행
+        </h2>
+        <StepList steps={PAGE2_STEPS} startNumber={5} />
+      </section>
     </div>
   );
 }
