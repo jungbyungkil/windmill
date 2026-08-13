@@ -1,7 +1,15 @@
 import useModalHistory from '../hooks/useModalHistory';
 
 /** 전체 메뉴(GNB) - 좌측 슬라이드 패널. 뒤로가기(popstate)로도 닫힘(useModalHistory). */
-export default function GlobalMenu({ open, onClose, onNavigateMyTrips, onNavigateHome }) {
+export default function GlobalMenu({
+  open,
+  onClose,
+  onNavigateMyTrips,
+  onNavigateHistory,
+  onNavigateHome,
+  onNavigateSettings,
+  onNavigateGuide,
+}) {
   useModalHistory(open, onClose);
   if (!open) return null;
 
@@ -25,8 +33,23 @@ export default function GlobalMenu({ open, onClose, onNavigateMyTrips, onNavigat
             </button>
           </li>
           <li>
+            <button type="button" className="global-menu-item" onClick={onNavigateHistory}>
+              🕘 이용 히스토리
+            </button>
+          </li>
+          <li>
             <button type="button" className="global-menu-item" onClick={onNavigateHome}>
               ➕ 새 여행 시작
+            </button>
+          </li>
+          <li>
+            <button type="button" className="global-menu-item" onClick={onNavigateSettings}>
+              ⚙️ 설정
+            </button>
+          </li>
+          <li>
+            <button type="button" className="global-menu-item" onClick={onNavigateGuide}>
+              ❓ 이용 가이드
             </button>
           </li>
         </ul>

@@ -22,8 +22,12 @@ import ClosingGateModal from './components/ClosingGateModal';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
 import MyTripsScreen from './components/MyTripsScreen';
+import HistoryScreen from './components/HistoryScreen';
+import SettingsScreen from './components/SettingsScreen';
+import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
 import { checkClosingGate } from './utils/closingTime';
+import { recordView } from './utils/viewHistory';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -150,6 +154,21 @@ export default function App() {
   function handleOpenMyTrips() {
     setMenuOpen(false);
     navigate('/my-trips');
+  }
+
+  function handleOpenHistory() {
+    setMenuOpen(false);
+    navigate('/history');
+  }
+
+  function handleOpenSettings() {
+    setMenuOpen(false);
+    navigate('/settings');
+  }
+
+  function handleOpenGuide() {
+    setMenuOpen(false);
+    navigate('/guide');
   }
 
   function handleMenuNewTrip() {
@@ -663,6 +682,7 @@ export default function App() {
   }
 
   async function handleOpenDocent(item) {
+    recordView({ type: 'place', id: item.contentId, name: item.placeName, thumbnail: item.thumbnailUrl });
     setDocentOpen(true);
     setDocentItem(item);
     setDocentPlaceName(item.placeName);
@@ -819,7 +839,10 @@ export default function App() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigateMyTrips={handleOpenMyTrips}
+        onNavigateHistory={handleOpenHistory}
         onNavigateHome={handleMenuNewTrip}
+        onNavigateSettings={handleOpenSettings}
+        onNavigateGuide={handleOpenGuide}
       />
       <ExitConfirmModal
         open={exitConfirm.confirmOpen}
@@ -1052,6 +1075,33 @@ export default function App() {
           <>
             <BackHeader title="내 여행 관리" onMenuClick={() => setMenuOpen(true)} />
             <MyTripsScreen sessionId={sessionId} onResume={handleResumeDraft} />
+          </>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <>
+            <BackHeader title="이용 히스토리" onMenuClick={() => setMenuOpen(true)} />
+            <HistoryScreen />
+          </>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <>
+            <BackHeader title="설정" onMenuClick={() => setMenuOpen(true)} />
+            <SettingsScreen />
+          </>
+        }
+      />
+      <Route
+        path="/guide"
+        element={
+          <>
+            <BackHeader title="이용 가이드" onMenuClick={() => setMenuOpen(true)} />
+            <GuideScreen />
           </>
         }
       />

@@ -1,4 +1,5 @@
 import { openExternalLink } from '../utils/externalLink';
+import { recordView } from '../utils/viewHistory';
 
 function formatDate(yyyyMMdd) {
   if (!yyyyMMdd || yyyyMMdd.length !== 8) return yyyyMMdd;
@@ -8,6 +9,11 @@ function formatDate(yyyyMMdd) {
 /** 본문 흐름과 분리된 하단 참고 영역 - 축제 정보는 선택 사항 */
 export default function FestivalBanner({ festivals, onAdd, addingId }) {
   if (!festivals || festivals.length === 0) return null;
+
+  function handleOpenFestival(f) {
+    recordView({ type: 'festival', id: f.contentId, name: f.placeName, thumbnail: f.thumbnailUrl });
+    openExternalLink(f.homepageUrl);
+  }
 
   return (
     <aside className="festival-banner festival-ref" aria-label="참고: 지역 축제">
@@ -25,7 +31,7 @@ export default function FestivalBanner({ festivals, onAdd, addingId }) {
               <button
                 type="button"
                 className="festival-thumb-btn"
-                onClick={() => openExternalLink(f.homepageUrl)}
+                onClick={() => handleOpenFestival(f)}
                 disabled={!f.homepageUrl}
                 aria-label={f.homepageUrl ? `${f.placeName} 축제 페이지 열기` : undefined}
               >
@@ -37,7 +43,7 @@ export default function FestivalBanner({ festivals, onAdd, addingId }) {
                 <button
                   type="button"
                   className="festival-name festival-name-link"
-                  onClick={() => openExternalLink(f.homepageUrl)}
+                  onClick={() => handleOpenFestival(f)}
                 >
                   {f.placeName}
                   <span className="festival-ext" aria-hidden="true">↗</span>

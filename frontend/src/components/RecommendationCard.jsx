@@ -1,4 +1,5 @@
 import { openExternalLink } from '../utils/externalLink';
+import { recordView } from '../utils/viewHistory';
 
 const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
@@ -55,7 +56,10 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
           <button
             type="button"
             className="reco-info-row reco-info-link"
-            onClick={() => openExternalLink(candidate.homepageUrl)}
+            onClick={() => {
+              recordView({ type: 'place', id: candidate.contentId, name: candidate.placeName, thumbnail: candidate.thumbnailUrl });
+              openExternalLink(candidate.homepageUrl);
+            }}
           >
             🔗 홈페이지
           </button>

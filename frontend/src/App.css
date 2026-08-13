@@ -4498,3 +4498,193 @@
   color: var(--level-danger, #dc2626);
 }
 
+/* ---------- 설정 ---------- */
+
+.settings-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.settings-section-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.settings-section-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.settings-scale-row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-scale-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.settings-scale-btn.active {
+  background: var(--sea);
+  border-color: var(--sea);
+  color: #fff;
+}
+
+/* ---------- 이용 히스토리 ---------- */
+
+.history-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.history-clear-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--sand-border);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--level-danger);
+  cursor: pointer;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+}
+
+.history-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.history-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sand);
+  font-size: 16px;
+}
+
+.history-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.history-name {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- 이용 가이드 ---------- */
+
+.guide-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
+}
+
+.guide-intro {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.guide-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.guide-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+}
+
+.guide-item-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.guide-item-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.guide-item-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+

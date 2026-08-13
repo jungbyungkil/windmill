@@ -3,6 +3,7 @@ import { TAG_OPTIONS } from '../constants';
 import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLevel';
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import { openExternalLink } from '../utils/externalLink';
+import { recordView } from '../utils/viewHistory';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 
 function draftFromItem(src) {
@@ -175,7 +176,10 @@ export default function ItineraryItemCard({
                 <button
                   type="button"
                   className="reco-info-row reco-info-link"
-                  onClick={() => openExternalLink(item.homepageUrl)}
+                  onClick={() => {
+                    recordView({ type: 'place', id: item.contentId, name: item.placeName, thumbnail: item.thumbnailUrl });
+                    openExternalLink(item.homepageUrl);
+                  }}
                 >
                   🔗 홈페이지
                 </button>

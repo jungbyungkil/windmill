@@ -45,6 +45,21 @@
   text-size-adjust: 100%;
 }
 
+/*
+ * 어르신 접근성 - 글씨 크기 조절(설정 > 글씨 크기). 이 프로젝트 CSS는 rem이 아닌 px 단위 위주라
+ * 루트 font-size만으로는 버튼/여백까지 함께 커지지 않음 - zoom으로 텍스트·터치영역·레이아웃을
+ * 통째로 비례 확대(브리프의 "버튼도 같이 커져야" 요구사항을 자동으로 만족).
+ * zoom은 Chrome/Safari/Edge(iOS Safari 포함) 지원, Firefox 미지원 - 모바일 웹 위주인 이 서비스
+ * 특성상 허용 가능한 트레이드오프로 판단.
+ */
+html[data-text-scale='large'] {
+  zoom: 1.125;
+}
+
+html[data-text-scale='xl'] {
+  zoom: 1.25;
+}
+
 * {
   box-sizing: border-box;
 }

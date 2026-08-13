@@ -9,6 +9,18 @@
     />
     <meta name="theme-color" content="#0a6b82" />
     <title>바람따라</title>
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem('windtrail:textScale');
+          if (v === 'large' || v === 'xl') {
+            document.documentElement.dataset.textScale = v;
+          }
+        } catch (e) {
+          /* localStorage 접근 불가(프라이빗 모드 등) - 기본 크기로 진행 */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
