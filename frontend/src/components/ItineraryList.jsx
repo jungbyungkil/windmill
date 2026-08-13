@@ -43,6 +43,7 @@ function resolveBusinessIds(businessAffectedItemIds, trigger, affectedItemIds, w
 }
 
 export default function ItineraryList({
+  itineraryId,
   items,
   affectedItemIds = [],
   weatherAffectedItemIds,
@@ -115,6 +116,7 @@ export default function ItineraryList({
 
       {items.length > 0 && (
         <DayRouteMap
+          itineraryId={itineraryId}
           items={items}
           weatherAffectedItemIds={[...weatherIds]}
           businessAffectedItemIds={[...businessIds]}

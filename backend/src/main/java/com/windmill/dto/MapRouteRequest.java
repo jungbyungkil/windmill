@@ -11,6 +11,8 @@ import java.util.List;
 public class MapRouteRequest {
     /** 방문 순서대로. 최소 2개 */
     private List<MapPoint> points;
+    /** 미지정 시 CAR */
+    private TransportMode mode;
 
     @Data
     @Builder

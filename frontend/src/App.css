@@ -4498,6 +4498,33 @@
   color: var(--level-danger, #dc2626);
 }
 
+/* ---------- 이동수단 선택 ---------- */
+
+.transport-mode-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.transport-mode-btn {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.transport-mode-btn.active {
+  background: var(--sea);
+  border-color: var(--sea);
+  color: #fff;
+}
+
 /* ---------- 설정 ---------- */
 
 .settings-screen {

@@ -137,11 +137,11 @@ export function getDocent(contentId, contentTypeId, lang = 'ko') {
   return request(`/docent/${contentId}${qs({ contentTypeId, lang })}`);
 }
 
-/** 카카오 길찾기 프록시 — 방문 순서 좌표 → 도로 경로 폴리라인 */
-export function getMapRoute(points) {
+/** 카카오 길찾기 프록시 — 방문 순서 좌표 → 경로 폴리라인. mode: CAR(기본)|WALK|TRANSIT */
+export function getMapRoute(points, mode) {
   return request('/map/route', {
     method: 'POST',
-    body: { points },
+    body: { points, mode },
   });
 }
 

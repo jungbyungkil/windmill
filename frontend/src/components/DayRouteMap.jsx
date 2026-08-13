@@ -3,8 +3,15 @@ import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-map
 import { getMapRoute, getPublicConfig } from '../api/windmillApi';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
 import { canOpenInKakaoMap, geocodePlaceWithKakaoServices, openInKakaoMap } from '../utils/kakaoMap';
+import useTransportMode from '../hooks/useTransportMode';
 
 const BUILD_TIME_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
+
+const TRANSPORT_MODES = [
+  { value: 'CAR', label: '🚗 자차' },
+  { value: 'WALK', label: '🚶 도보' },
+  { value: 'TRANSIT', label: '🚌 대중교통' },
+];
 
 const MARKER_COLOR = {
   NORMAL: '#2f9e6a',
@@ -54,7 +61,7 @@ function buildStopMeta(item, index, weather, business, crowd) {
   };
 }
 
-function DayRouteMapCanvas({ draftStops, jsKey }) {
+function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
   const [loading, error] = useKakaoLoader({
     appkey: jsKey,
     libraries: ['services'],
@@ -123,7 +130,7 @@ function DayRouteMapCanvas({ draftStops, jsKey }) {
     let cancelled = false;
     setLoadingRoute(true);
     setRouteError(null);
-    getMapRoute(stops.map((s) => ({ lon: s.lng, lat: s.lat, name: s.item.placeName })))
+    getMapRoute(stops.map((s) => ({ lon: s.lng, lat: s.lat, name: s.item.placeName })), mode)
       .then((res) => {
         if (!cancelled) setRoute(res);
       })
@@ -143,7 +150,7 @@ function DayRouteMapCanvas({ draftStops, jsKey }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopKey, resolving]);
+  }, [stopKey, resolving, mode]);
 
   const center = useMemo(() => {
     if (!stops.length) return { lat: 37.5665, lng: 126.978 };
@@ -205,9 +212,9 @@ function DayRouteMapCanvas({ draftStops, jsKey }) {
           <Polyline
             path={path}
             strokeWeight={5}
-            strokeColor="#1d6b8a"
+            strokeColor={route?.estimated ? '#8a8f98' : '#1d6b8a'}
             strokeOpacity={0.85}
-            strokeStyle="solid"
+            strokeStyle={route?.estimated ? 'shortdash' : 'solid'}
           />
         )}
         {stops.map((stop) => (
@@ -263,7 +270,7 @@ function DayRouteMapCanvas({ draftStops, jsKey }) {
         )}
       </Map>
       <p className="day-route-map-caption">
-        {loadingRoute && '도로 경로 계산 중…'}
+        {loadingRoute && '경로 계산 중…'}
         {!loadingRoute && route?.roadBased && route.distanceMeters != null && (
           <>
             도로 기준 약 {(route.distanceMeters / 1000).toFixed(1)}km
@@ -272,7 +279,15 @@ function DayRouteMapCanvas({ draftStops, jsKey }) {
             )}
           </>
         )}
-        {!loadingRoute && route && !route.roadBased && (route.message || routeError || '직선 연결')}
+        {!loadingRoute && route?.estimated && route.distanceMeters != null && (
+          <>
+            직선거리 약 {(route.distanceMeters / 1000).toFixed(1)}km 기준 추정
+            {route.durationSeconds != null && (
+              <> · 약 {Math.max(1, Math.round(route.durationSeconds / 60))}분(추정)</>
+            )}
+          </>
+        )}
+        {!loadingRoute && route && !route.roadBased && !route.estimated && (route.message || routeError || '직선 연결')}
       </p>
     </>
   );
@@ -283,6 +298,7 @@ function DayRouteMapCanvas({ draftStops, jsKey }) {
  * TourAPI 좌표가 없어도 주소/장소명으로 카카오 지오코딩해 표시한다.
  */
 export default function DayRouteMap({
+  itineraryId,
   items = [],
   weatherAffectedItemIds = [],
   businessAffectedItemIds = [],
@@ -291,6 +307,7 @@ export default function DayRouteMap({
   const [open, setOpen] = useState(true);
   const [jsKey, setJsKey] = useState(BUILD_TIME_JS_KEY);
   const [keyChecked, setKeyChecked] = useState(Boolean(BUILD_TIME_JS_KEY));
+  const [mode, setMode] = useTransportMode(itineraryId);
 
   useEffect(() => {
     let cancelled = false;
@@ -361,7 +378,21 @@ export default function DayRouteMap({
             <p className="day-route-map-hint">좌표·주소가 있는 장소가 아직 없어요.</p>
           )}
           {jsKey && draftStops.length > 0 && (
-            <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} />
+            <>
+              <div className="transport-mode-toggle" role="group" aria-label="이동수단 선택">
+                {TRANSPORT_MODES.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    className={`transport-mode-btn ${mode === m.value ? 'active' : ''}`}
+                    onClick={() => setMode(m.value)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} mode={mode} />
+            </>
           )}
         </div>
       )}

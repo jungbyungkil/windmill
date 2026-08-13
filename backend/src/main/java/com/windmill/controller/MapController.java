@@ -21,7 +21,9 @@ public class MapController {
 
     @PostMapping("/route")
     public Mono<ResponseEntity<MapRouteResponse>> route(@RequestBody MapRouteRequest request) {
-        return kakaoDirectionsClient.route(request == null ? null : request.getPoints())
+        return kakaoDirectionsClient.route(
+                        request == null ? null : request.getPoints(),
+                        request == null ? null : request.getMode())
                 .map(ResponseEntity::ok);
     }
 }

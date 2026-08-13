@@ -14,6 +14,9 @@ public class MapRouteResponse {
     private Integer durationSeconds;
     private boolean roadBased;
     private String message;
+    private TransportMode mode;
+    /** true면 실제 경로가 아닌 직선거리+평균속도 기반 추정치(WALK/TRANSIT) */
+    private boolean estimated;
 
     @Data
     @Builder

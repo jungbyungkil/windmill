@@ -3,6 +3,7 @@ package com.windmill.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.dto.MapRouteRequest;
 import com.windmill.dto.MapRouteResponse;
+import com.windmill.dto.TransportMode;
 import com.windmill.util.GeoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,22 +48,70 @@ public class KakaoDirectionsClient {
         return !restApiKey.isBlank();
     }
 
-    public Mono<MapRouteResponse> route(List<MapRouteRequest.MapPoint> points) {
+    /** 도보 평균 속도(km/h) - 실제 도보 길찾기는 카카오 제휴 전용이라 미확보(브리프 참고) */
+    private static final double WALK_KMH = 4.5;
+    /** 대중교통 평균 속도(km/h, 환승·대기 포함 도심 근사치) - 실제 노선 API 미확보 */
+    private static final double TRANSIT_KMH = 20.0;
+
+    public Mono<MapRouteResponse> route(List<MapRouteRequest.MapPoint> points, TransportMode mode) {
+        TransportMode m = mode == null ? TransportMode.CAR : mode;
         if (points == null || points.size() < 2) {
             return Mono.just(MapRouteResponse.builder()
                     .path(List.of())
                     .roadBased(false)
+                    .mode(m)
                     .message("경로를 그리려면 좌표가 있는 장소가 2곳 이상 필요해요.")
                     .build());
         }
+        if (m != TransportMode.CAR) {
+            return Mono.just(speedEstimate(points, m));
+        }
         if (!isConfigured()) {
-            return Mono.just(straightFallback(points, "카카오 REST 키가 없어 직선으로 연결했어요."));
+            MapRouteResponse resp = straightFallback(points, "카카오 REST 키가 없어 직선으로 연결했어요.");
+            resp.setMode(m);
+            return Mono.just(resp);
         }
         return fetchRoadPath(points)
+                .doOnNext(r -> r.setMode(m))
                 .onErrorResume(e -> {
                     log.warn("[KakaoDirections] fallback to straight line: {}", e.toString());
-                    return Mono.just(straightFallback(points, "길찾기를 불러오지 못해 직선으로 연결했어요."));
+                    MapRouteResponse resp = straightFallback(points, "길찾기를 불러오지 못해 직선으로 연결했어요.");
+                    resp.setMode(m);
+                    return Mono.just(resp);
                 });
+    }
+
+    /**
+     * 도보/대중교통 추정 — 제휴 전용 API 미확보 상태라 브리프의 MVP 대안(대안1)을 따라
+     * 직선거리 + 평균 속도로 소요시간만 추정한다. 실제 경로가 아니므로 estimated=true.
+     */
+    private MapRouteResponse speedEstimate(List<MapRouteRequest.MapPoint> points, TransportMode mode) {
+        double kmh = mode == TransportMode.WALK ? WALK_KMH : TRANSIT_KMH;
+        List<MapRouteResponse.LatLng> path = new ArrayList<>();
+        double totalKm = 0;
+        MapRouteRequest.MapPoint prev = null;
+        for (MapRouteRequest.MapPoint p : points) {
+            path.add(MapRouteResponse.LatLng.builder().lat(p.getLat()).lng(p.getLon()).build());
+            if (prev != null) {
+                Double km = GeoUtils.distanceKmSafe(
+                        String.valueOf(prev.getLon()), String.valueOf(prev.getLat()),
+                        String.valueOf(p.getLon()), String.valueOf(p.getLat()));
+                if (km != null) {
+                    totalKm += km;
+                }
+            }
+            prev = p;
+        }
+        String label = mode == TransportMode.WALK ? "도보" : "대중교통";
+        return MapRouteResponse.builder()
+                .path(path)
+                .distanceMeters(totalKm > 0 ? (int) Math.round(totalKm * 1000) : null)
+                .durationSeconds(totalKm > 0 ? (int) Math.round(totalKm / kmh * 3600) : null)
+                .roadBased(false)
+                .estimated(true)
+                .mode(mode)
+                .message(label + " 실제 경로 API는 아직 준비 중이라, 직선거리 기준으로 추정한 소요시간이에요.")
+                .build();
     }
 
     private Mono<MapRouteResponse> fetchRoadPath(List<MapRouteRequest.MapPoint> points) {
