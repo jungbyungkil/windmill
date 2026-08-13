@@ -25,7 +25,8 @@ function draftFromItem(src) {
 export default function ItineraryItemCard({
   item,
   weatherAlerted = false,
-  businessAlerted = false,
+  closedDayAlerted = false,
+  hoursEndedAlerted = false,
   crowdAlerted = false,
   /** @deprecated */
   alerted = false,
@@ -39,6 +40,7 @@ export default function ItineraryItemCard({
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
   const isWeather = (weatherAlerted || alerted) && !isIndoorPlace(item);
+  const businessAlerted = closedDayAlerted || hoursEndedAlerted;
   const status = itemStatusLevel(item, {
     weatherAlerted: isWeather,
     businessAlerted,
@@ -142,7 +144,10 @@ export default function ItineraryItemCard({
               <span className={`item-status-chip ${statusClass}`}>{STATUS_LABEL[status]}</span>
               {item.isAlternate && <span className="alt-badge" title="추천으로 담은 장소">추천</span>}
               {isWeather && <span className="weather-affected-badge" title="비·폭염 영향 야외 일정">⚠️ 야외</span>}
-              {businessAlerted && <span className="business-affected-badge" title="방문일 정기휴무·영업종료">🚫 휴무</span>}
+              {closedDayAlerted && <span className="business-affected-badge" title="방문일이 정기휴무 요일">🚫 휴무</span>}
+              {hoursEndedAlerted && !closedDayAlerted && (
+                <span className="business-affected-badge" title="지금 영업시간이 끝났어요">🕐 영업종료</span>
+              )}
               {crowdAlerted && !isWeather && !businessAlerted && (
                 <span className="crowd-affected-badge" title="혼잡 주의">👥 혼잡</span>
               )}

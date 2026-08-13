@@ -1,6 +1,7 @@
 package com.windmill.service.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.dto.BusinessStatus;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.SentryBreadcrumbs;
 
@@ -37,21 +38,22 @@ public final class BusinessHoursEvaluator {
     private static final Pattern TIME_RANGE = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[~-]\\s*(\\d{1,2}):(\\d{2})");
     /** 마감 임박 버퍼(분) — close 1시간 전부터 선택 불가 */
     public static final int CLOSE_BUFFER_MINUTES = 60;
-    /** 매월 마지막 (주) X요일 */
+    /** 매월(매달) 마지막 (주) X요일 */
     private static final Pattern LAST_WEEKDAY = Pattern.compile(
-            "매월\\s*마지막\\s*(?:주\\s*)?([월화수목금토일])요일");
+            "(?:매월|매달)\\s*마지막\\s*(?:주\\s*)?([월화수목금토일])요일");
     /** 매주 X요일 (매월 마지막 … 구문은 제외하고 볼 때 사용) */
     private static final Pattern EVERY_WEEKDAY = Pattern.compile(
             "매주\\s*([월화수목금토일])(?:요일)?");
     /**
-     * 매월 N번째(·M번째…) X요일 — "매월 두번째·네번째 수요일", "매월 2,4주 수요일", "매월 첫째주 화요일" 등.
-     * group(1)에 주차 표기(숫자·서수어 조합)를, group(2)에 요일 한 글자를 담아 WEEK_ORDINAL_TOKEN으로 재파싱한다.
+     * 매월(매달) N번째(·M번째…) X요일 — "매월 두번째·네번째 수요일", "매달 셋째·넷째·다섯째 목요일",
+     * "매월 2,4주 수요일", "매월 첫째주 화요일" 등. group(1)에 주차 표기(숫자·서수어 조합)를, group(2)에
+     * 요일 한 글자를 담아 WEEK_ORDINAL_TOKEN으로 재파싱한다.
      */
     private static final Pattern NTH_WEEKDAY_CLAUSE = Pattern.compile(
-            "매월\\s*([^월화수목금토일]*?)\\s*([월화수목금토일])요일");
+            "(?:매월|매달)\\s*([^월화수목금토일]*?)\\s*([월화수목금토일])요일");
     private static final Pattern WEEK_ORDINAL_TOKEN = Pattern.compile(
             "\\d+|첫번째|첫째|첫|두번째|둘째|세번째|셋째|네번째|넷째|다섯번째|다섯째");
-    /** "매주"/"매월" 없이 요일명만 적힌 경우("월요일" 단독) - 흔한 축약 표기, 매주 그 요일로 해석 */
+    /** "매주"/"매월"/"매달" 없이 요일명만 적힌 경우("월요일" 단독) - 흔한 축약 표기, 매주 그 요일로 해석 */
     private static final Pattern BARE_WEEKDAY = Pattern.compile("([월화수목금토일])요일");
     private static final String[] WEEKDAY_KO = {"월", "화", "수", "목", "금", "토", "일"};
 
@@ -72,14 +74,27 @@ public final class BusinessHoursEvaluator {
         return isOpenAt(field -> introFields.getOrDefault(field, ""), KoreaClock.now());
     }
 
+    /** 지금 이 순간 영업 상태(휴무/영업종료/영업중 구분) - 추천 카드 배지용 */
+    public static BusinessStatus currentStatus(Map<String, String> introFields) {
+        if (introFields == null || introFields.isEmpty()) {
+            return BusinessStatus.OPEN;
+        }
+        return statusAt(field -> introFields.getOrDefault(field, ""), KoreaClock.now());
+    }
+
     /** 방문 예정일·시각 기준 영업 여부 (일정 트리거용) */
     public static boolean isOpenAt(Map<String, String> introFields, LocalDateTime at) {
+        return statusAt(introFields, at) == BusinessStatus.OPEN;
+    }
+
+    /** 방문 예정일·시각 기준 영업 상태(휴무/영업종료/영업중 구분) - 일정 트리거 배지 구분용 */
+    public static BusinessStatus statusAt(Map<String, String> introFields, LocalDateTime at) {
         if (introFields == null || introFields.isEmpty()) {
-            return true;
+            return BusinessStatus.OPEN;
         }
         LocalDateTime resolved = at == null ? KoreaClock.now() : at;
         SentryBreadcrumbs.timeCalc("business-hours", "isOpenAt 입력=" + at + " 판정기준=" + resolved);
-        return isOpenAt(field -> introFields.getOrDefault(field, ""), resolved);
+        return statusAt(field -> introFields.getOrDefault(field, ""), resolved);
     }
 
     /**
@@ -140,10 +155,10 @@ public final class BusinessHoursEvaluator {
             return true;
         }
 
-        // 3) "매주"/"매월" 접두어 자체가 텍스트에 전혀 없이 요일명만 있는 경우("월요일" 단독) -
-        //    실제 TourAPI restdate 필드에 흔한 축약 표기. 위 매월 관련 규칙(1, 1.5)과 겹칠 여지가
-        //    없을 때만("매월"/"매주" 미포함) 매주 그 요일 휴무로 해석한다.
-        if (!restText.contains("매월") && !restText.contains("매주")) {
+        // 3) "매주"/"매월"/"매달" 접두어 자체가 텍스트에 전혀 없이 요일명만 있는 경우("월요일" 단독) -
+        //    실제 TourAPI restdate 필드에 흔한 축약 표기. 위 매월(매달) 관련 규칙(1, 1.5)과 겹칠 여지가
+        //    없을 때만("매월"/"매달"/"매주" 미포함) 매주 그 요일 휴무로 해석한다.
+        if (!restText.contains("매월") && !restText.contains("매달") && !restText.contains("매주")) {
             Matcher bare = BARE_WEEKDAY.matcher(restText);
             while (bare.find()) {
                 if (todayKo.equals(bare.group(1))) {
@@ -190,12 +205,17 @@ public final class BusinessHoursEvaluator {
     }
 
     private static boolean isOpenAt(Function<String, String> fieldAccessor, LocalDateTime at) {
+        return statusAt(fieldAccessor, at) == BusinessStatus.OPEN;
+    }
+
+    /** 휴무(정기휴무 요일)와 영업종료(영업시간 밖)를 구분해서 판정 */
+    private static BusinessStatus statusAt(Function<String, String> fieldAccessor, LocalDateTime at) {
         LocalDate date = at.toLocalDate();
 
         for (String field : RESTDATE_FIELDS) {
             String v = fieldAccessor.apply(field);
             if (!v.isBlank() && isClosedOnRestDate(v, date)) {
-                return false;
+                return BusinessStatus.CLOSED_DAY;
             }
         }
 
@@ -206,13 +226,13 @@ public final class BusinessHoursEvaluator {
                 LocalTime start = LocalTime.of(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
                 LocalTime end = LocalTime.of(Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)));
                 LocalTime nowTime = at.toLocalTime();
-                if (end.isBefore(start)) {
-                    return nowTime.isAfter(start) || nowTime.isBefore(end);
-                }
-                return !nowTime.isBefore(start) && !nowTime.isAfter(end);
+                boolean open = end.isBefore(start)
+                        ? (nowTime.isAfter(start) || nowTime.isBefore(end))
+                        : (!nowTime.isBefore(start) && !nowTime.isAfter(end));
+                return open ? BusinessStatus.OPEN : BusinessStatus.HOURS_ENDED;
             }
         }
-        return true;
+        return BusinessStatus.OPEN;
     }
 
     /**

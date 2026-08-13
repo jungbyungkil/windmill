@@ -10,7 +10,8 @@ const LEVEL_META = {
 const CAUSE_META = {
   heatTrigger: { icon: '🌡️', label: '폭염', avoid: 'HEAT' },
   weatherTrigger: { icon: '🌧️', label: '비 소식', avoid: 'WEATHER' },
-  businessTrigger: { icon: '🚫', label: '영업종료/휴무', avoid: 'BUSINESS' },
+  closedDayTrigger: { icon: '🚫', label: '휴무', avoid: 'BUSINESS' },
+  hoursEndedTrigger: { icon: '🕐', label: '영업종료', avoid: 'BUSINESS' },
   crowdTrigger: { icon: '👥', label: '혼잡', avoid: 'CROWD' },
   routeTangleTrigger: { icon: '🔀', label: '동선 꼬임', avoid: null },
 };
@@ -19,7 +20,7 @@ function primaryAvoidHint(trigger) {
   if (!trigger) return undefined;
   if (trigger.heatTrigger) return 'HEAT';
   if (trigger.weatherTrigger) return 'WEATHER';
-  if (trigger.businessTrigger) return 'BUSINESS';
+  if (trigger.closedDayTrigger || trigger.hoursEndedTrigger) return 'BUSINESS';
   if (trigger.crowdTrigger) return 'CROWD';
   return undefined;
 }

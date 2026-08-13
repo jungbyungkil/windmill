@@ -47,6 +47,8 @@ export default function ItineraryList({
   affectedItemIds = [],
   weatherAffectedItemIds,
   businessAffectedItemIds,
+  closedDayAffectedItemIds,
+  hoursEndedAffectedItemIds,
   crowdAffectedItemIds,
   weatherAlert = false,
   trigger = null,
@@ -72,6 +74,9 @@ export default function ItineraryList({
   const businessIds = toIdSet(
     resolveBusinessIds(businessAffectedItemIds, trigger, affectedItemIds, weatherIds),
   );
+  // 휴무(정기휴무 요일)·영업종료(영업시간 밖) 구분 - 신규 필드라 구버전 폴백 없이 그대로 사용
+  const closedDayIds = toIdSet(closedDayAffectedItemIds);
+  const hoursEndedIds = toIdSet(hoursEndedAffectedItemIds);
   const crowdIds = toIdSet(crowdAffectedItemIds);
   const tips = tipsFromTrigger(trigger);
   const tipLevel = triggerStatusLevel(trigger);
@@ -118,6 +123,8 @@ export default function ItineraryList({
           items={items}
           weatherAffectedItemIds={[...weatherIds]}
           businessAffectedItemIds={[...businessIds]}
+          closedDayAffectedItemIds={[...closedDayIds]}
+          hoursEndedAffectedItemIds={[...hoursEndedIds]}
           crowdAffectedItemIds={[...crowdIds]}
         />
       )}
@@ -127,9 +134,14 @@ export default function ItineraryList({
           빨간 <strong>야외</strong> 표시는 비·폭염 영향 일정이에요. 바람개비에서 실내로 바꿔보세요.
         </p>
       )}
-      {businessIds.size > 0 && (
+      {closedDayIds.size > 0 && (
         <p className="itinerary-business-hint">
-          <strong>휴무</strong> 표시는 방문일 기준 정기휴무·영업종료예요. 대체 장소를 골라보세요.
+          <strong>휴무</strong> 표시는 방문일이 정기휴무일이라는 뜻이에요. 대체 장소를 골라보세요.
+        </p>
+      )}
+      {hoursEndedIds.size > 0 && (
+        <p className="itinerary-business-hint">
+          <strong>영업종료</strong> 표시는 지금 영업시간이 끝났다는 뜻이에요. 대체 장소를 골라보세요.
         </p>
       )}
       {items.length === 0 ? (
@@ -152,7 +164,8 @@ export default function ItineraryList({
                 key={item.itemId}
                 item={item}
                 weatherAlerted={weatherIds.has(id) && !indoor}
-                businessAlerted={businessIds.has(id)}
+                closedDayAlerted={closedDayIds.has(id)}
+                hoursEndedAlerted={hoursEndedIds.has(id)}
                 crowdAlerted={crowdIds.has(id)}
                 onUpdateTime={onUpdateTime}
                 onUpdateItem={onUpdateItem}

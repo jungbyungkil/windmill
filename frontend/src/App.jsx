@@ -1035,6 +1035,8 @@ export default function App() {
                   affectedItemIds={trigger?.affectedItemIds}
                   weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
                   businessAffectedItemIds={trigger?.businessAffectedItemIds}
+                  closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
+                  hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
                   crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
                   weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
                   trigger={trigger}

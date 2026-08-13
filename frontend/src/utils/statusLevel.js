@@ -71,8 +71,11 @@ export function tipsFromTrigger(trigger) {
   if (trigger.crowdTrigger) {
     tips.push({ id: 'crowd', icon: '👥', text: '혼잡이 예상돼요. 이른 시간이나 대안 장소로 피하면 편해요.' });
   }
-  if (trigger.businessTrigger) {
-    tips.push({ id: 'biz', icon: '🚫', text: '방문일 기준 정기휴무·영업종료 장소가 있어요. 대체 일정을 골라보세요.' });
+  if (trigger.closedDayTrigger) {
+    tips.push({ id: 'closedDay', icon: '🚫', text: '방문일이 정기휴무일인 장소가 있어요. 대체 일정을 골라보세요.' });
+  }
+  if (trigger.hoursEndedTrigger) {
+    tips.push({ id: 'hoursEnded', icon: '🕐', text: '지금 영업이 끝난 장소가 있어요. 대체 일정을 골라보세요.' });
   }
   if (trigger.routeTangleTrigger) {
     tips.push({ id: 'route', icon: '🔀', text: '동선이 꼬였어요. 자동 재배치로 이동을 줄여 보세요.' });
@@ -97,8 +100,11 @@ export function baramiCommentFromTrigger(trigger) {
   if (trigger.crowdTrigger) {
     return '붐비는 곳이 있어요. 시간만 살짝 옮기면 여유롭게 즐길 수 있어요.';
   }
-  if (trigger.businessTrigger) {
+  if (trigger.closedDayTrigger) {
     return '쉬는 날이 끼어 있어요. 대체 장소만 챙기면 이 코스 그대로 좋아요!';
+  }
+  if (trigger.hoursEndedTrigger) {
+    return '영업이 끝난 곳이 있어요. 대체 장소만 챙기면 이 코스 그대로 좋아요!';
   }
   if (trigger.level === 'WARNING') {
     return '변수가 조금 보여요. 미리 대안만 봐 두면 안심이에요.';

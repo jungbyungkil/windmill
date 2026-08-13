@@ -39,5 +39,6 @@ public class RecommendationCandidate {
     private String mapY;            // 위도 - 동선 최적화용
     private String visitDate;       // 스마트 플랜 다일 배정용 "YYYY-MM-DD"
     private Boolean businessOpen;   // Stage2 결과 - RelatedCandidate에서 그대로 넘어옴, 모르면 null
+    private BusinessStatus businessStatus; // Stage2 결과 - 휴무/영업종료 구분(businessOpen=false일 때 이유)
     private List<Badge> badges;     // 날씨/혼잡/영업 실시간 상태 배지 - RecommendationPipeline에서 조립
 }

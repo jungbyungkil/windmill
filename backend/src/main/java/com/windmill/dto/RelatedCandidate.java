@@ -18,6 +18,7 @@ public class RelatedCandidate {
     private Integer contentTypeId;
     private String thumbnailUrl;   // firstimage - 없으면 null(프론트에서 플레이스홀더 표시)
     private Boolean businessOpen;  // Stage2 결과
+    private BusinessStatus businessStatus; // Stage2 결과 - 휴무/영업종료 구분(businessOpen=false일 때 이유)
 
     // 아래는 Stage2에서 TourAttractionService.getDetail() 조회 결과로 채워짐 (위치/전화/요금/정기휴무 카드 표시용)
     private String addr1;

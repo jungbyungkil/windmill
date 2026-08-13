@@ -16,7 +16,12 @@ public class TriggerResult {
     private boolean crowdTrigger;
     /** 평시 대비 200%·매우붐빔 등 — 바람개비 DANGER 승격 */
     private boolean crowdUrgent;
+    /** 휴무·영업종료 합집합 - 하위 호환용. 배지 등 구분 표시는 closedDayTrigger/hoursEndedTrigger를 우선 사용 */
     private boolean businessTrigger;
+    /** 방문일이 정기휴무 요일 */
+    private boolean closedDayTrigger;
+    /** 정기휴무는 아니지만 방문 시각이 영업시간 밖(오늘 진행 중인 여행에만 해당) */
+    private boolean hoursEndedTrigger;
     /** 동선 꼬임(비효율 경로) - 자동 재배치 제안 */
     private boolean routeTangleTrigger;
     private RouteTangleResult routeTangle;
@@ -30,8 +35,12 @@ public class TriggerResult {
     private List<Long> affectedItemIds;
     /** 비·폭염에 걸린 야외 일정만 */
     private List<Long> weatherAffectedItemIds;
-    /** 휴무·영업종료에 걸린 일정만 */
+    /** 휴무·영업종료 합집합에 걸린 일정 - 하위 호환용 */
     private List<Long> businessAffectedItemIds;
+    /** 방문일이 정기휴무 요일인 일정만 */
+    private List<Long> closedDayAffectedItemIds;
+    /** 영업종료(영업시간 밖)에 걸린 일정만 */
+    private List<Long> hoursEndedAffectedItemIds;
     /** 혼잡에 걸린 일정만 */
     private List<Long> crowdAffectedItemIds;
     /** 여행 기간과 겹치는 지역 축제 제안 - level 산정에는 관여하지 않는다 */

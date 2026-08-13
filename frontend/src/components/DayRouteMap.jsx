@@ -24,23 +24,30 @@ function canGeocode(item) {
   return Boolean((item?.addr1 || '').trim() || (item?.placeName || '').trim());
 }
 
-function statusText(item, weather, business, crowd) {
+function statusText(item, weather, closedDay, hoursEnded, crowd) {
   const parts = [];
   if (item.scheduledTime) parts.push(item.scheduledTime);
-  const level = itemStatusLevel(item, { weatherAlerted: weather, businessAlerted: business, crowdAlerted: crowd });
+  const level = itemStatusLevel(item, {
+    weatherAlerted: weather,
+    businessAlerted: closedDay || hoursEnded,
+    crowdAlerted: crowd,
+  });
   if (level === 'DANGER') parts.push('야외·날씨 주의');
-  else if (business) parts.push('휴무·영업 주의');
+  else if (closedDay) parts.push('휴무');
+  else if (hoursEnded) parts.push('영업종료');
   else if (crowd || level === 'WARNING') parts.push('혼잡 주의');
   else parts.push(STATUS_LABEL.NORMAL);
   return parts.join(' · ');
 }
 
-function buildStopMeta(item, index, weather, business, crowd) {
+function buildStopMeta(item, index, weather, closedDay, hoursEnded, crowd) {
   const id = Number(item.itemId);
   const indoor = isIndoorPlace(item);
+  const isClosedDay = closedDay.has(id);
+  const isHoursEnded = hoursEnded.has(id);
   const level = itemStatusLevel(item, {
     weatherAlerted: weather.has(id) && !indoor,
-    businessAlerted: business.has(id),
+    businessAlerted: isClosedDay || isHoursEnded,
     crowdAlerted: crowd.has(id),
   });
   return {
@@ -49,7 +56,8 @@ function buildStopMeta(item, index, weather, business, crowd) {
     id,
     level,
     weather: weather.has(id) && !indoor,
-    business: business.has(id),
+    closedDay: isClosedDay,
+    hoursEnded: isHoursEnded,
     crowd: crowd.has(id),
   };
 }
@@ -239,7 +247,7 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
           >
             <div className="day-route-map-info">
               <strong>{selected.item.placeName}</strong>
-              <p>{statusText(selected.item, selected.weather, selected.business, selected.crowd)}</p>
+              <p>{statusText(selected.item, selected.weather, selected.closedDay, selected.hoursEnded, selected.crowd)}</p>
               {selected.fromAddress && <em>주소 기준 위치</em>}
               {selected.item.category && !selected.fromAddress && <em>{selected.item.category}</em>}
               {canOpenInKakaoMap(selected.item) && (
@@ -293,7 +301,8 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
 export default function DayRouteMap({
   items = [],
   weatherAffectedItemIds = [],
-  businessAffectedItemIds = [],
+  closedDayAffectedItemIds = [],
+  hoursEndedAffectedItemIds = [],
   crowdAffectedItemIds = [],
 }) {
   const [open, setOpen] = useState(true);
@@ -320,18 +329,19 @@ export default function DayRouteMap({
   }, []);
 
   const weather = useMemo(() => new Set((weatherAffectedItemIds || []).map(Number)), [weatherAffectedItemIds]);
-  const business = useMemo(() => new Set((businessAffectedItemIds || []).map(Number)), [businessAffectedItemIds]);
+  const closedDay = useMemo(() => new Set((closedDayAffectedItemIds || []).map(Number)), [closedDayAffectedItemIds]);
+  const hoursEnded = useMemo(() => new Set((hoursEndedAffectedItemIds || []).map(Number)), [hoursEndedAffectedItemIds]);
   const crowd = useMemo(() => new Set((crowdAffectedItemIds || []).map(Number)), [crowdAffectedItemIds]);
 
   const draftStops = useMemo(() => {
     return (items || []).map((item, index) => {
-      const meta = buildStopMeta(item, index, weather, business, crowd);
+      const meta = buildStopMeta(item, index, weather, closedDay, hoursEnded, crowd);
       const coord = parseCoord(item);
       if (coord) return { ...meta, ...coord };
       if (!canGeocode(item)) return null;
       return meta;
     }).filter(Boolean);
-  }, [items, weather, business, crowd]);
+  }, [items, weather, closedDay, hoursEnded, crowd]);
 
   const knownCoordCount = useMemo(
     () => draftStops.filter((s) => s.lat != null && s.lng != null).length,

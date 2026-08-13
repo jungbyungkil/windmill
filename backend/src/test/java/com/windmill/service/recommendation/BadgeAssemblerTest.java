@@ -1,6 +1,7 @@
 package com.windmill.service.recommendation;
 
 import com.windmill.dto.Badge;
+import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.service.trigger.RegionCondition;
 import org.junit.jupiter.api.Test;
@@ -101,14 +102,20 @@ class BadgeAssemblerTest {
     }
 
     @Test
-    void businessOpenBadge() {
+    void businessStatusBadges_closedDayAndHoursEndedAreDistinct() {
         RegionCondition condition = RegionCondition.builder().crowdRateByPlaceName(Map.of()).build();
-        RecommendationCandidate open = RecommendationCandidate.builder().businessOpen(true).build();
-        RecommendationCandidate closed = RecommendationCandidate.builder().businessOpen(false).build();
-        RecommendationCandidate unknown = RecommendationCandidate.builder().businessOpen(null).build();
-        assembler.attach(List.of(open, closed, unknown), condition);
+        RecommendationCandidate open = RecommendationCandidate.builder()
+                .businessStatus(BusinessStatus.OPEN).build();
+        RecommendationCandidate closedDay = RecommendationCandidate.builder()
+                .businessStatus(BusinessStatus.CLOSED_DAY).build();
+        RecommendationCandidate hoursEnded = RecommendationCandidate.builder()
+                .businessStatus(BusinessStatus.HOURS_ENDED).build();
+        RecommendationCandidate unknown = RecommendationCandidate.builder()
+                .businessStatus(null).build();
+        assembler.attach(List.of(open, closedDay, hoursEnded, unknown), condition);
         assertTrue(open.getBadges().stream().anyMatch(b -> "영업중".equals(b.getLabel())));
-        assertTrue(closed.getBadges().stream().anyMatch(b -> b.getLabel().contains("영업종료")));
+        assertTrue(closedDay.getBadges().stream().anyMatch(b -> "휴무".equals(b.getLabel())));
+        assertTrue(hoursEnded.getBadges().stream().anyMatch(b -> "영업종료".equals(b.getLabel())));
         assertTrue(unknown.getBadges() == null || unknown.getBadges().stream()
                 .noneMatch(b -> b.getType() == Badge.BadgeType.HOURS));
     }

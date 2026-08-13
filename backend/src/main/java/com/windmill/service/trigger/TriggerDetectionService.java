@@ -2,6 +2,7 @@ package com.windmill.service.trigger;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
+import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.FestivalSuggestion;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.TourAttractionDetail;
@@ -53,6 +54,8 @@ public class TriggerDetectionService {
                     .affectedItemIds(List.of())
                     .weatherAffectedItemIds(List.of())
                     .businessAffectedItemIds(List.of())
+                    .closedDayAffectedItemIds(List.of())
+                    .hoursEndedAffectedItemIds(List.of())
                     .crowdAffectedItemIds(List.of())
                     .festivalSuggestions(festivals).build());
         }
@@ -128,26 +131,27 @@ public class TriggerDetectionService {
         boolean closedBySnapshot = BusinessHoursEvaluator.isClosedOnRestDate(item.getRestDateText(), day);
 
         if (closedBySnapshot) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, true));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, true, false));
         }
 
         // 방문일이 오늘이 아니면(미래 당일치기 사전 계획) "지금 이 순간 영업 중인지" 실시간 비교는 의미가
         // 없다 - 이 아래 라이브 체크는 실제 현재 시각을 방문일에 갖다 붙여 비교하므로, 오늘 진행 중인
         // 여행에만 적용하고 미래 방문일은 위 정기휴무 요일 판정까지만 반영한다.
         if (!day.equals(KoreaClock.today())) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, false));
         }
 
         if (item.getContentId() == null || item.getContentTypeId() == null) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, false));
         }
 
         LocalDateTime at = LocalDateTime.of(day, KoreaClock.nowTime());
         return tourAttractionService.getDetail(item.getContentId(), item.getContentTypeId())
                 .map(TourAttractionDetail::getIntroFields)
-                .map(fields -> !BusinessHoursEvaluator.isOpenAt(fields, at))
-                .map(closed -> buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, closed))
-                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
+                .map(fields -> BusinessHoursEvaluator.statusAt(fields, at))
+                .map(status -> buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent,
+                        status == BusinessStatus.CLOSED_DAY, status == BusinessStatus.HOURS_ENDED))
+                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, false));
     }
 
     private TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem) {
@@ -156,16 +160,24 @@ public class TriggerDetectionService {
         boolean heatUrgent = perItem.stream().anyMatch(e -> e.getValue().isHeatUrgent());
         boolean crowd = perItem.stream().anyMatch(e -> e.getValue().isCrowdTrigger());
         boolean crowdUrgent = perItem.stream().anyMatch(e -> e.getValue().isCrowdUrgent());
-        boolean business = perItem.stream().anyMatch(e -> e.getValue().isBusinessTrigger());
+        boolean closedDay = perItem.stream().anyMatch(e -> e.getValue().isClosedDayTrigger());
+        boolean hoursEnded = perItem.stream().anyMatch(e -> e.getValue().isHoursEndedTrigger());
 
         List<Long> weatherIds = perItem.stream()
                 .filter(e -> e.getValue().isWeatherTrigger() || e.getValue().isHeatTrigger())
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
-        List<Long> businessIds = perItem.stream()
-                .filter(e -> e.getValue().isBusinessTrigger())
+        List<Long> closedDayIds = perItem.stream()
+                .filter(e -> e.getValue().isClosedDayTrigger())
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
+        List<Long> hoursEndedIds = perItem.stream()
+                .filter(e -> e.getValue().isHoursEndedTrigger())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        List<Long> businessIds = new ArrayList<>();
+        closedDayIds.forEach(id -> { if (!businessIds.contains(id)) businessIds.add(id); });
+        hoursEndedIds.forEach(id -> { if (!businessIds.contains(id)) businessIds.add(id); });
         List<Long> crowdIds = perItem.stream()
                 .filter(e -> e.getValue().isCrowdTrigger())
                 .map(Map.Entry::getKey)
@@ -175,22 +187,27 @@ public class TriggerDetectionService {
         businessIds.forEach(id -> { if (!affected.contains(id)) affected.add(id); });
         crowdIds.forEach(id -> { if (!affected.contains(id)) affected.add(id); });
 
-        return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, business,
-                affected, weatherIds, businessIds, crowdIds);
+        return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, closedDay, hoursEnded,
+                affected, weatherIds, businessIds, closedDayIds, hoursEndedIds, crowdIds);
     }
 
     private TriggerResult buildResult(boolean weather, boolean heat, boolean heatUrgent,
-                                      boolean crowd, boolean crowdUrgent, boolean business) {
-        return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, business,
-                List.of(), List.of(), List.of(), List.of());
+                                      boolean crowd, boolean crowdUrgent,
+                                      boolean closedDay, boolean hoursEnded) {
+        return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, closedDay, hoursEnded,
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private TriggerResult buildResult(boolean weather, boolean heat, boolean heatUrgent,
-                                      boolean crowd, boolean crowdUrgent, boolean business,
+                                      boolean crowd, boolean crowdUrgent,
+                                      boolean closedDay, boolean hoursEnded,
                                       List<Long> affectedItemIds,
                                       List<Long> weatherAffectedItemIds,
                                       List<Long> businessAffectedItemIds,
+                                      List<Long> closedDayAffectedItemIds,
+                                      List<Long> hoursEndedAffectedItemIds,
                                       List<Long> crowdAffectedItemIds) {
+        boolean business = closedDay || hoursEnded;
         int count = (weather ? 1 : 0) + (heat ? 1 : 0) + (crowd ? 1 : 0) + (business ? 1 : 0);
         List<String> details = new ArrayList<>();
         if (weather) {
@@ -210,8 +227,12 @@ public class TriggerDetectionService {
                 details.add("혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?");
             }
         }
-        if (business) {
+        if (closedDay && hoursEnded) {
             details.add("오늘(방문일) 정기휴무·영업종료인 장소가 있어요. 대체 장소를 골라보세요.");
+        } else if (closedDay) {
+            details.add("오늘(방문일) 정기휴무인 장소가 있어요. 대체 장소를 골라보세요.");
+        } else if (hoursEnded) {
+            details.add("지금 영업이 끝난 장소가 있어요. 대체 장소를 골라보세요.");
         }
 
         TriggerLevel level = TriggerLevel.NORMAL;
@@ -232,12 +253,16 @@ public class TriggerDetectionService {
                 .crowdTrigger(crowd)
                 .crowdUrgent(crowdUrgent)
                 .businessTrigger(business)
+                .closedDayTrigger(closedDay)
+                .hoursEndedTrigger(hoursEnded)
                 .triggerCount(count)
                 .level(level)
                 .triggerDetails(details)
                 .affectedItemIds(affectedItemIds)
                 .weatherAffectedItemIds(weatherAffectedItemIds)
                 .businessAffectedItemIds(businessAffectedItemIds)
+                .closedDayAffectedItemIds(closedDayAffectedItemIds)
+                .hoursEndedAffectedItemIds(hoursEndedAffectedItemIds)
                 .crowdAffectedItemIds(crowdAffectedItemIds)
                 .build();
     }

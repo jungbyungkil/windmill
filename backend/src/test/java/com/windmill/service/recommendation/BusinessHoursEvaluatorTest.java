@@ -49,6 +49,15 @@ class BusinessHoursEvaluatorTest {
     }
 
     @Test
+    void maedalSynonymForMaewolWithMultipleOrdinals() {
+        // 실제 사례(성식당): "매달"(매월 동의어) + 여러 주차 나열 - 2026-08-13은 8월의 2번째 목요일이라
+        // "셋째·넷째·다섯째"에 안 걸려야 함(매주 목요일로 오인해 휴무 처리하면 안 됨)
+        String rest = "매달 셋째, 넷째, 다섯째 목요일";
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 13))); // 2번째 목요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 20)));  // 3번째 목요일
+    }
+
+    @Test
     void firstTuesdayOfMonthCloses() {
         String rest = "매월 첫째주 화요일";
         assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 4)));

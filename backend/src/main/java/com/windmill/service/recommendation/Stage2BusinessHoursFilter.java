@@ -76,7 +76,9 @@ public class Stage2BusinessHoursFilter {
         var close = BusinessHoursEvaluator.extractCloseTime(detail.getIntroFields());
         candidate.setCloseTime(BusinessHoursEvaluator.formatHhMm(close));
 
-        candidate.setBusinessOpen(BusinessHoursEvaluator.isCurrentlyOpen(detail.getIntroFields()));
+        var status = BusinessHoursEvaluator.currentStatus(detail.getIntroFields());
+        candidate.setBusinessOpen(status == com.windmill.dto.BusinessStatus.OPEN);
+        candidate.setBusinessStatus(status);
 
         String strollerText = BusinessHoursEvaluator.extractStrollerText(detail.getIntroFields());
         candidate.setStrollerText(strollerText);
@@ -89,6 +91,7 @@ public class Stage2BusinessHoursFilter {
     /** 상세조회 실패/빈 응답 - 보수적으로 영업중 취급하되 위치/요금 등 부가정보는 비워둔다 */
     private RelatedCandidate openWithoutDetail(RelatedCandidate candidate) {
         candidate.setBusinessOpen(true);
+        candidate.setBusinessStatus(com.windmill.dto.BusinessStatus.OPEN);
         return candidate;
     }
 }

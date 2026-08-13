@@ -73,16 +73,22 @@ public class BadgeAssembler {
                     .build());
         }
 
-        if (Boolean.TRUE.equals(c.getBusinessOpen())) {
+        if (c.getBusinessStatus() == com.windmill.dto.BusinessStatus.OPEN) {
             badges.add(Badge.builder()
                     .type(Badge.BadgeType.HOURS)
                     .label("영업중")
                     .severity(Badge.Severity.SUCCESS)
                     .build());
-        } else if (Boolean.FALSE.equals(c.getBusinessOpen())) {
+        } else if (c.getBusinessStatus() == com.windmill.dto.BusinessStatus.CLOSED_DAY) {
             badges.add(Badge.builder()
                     .type(Badge.BadgeType.HOURS)
-                    .label("영업종료 · 휴무일 수 있어요")
+                    .label("휴무")
+                    .severity(Badge.Severity.WARNING)
+                    .build());
+        } else if (c.getBusinessStatus() == com.windmill.dto.BusinessStatus.HOURS_ENDED) {
+            badges.add(Badge.builder()
+                    .type(Badge.BadgeType.HOURS)
+                    .label("영업종료")
                     .severity(Badge.Severity.WARNING)
                     .build());
         }
