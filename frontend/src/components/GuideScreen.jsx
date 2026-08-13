@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+
 const PAGE1_STEPS = [
   { icon: '📍', title: '여행 지역 선택', body: '시/도 → 시/군/구 순서로 다녀올 지역을 골라요.' },
   { icon: '📅', title: '여행 날짜 선택', body: '바람따라는 당일치기만 지원해요. 하루 날짜만 고르면 돼요.' },
@@ -58,11 +60,13 @@ function StepList({ steps, startNumber = 1 }) {
   );
 }
 
-/** 전체 메뉴 > 이용 가이드 - 실제 화면 흐름(PAGE1 온보딩 → PAGE2 여행 진행) 그대로 정리 */
+/** 전체 메뉴 > 이용 가이드 - 실제 화면 흐름(PAGE1 온보딩 → PAGE2 여행 진행) 그대로 정리 + 버튼으로 바로 따라 해볼 수 있게 함 */
 export default function GuideScreen() {
+  const navigate = useNavigate();
+
   return (
     <div className="guide-screen">
-      <p className="guide-intro">바람따라는 이런 순서로 쓰면 편해요.</p>
+      <p className="guide-intro">바람따라는 이런 순서로 쓰면 편해요. 버튼을 누르면 그 자리에서 바로 따라 해볼 수 있어요.</p>
 
       <section className="guide-page">
         <h2 className="guide-page-title">
@@ -88,6 +92,10 @@ export default function GuideScreen() {
             ))}
           </div>
         </div>
+
+        <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/')}>
+          🌬️ 여기서부터 따라 해보기
+        </button>
       </section>
 
       <section className="guide-page">
@@ -96,6 +104,11 @@ export default function GuideScreen() {
           여행 진행
         </h2>
         <StepList steps={PAGE2_STEPS} startNumber={5} />
+
+        <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/')}>
+          🧭 내 일정에서 이어서 따라 해보기
+        </button>
+        <p className="guide-cta-hint">진행 중인 일정이 있으면 바로 그 일정으로, 없으면 새 여행 시작 화면으로 이동해요.</p>
       </section>
     </div>
   );

@@ -151,6 +151,11 @@ export default function App() {
     navigate('/trip');
   }
 
+  function handleOpenMyTrips() {
+    setMenuOpen(false);
+    navigate('/my-trips');
+  }
+
   function handleOpenHistory() {
     setMenuOpen(false);
     navigate('/history');
@@ -880,6 +885,7 @@ export default function App() {
       <GlobalMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
+        onNavigateMyTrips={handleOpenMyTrips}
         onNavigateHistory={handleOpenHistory}
         onNavigateGuide={handleOpenGuide}
       />

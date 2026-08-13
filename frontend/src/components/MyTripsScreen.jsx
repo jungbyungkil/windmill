@@ -92,6 +92,9 @@ export default function MyTripsScreen({ sessionId, onResume }) {
                     : ''}
                   {trip.withPet ? ' · 🐾' : ''}
                 </span>
+                {trip.status === 'ENDED' && trip.overallNote && (
+                  <p className="my-trips-note">💬 {trip.overallNote}</p>
+                )}
               </div>
               <div className="my-trips-row-actions">
                 {trip.status === 'ACTIVE' ? (
@@ -103,7 +106,13 @@ export default function MyTripsScreen({ sessionId, onResume }) {
                     이어하기
                   </button>
                 ) : (
-                  <span className="my-trips-resume-disabled">조회만 가능</span>
+                  <button
+                    type="button"
+                    className="my-trips-resume-disabled my-trips-view-btn"
+                    onClick={() => onResume(trip.itineraryId)}
+                  >
+                    코스 보기
+                  </button>
                 )}
                 <button
                   type="button"

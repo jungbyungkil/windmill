@@ -30,7 +30,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -185,18 +185,20 @@ public class ItineraryService {
      */
     @Transactional(readOnly = true)
     public List<ItineraryListItemResponse> listAll(String sessionUuid, ItineraryStatus statusFilter, int limit) {
-        Set<Long> endedByRecord = tripRecordRepository.findBySessionUuid(sessionUuid).stream()
-                .map(TripRecord::getItinerary)
-                .filter(java.util.Objects::nonNull)
-                .map(Itinerary::getId)
-                .collect(Collectors.toSet());
+        Map<Long, TripRecord> recordByItineraryId = tripRecordRepository.findBySessionUuid(sessionUuid).stream()
+                .filter(t -> t.getItinerary() != null)
+                .collect(Collectors.toMap(t -> t.getItinerary().getId(), t -> t, (a, b) -> a));
 
         return itineraryRepository.findBySessionUuid(sessionUuid).stream()
                 .sorted(Comparator
                         .comparing(Itinerary::getStartDate, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Itinerary::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .map(i -> ItineraryListItemResponse.from(i,
-                        ItineraryStatus.of(i.getStartDate(), endedByRecord.contains(i.getId()))))
+                .map(i -> {
+                    TripRecord record = recordByItineraryId.get(i.getId());
+                    return ItineraryListItemResponse.from(i,
+                            ItineraryStatus.of(i.getStartDate(), record != null),
+                            record == null ? null : record.getOverallNote());
+                })
                 .filter(r -> statusFilter == null || r.getStatus() == statusFilter)
                 .limit(Math.max(1, limit))
                 .collect(Collectors.toList());
