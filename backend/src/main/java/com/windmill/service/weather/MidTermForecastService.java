@@ -5,6 +5,7 @@ import com.windmill.client.MidFcstClient;
 import com.windmill.dto.MidTermForecastResponse;
 import com.windmill.dto.RegionCode;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.MidTermRegionMapper;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +44,7 @@ public class MidTermForecastService {
     }
 
     private MidTermForecastResponse assemble(MidTermRegionMapper.MidRegs regs, JsonNode land, JsonNode ta) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = KoreaClock.today();
         List<MidTermForecastResponse.DayOutlook> days = new ArrayList<>();
         int rainDays = 0;
         int heatDays = 0;

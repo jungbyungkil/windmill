@@ -15,6 +15,7 @@ import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.GeoUtils;
 import com.windmill.util.PlaceTagSanitizer;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.RouteOptimizer;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
@@ -117,7 +118,7 @@ public class SmartPlanService {
         if (forDate != null) {
             return List.of(forDate);
         }
-        LocalDate start = itinerary.getStartDate() != null ? itinerary.getStartDate() : LocalDate.now();
+        LocalDate start = itinerary.getStartDate() != null ? itinerary.getStartDate() : KoreaClock.today();
         LocalDate end = itinerary.getEndDate() != null ? itinerary.getEndDate() : start;
         if (end.isBefore(start)) {
             end = start;
@@ -227,7 +228,7 @@ public class SmartPlanService {
                     .build());
         }
 
-        boolean sameDayPlan = targetDays.size() == 1 && targetDays.get(0).equals(LocalDate.now());
+        boolean sameDayPlan = targetDays.size() == 1 && targetDays.get(0).equals(KoreaClock.today());
         String summary = buildSummary(rain, heat, crowdFiltered, totalKm, allStops, targetDays.size(),
                 sameDayPlan ? resolveDayStart(targetDays.get(0)) : null, familyPace);
         log.info("[SmartPlan] days={}, stops={}, meals={}, family={}, rain={}, heat={}, totalKm={}",
@@ -497,8 +498,8 @@ public class SmartPlanService {
     }
 
     LocalTime resolveDayStart(LocalDate visitDate) {
-        if (visitDate != null && visitDate.equals(LocalDate.now())) {
-            LocalTime soon = LocalTime.now().plusMinutes(TODAY_LEAD_MINUTES).withSecond(0).withNano(0);
+        if (visitDate != null && visitDate.equals(KoreaClock.today())) {
+            LocalTime soon = KoreaClock.nowTime().plusMinutes(TODAY_LEAD_MINUTES).withSecond(0).withNano(0);
             int minute = soon.getMinute();
             LocalTime rounded;
             if (minute == 0) {

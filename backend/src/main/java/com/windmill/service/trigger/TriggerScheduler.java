@@ -5,13 +5,13 @@ import com.windmill.client.CrowdRateClient;
 import com.windmill.client.WeatherClient;
 import com.windmill.dto.RegionCode;
 import com.windmill.util.CrowdCongestionEvaluator;
+import com.windmill.util.KoreaClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -81,7 +81,7 @@ public class TriggerScheduler {
         Map<String, List<Double>> series = new HashMap<>();
         Map<String, String> categories = new HashMap<>();
         Map<String, Double> todayRates = new HashMap<>();
-        String today = LocalDate.now().format(YMD);
+        String today = KoreaClock.today().format(YMD);
 
         for (JsonNode item : items) {
             String name = item.path("tAtsNm").asText(null);
@@ -140,7 +140,7 @@ public class TriggerScheduler {
     }
 
     private Double maxByCategoryToday(List<JsonNode> items, String category) {
-        String today = LocalDate.now().format(YMD);
+        String today = KoreaClock.today().format(YMD);
         Double max = null;
         for (JsonNode i : items) {
             if (!category.equals(i.path("category").asText())) {

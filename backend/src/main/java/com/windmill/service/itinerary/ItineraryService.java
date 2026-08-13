@@ -53,7 +53,7 @@ public class ItineraryService {
                 || !request.getStartDate().equals(request.getEndDate())) {
             throw new IllegalArgumentException("당일치기만 가능합니다. 여행 날짜는 하루만 선택해 주세요.");
         }
-        if (request.getStartDate().isBefore(LocalDate.now())) {
+        if (request.getStartDate().isBefore(KoreaClock.today())) {
             throw new IllegalArgumentException("여행일은 오늘 이후여야 합니다.");
         }
         RegionCode region = regionCodeService.find(request.getSignguFullCode())
@@ -93,7 +93,7 @@ public class ItineraryService {
         if (startDate == null) {
             throw new IllegalArgumentException("여행 날짜를 선택해 주세요.");
         }
-        if (startDate.isBefore(LocalDate.now())) {
+        if (startDate.isBefore(KoreaClock.today())) {
             throw new IllegalArgumentException("여행일은 오늘 이후여야 합니다.");
         }
         TripRecord record = tripRecordRepository.findById(tripRecordId)
@@ -293,8 +293,8 @@ public class ItineraryService {
         if (last != null && last.getScheduledTime() != null) {
             LocalTime lastStart = ClosingTimeGate.parseHhMm(last.getScheduledTime());
             cursor = lastStart != null ? lastStart.plusMinutes(75) : LocalTime.of(9, 0);
-        } else if (visitDate != null && visitDate.equals(LocalDate.now())) {
-            LocalTime soon = LocalTime.now().plusMinutes(30).withSecond(0).withNano(0);
+        } else if (visitDate != null && visitDate.equals(KoreaClock.today())) {
+            LocalTime soon = KoreaClock.nowTime().plusMinutes(30).withSecond(0).withNano(0);
             int m = soon.getMinute();
             if (m == 0) {
                 cursor = soon;

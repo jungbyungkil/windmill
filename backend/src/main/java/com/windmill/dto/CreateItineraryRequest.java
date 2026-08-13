@@ -1,6 +1,7 @@
 package com.windmill.dto;
 
 import com.windmill.domain.CompanionType;
+import com.windmill.util.KoreaClock;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,6 +33,6 @@ public class CreateItineraryRequest {
 
     @AssertTrue(message = "여행일은 오늘 이후여야 합니다.")
     public boolean isNotPastStart() {
-        return startDate == null || !startDate.isBefore(LocalDate.now());
+        return startDate == null || !startDate.isBefore(KoreaClock.today());
     }
 }

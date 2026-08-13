@@ -1,5 +1,6 @@
 package com.windmill.dto;
 
+import com.windmill.util.KoreaClock;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -14,6 +15,6 @@ public class StartFromTripRecordRequest {
 
     @AssertTrue(message = "여행일은 오늘 이후여야 합니다.")
     public boolean isNotPastStart() {
-        return startDate == null || !startDate.isBefore(LocalDate.now());
+        return startDate == null || !startDate.isBefore(KoreaClock.today());
     }
 }

@@ -4,6 +4,7 @@ import com.windmill.client.KakaoDirectionsClient;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.MapRouteRequest;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.VisitOrderOptimizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -167,8 +168,8 @@ public class RouteRecalculationService {
     private LocalTime resolveDayStart(List<ItineraryItem> ordered) {
         LocalTime cursor = DAY_START;
         LocalDate visit = resolveVisitDate(ordered);
-        if (visit != null && visit.equals(LocalDate.now())) {
-            LocalTime soon = LocalTime.now().plusMinutes(30).withSecond(0).withNano(0);
+        if (visit != null && visit.equals(KoreaClock.today())) {
+            LocalTime soon = KoreaClock.nowTime().plusMinutes(30).withSecond(0).withNano(0);
             int m = soon.getMinute();
             if (m == 0) {
                 cursor = soon;
