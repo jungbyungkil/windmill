@@ -131,6 +131,13 @@ public class TriggerDetectionService {
             return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, true));
         }
 
+        // 방문일이 오늘이 아니면(미래 당일치기 사전 계획) "지금 이 순간 영업 중인지" 실시간 비교는 의미가
+        // 없다 - 이 아래 라이브 체크는 실제 현재 시각을 방문일에 갖다 붙여 비교하므로, 오늘 진행 중인
+        // 여행에만 적용하고 미래 방문일은 위 정기휴무 요일 판정까지만 반영한다.
+        if (!day.equals(KoreaClock.today())) {
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
+        }
+
         if (item.getContentId() == null || item.getContentTypeId() == null) {
             return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false));
         }
