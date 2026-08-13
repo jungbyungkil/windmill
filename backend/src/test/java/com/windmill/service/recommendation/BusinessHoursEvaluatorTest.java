@@ -30,6 +30,32 @@ class BusinessHoursEvaluatorTest {
     }
 
     @Test
+    void secondAndFourthWednesdayCloses_wordOrdinal() {
+        String rest = "매월 두번째·네번째 수요일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 12))); // 2주차
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 26))); // 4주차
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 5)));  // 1주차
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 19))); // 3주차
+        // 요일이 다르면(일요일) 주차가 맞아도 닫지 않음
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 16)));
+    }
+
+    @Test
+    void secondAndFourthWednesdayCloses_numericOrdinal() {
+        String rest = "매월 2,4주 수요일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 12)));
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 26)));
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 5)));
+    }
+
+    @Test
+    void firstTuesdayOfMonthCloses() {
+        String rest = "매월 첫째주 화요일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 4)));
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 11)));
+    }
+
+    @Test
     void yearRoundOpen() {
         assertFalse(BusinessHoursEvaluator.isClosedOnRestDate("연중무휴", LocalDate.of(2026, 8, 9)));
     }

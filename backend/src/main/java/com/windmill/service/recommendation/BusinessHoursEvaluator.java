@@ -43,6 +43,14 @@ public final class BusinessHoursEvaluator {
     /** 매주 X요일 (매월 마지막 … 구문은 제외하고 볼 때 사용) */
     private static final Pattern EVERY_WEEKDAY = Pattern.compile(
             "매주\\s*([월화수목금토일])(?:요일)?");
+    /**
+     * 매월 N번째(·M번째…) X요일 — "매월 두번째·네번째 수요일", "매월 2,4주 수요일", "매월 첫째주 화요일" 등.
+     * group(1)에 주차 표기(숫자·서수어 조합)를, group(2)에 요일 한 글자를 담아 WEEK_ORDINAL_TOKEN으로 재파싱한다.
+     */
+    private static final Pattern NTH_WEEKDAY_CLAUSE = Pattern.compile(
+            "매월\\s*([^월화수목금토일]*?)\\s*([월화수목금토일])요일");
+    private static final Pattern WEEK_ORDINAL_TOKEN = Pattern.compile(
+            "\\d+|첫번째|첫째|첫|두번째|둘째|세번째|셋째|네번째|넷째|다섯번째|다섯째");
     private static final String[] WEEKDAY_KO = {"월", "화", "수", "목", "금", "토", "일"};
 
     private BusinessHoursEvaluator() {
@@ -99,6 +107,22 @@ public final class BusinessHoursEvaluator {
             }
         }
 
+        // 1.5) 매월 N번째(·M번째…) X요일 — "매월 마지막"과 겹치지 않는 특정 주차 지정만 매칭
+        //      (group(1)에 주차 서수/숫자가 하나도 없으면 - 예: "매월 마지막 주" - 아래 루프가 그냥 안 걸림)
+        Matcher nth = NTH_WEEKDAY_CLAUSE.matcher(restText);
+        while (nth.find()) {
+            if (!todayKo.equals(nth.group(2))) {
+                continue;
+            }
+            int currentWeek = weekOfMonth(date);
+            Matcher ordinal = WEEK_ORDINAL_TOKEN.matcher(nth.group(1));
+            while (ordinal.find()) {
+                if (weekOrdinalValue(ordinal.group()) == currentWeek) {
+                    return true;
+                }
+            }
+        }
+
         // 2) 매주 X요일 — 같은 요일의 "마지막 주" 규칙만 있는 경우는 제외
         Matcher every = EVERY_WEEKDAY.matcher(restText);
         while (every.find()) {
@@ -122,6 +146,34 @@ public final class BusinessHoursEvaluator {
     /** 해당 날짜가 그 달의 마지막 해당 요일인지 (예: 8월 마지막 일요일) */
     static boolean isLastWeekdayOfMonth(LocalDate date) {
         return date.plusWeeks(1).getMonth() != date.getMonth();
+    }
+
+    /** 그 달에서 몇 번째 주인지 (1~5) - "1~7일=첫째 주, 8~14일=둘째 주…" 통상 표기 기준 */
+    static int weekOfMonth(LocalDate date) {
+        return (date.getDayOfMonth() - 1) / 7 + 1;
+    }
+
+    /** "두번째"/"둘째"/"2" 같은 주차 서수 토큰을 1~5 숫자로. 못 알아들으면 0(어느 주와도 매칭 안 됨) */
+    private static int weekOrdinalValue(String token) {
+        if (Character.isDigit(token.charAt(0))) {
+            return Integer.parseInt(token);
+        }
+        if (token.startsWith("첫")) {
+            return 1;
+        }
+        if (token.equals("둘째") || token.equals("두번째")) {
+            return 2;
+        }
+        if (token.equals("셋째") || token.equals("세번째")) {
+            return 3;
+        }
+        if (token.equals("넷째") || token.equals("네번째")) {
+            return 4;
+        }
+        if (token.equals("다섯째") || token.equals("다섯번째")) {
+            return 5;
+        }
+        return 0;
     }
 
     private static boolean isOpenAt(Function<String, String> fieldAccessor, LocalDateTime at) {
