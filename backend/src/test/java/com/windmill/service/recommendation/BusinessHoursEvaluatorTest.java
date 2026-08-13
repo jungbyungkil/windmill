@@ -56,6 +56,22 @@ class BusinessHoursEvaluatorTest {
     }
 
     @Test
+    void bareWeekdayNoPrefixCloses() {
+        // 실제 TourAPI 사례(전원미술관): restdate 필드가 "매주" 없이 "월요일"만 있는 경우
+        String rest = "월요일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 17))); // 월요일
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 18))); // 화요일
+    }
+
+    @Test
+    void bareWeekdayFallback_doesNotOverrideNthWeekRule() {
+        // "매월"이 포함된 텍스트는 3)단계(bare weekday) 대상이 아니라 1.5)단계 주차 판정을 따라야 함
+        String rest = "매월 두번째·네번째 수요일";
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 5))); // 1주차 수요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 12))); // 2주차 수요일
+    }
+
+    @Test
     void yearRoundOpen() {
         assertFalse(BusinessHoursEvaluator.isClosedOnRestDate("연중무휴", LocalDate.of(2026, 8, 9)));
     }

@@ -51,6 +51,8 @@ public final class BusinessHoursEvaluator {
             "매월\\s*([^월화수목금토일]*?)\\s*([월화수목금토일])요일");
     private static final Pattern WEEK_ORDINAL_TOKEN = Pattern.compile(
             "\\d+|첫번째|첫째|첫|두번째|둘째|세번째|셋째|네번째|넷째|다섯번째|다섯째");
+    /** "매주"/"매월" 없이 요일명만 적힌 경우("월요일" 단독) - 흔한 축약 표기, 매주 그 요일로 해석 */
+    private static final Pattern BARE_WEEKDAY = Pattern.compile("([월화수목금토일])요일");
     private static final String[] WEEKDAY_KO = {"월", "화", "수", "목", "금", "토", "일"};
 
     private BusinessHoursEvaluator() {
@@ -138,8 +140,19 @@ public final class BusinessHoursEvaluator {
             return true;
         }
 
-        // 3) 레거시: "매주 일" 형태 없이 "매주 일요일"만 있는 경우 이미 EVERY로 처리됨.
-        //    "공휴일"만 있는 텍스트는 달력 없이 단정하지 않음(임시휴관일 포함 오탐 방지).
+        // 3) "매주"/"매월" 접두어 자체가 텍스트에 전혀 없이 요일명만 있는 경우("월요일" 단독) -
+        //    실제 TourAPI restdate 필드에 흔한 축약 표기. 위 매월 관련 규칙(1, 1.5)과 겹칠 여지가
+        //    없을 때만("매월"/"매주" 미포함) 매주 그 요일 휴무로 해석한다.
+        if (!restText.contains("매월") && !restText.contains("매주")) {
+            Matcher bare = BARE_WEEKDAY.matcher(restText);
+            while (bare.find()) {
+                if (todayKo.equals(bare.group(1))) {
+                    return true;
+                }
+            }
+        }
+
+        // 4) "공휴일"만 있는 텍스트는 달력 없이 단정하지 않음(임시휴관일 포함 오탐 방지).
         return false;
     }
 
