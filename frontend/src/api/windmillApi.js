@@ -200,6 +200,15 @@ export function clickTripStory(id) {
   return request(`/trip-records/${id}/click`, { method: 'POST' });
 }
 
+/** 웹 푸시 FCM 토큰 등록 */
+export function registerPush(sessionId, { fcmToken, itineraryId } = {}) {
+  return request('/push/register', {
+    method: 'POST',
+    sessionId,
+    body: { fcmToken, itineraryId },
+  });
+}
+
 /** 추천 기록 일정을 그대로 복제해 당일치기 시작 */
 export function startFromTripRecord(sessionId, id, { startDate }) {
   return request(`/trip-records/${id}/start`, {

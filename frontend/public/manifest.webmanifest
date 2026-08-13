@@ -1,0 +1,19 @@
+{
+  "name": "바람따라",
+  "short_name": "바람따라",
+  "description": "바람이 알려주는 실시간 여행 - 날씨·혼잡·동선 변수에 맞춰 당일치기 코스를 제안해요.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f7f9",
+  "theme_color": "#0a6b82",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

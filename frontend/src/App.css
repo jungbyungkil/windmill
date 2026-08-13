@@ -4594,6 +4594,15 @@
   color: #fff;
 }
 
+.settings-push-btn {
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+.settings-push-status {
+  margin-top: 8px;
+}
+
 /* ---------- 이용 히스토리 ---------- */
 
 .history-screen {

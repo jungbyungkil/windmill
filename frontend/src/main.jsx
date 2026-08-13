@@ -15,6 +15,14 @@ if (dsn) {
   })
 }
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* PWA 설치·푸시 수신 불가 상태로 계속 진행 - 핵심 기능엔 영향 없음 */
+    })
+  })
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={ErrorFallback}>

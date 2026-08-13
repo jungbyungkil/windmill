@@ -63,6 +63,12 @@
             <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
             <version>8.53.0</version>
         </dependency>
+        <!-- 웹 푸시(FCM) 발송 - 서비스 계정 키 미설정 시 PushSenderService가 no-op으로 안전 폴백 -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.10.0</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

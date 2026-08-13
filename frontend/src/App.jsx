@@ -1093,7 +1093,7 @@ export default function App() {
         element={
           <>
             <BackHeader title="설정" onMenuClick={() => setMenuOpen(true)} />
-            <SettingsScreen />
+            <SettingsScreen sessionId={sessionId} />
           </>
         }
       />

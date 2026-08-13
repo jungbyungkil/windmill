@@ -21,6 +21,8 @@ backend/src/main/resources/static/assets/
 backend/src/main/resources/static/index.html
 backend/src/main/resources/static/favicon.svg
 backend/src/main/resources/static/icons.svg
+backend/src/main/resources/static/manifest.webmanifest
+backend/src/main/resources/static/sw.js
 
 # Local toolchains (portable JDK/Maven)
 .tools/

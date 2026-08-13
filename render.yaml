@@ -65,3 +65,7 @@ services:
         sync: false
       - key: SENTRY_PROJECT
         sync: false
+      # 웹 푸시(FCM) - Firebase 서비스 계정 키(JSON)를 base64로 인코딩해서 등록. 비어있으면
+      # 백엔드가 자동으로 푸시 발송을 비활성화함(PushSenderService)
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
+        sync: false
