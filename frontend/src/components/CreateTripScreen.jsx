@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import PinwheelHero from './PinwheelHero';
 import TripStoryFeed from './TripStoryFeed';
-import SituationBanner, { loadSituationByGeolocation, maybeNotifySituation } from './SituationBanner';
+import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
 import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS } from '../constants';
 
@@ -159,10 +159,13 @@ export default function CreateTripScreen({
       <p className="brand-tagline">당일치기 여행의 날씨·혼잡·동선 변수를 미리 알려주고, 대안을 쌓아 모두가 참고하는 가이드</p>
 
       {!situationDismissed && (
-        <SituationBanner
+        <NudgeCard
           situation={situation}
           loading={situationLoading}
           onDismiss={() => setSituationDismissed(true)}
+          onAction={() => {
+            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
         />
       )}
 
@@ -215,7 +218,7 @@ export default function CreateTripScreen({
         </div>
       ) : null}
 
-      <form className="trip-form" onSubmit={handleSubmit}>
+      <form id="trip-form" className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">
           <label className="trip-form-label">여행 지역</label>
           {regionsError && <div className="error-msg">❌ 지역 목록을 불러오지 못했어요: {regionsError}</div>}

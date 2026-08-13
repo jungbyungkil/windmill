@@ -1,9 +1,11 @@
 package com.windmill.service.trigger;
 
+import com.windmill.dto.NudgeType;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SituationSummaryResponse;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.util.CrowdCongestionEvaluator;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.TriggerThresholds;
 import com.windmill.util.WeatherGridUtils;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +90,24 @@ public class SituationService {
                             pop == null ? "-" : Math.round(pop) + "%",
                             crowded);
 
+                    // 넛지 타입 우선순위: 강한 강수(긴급) > 혼잡 > 폭염 > 순항(기본)
+                    NudgeType nudgeType;
+                    String message;
+                    if (rain) {
+                        nudgeType = NudgeType.WEATHER_RAIN;
+                        message = "비 소식이 있어요. 실내 코스로 준비해볼까요?";
+                    } else if (crowded > 0) {
+                        nudgeType = NudgeType.CROWD;
+                        message = "혼잡 예상 장소가 " + crowded + "곳 있어요. 여유로운 곳으로 바꿔볼까요?";
+                    } else if (heat) {
+                        nudgeType = NudgeType.WEATHER_HEAT;
+                        message = "오늘 최고기온이 높아요. 시원한 코스 어때요?";
+                    } else {
+                        nudgeType = NudgeType.CRUISE;
+                        message = "지금은 순항 중이에요. 바람따라 스마트 일정으로 떠나볼까요?";
+                    }
+                    String nudgeId = nudgeType.name() + "_" + KoreaClock.today() + "_" + region.getSignguFullCode();
+
                     return SituationSummaryResponse.builder()
                             .regionCode(region.getSignguFullCode())
                             .regionDisplayName(region.getSidoName() + " " + region.getSignguName())
@@ -100,6 +120,11 @@ public class SituationService {
                             .headline(headline)
                             .detail(detail)
                             .tips(tips)
+                            .nudgeType(nudgeType)
+                            .priority(nudgeType.priority())
+                            .message(message)
+                            .nudgeId(nudgeId)
+                            .dismissible(true)
                             .build();
                 });
     }

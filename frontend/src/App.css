@@ -1906,29 +1906,31 @@
   margin-bottom: 10px;
 }
 
-/* ---------- Situation banner ---------- */
+/* ---------- Nudge card (홈 화면 상황 카드) ---------- */
 
-.situation-banner {
+.nudge-card {
+  --nudge-tone: var(--level-normal);
   display: flex;
   align-items: flex-start;
   gap: 10px;
   margin: 0 16px 14px;
-  padding: 12px 14px;
+  padding: 4px 6px 4px 14px;
   border-radius: 14px;
-  border: 1px solid var(--sand-border);
-  background: linear-gradient(135deg, #f7faf8, #eef5f8);
+  border: 1px solid color-mix(in srgb, var(--nudge-tone) 24%, var(--sand-border));
+  background: color-mix(in srgb, var(--nudge-tone) 7%, var(--sand-card));
   animation: fade-up 0.45s ease;
 }
 
-.situation-banner.alert {
-  border-color: color-mix(in srgb, #c45c4a 40%, var(--sand-border));
-  background: linear-gradient(135deg, #fff6f3, #fff9ef);
-}
+.nudge-card.tone-urgent { --nudge-tone: var(--level-danger); }
+.nudge-card.tone-crowd { --nudge-tone: var(--level-warning); }
+.nudge-card.tone-heat { --nudge-tone: #eab308; }
+.nudge-card.tone-ok { --nudge-tone: var(--level-normal); }
 
-.situation-banner.loading {
+.nudge-card.loading {
   color: var(--muted);
   font-size: 13px;
   align-items: center;
+  padding: 12px 14px;
 }
 
 .situation-pulse {
@@ -1944,52 +1946,54 @@
   50% { opacity: 1; transform: scale(1.15); }
 }
 
-.situation-body {
+.nudge-card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 10px 4px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
 }
 
-.situation-headline {
+.nudge-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nudge-card-icon {
   font-size: 14px;
 }
 
-.situation-detail {
+.nudge-card-headline {
+  font-size: 14px;
+}
+
+.nudge-card-detail {
   font-size: 12px;
   color: var(--muted);
 }
 
-.situation-tips {
-  margin: 8px 0 0;
+.nudge-card-message {
+  margin: 6px 0 0;
   padding: 8px 10px;
-  list-style: none;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--status-warning) 10%, white);
-  border: 1px solid color-mix(in srgb, var(--status-warning) 22%, var(--sand-border));
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  background: color-mix(in srgb, var(--nudge-tone) 12%, white);
+  border: 1px solid color-mix(in srgb, var(--nudge-tone) 26%, var(--sand-border));
   font-size: 12px;
-}
-
-.situation-tips li {
-  display: flex;
-  gap: 6px;
-  color: var(--ink);
   line-height: 1.4;
+  color: var(--ink);
 }
 
-.situation-tips li::before {
-  content: '★';
-  color: var(--status-warning);
-  font-size: 10px;
-  margin-top: 2px;
-}
-
-.situation-dismiss {
+.nudge-card-dismiss {
   flex-shrink: 0;
+  margin-top: 6px;
 }
 
 /* ---------- Shared itinerary ---------- */
@@ -4080,7 +4084,7 @@
 
   .barami-text,
   .travel-tips-card,
-  .situation-body {
+  .nudge-card-body {
     font-size: 14px;
     line-height: 1.55;
   }
