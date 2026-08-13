@@ -9,6 +9,28 @@
   color: var(--muted);
 }
 
+.error-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100svh;
+  padding: 24px;
+  text-align: center;
+}
+
+.error-fallback-emoji {
+  margin: 0;
+  font-size: 32px;
+}
+
+.error-fallback-message {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
 .back-header {
   display: flex;
   align-items: center;

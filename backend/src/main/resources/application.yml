@@ -52,3 +52,11 @@ weather:
 logging:
   level:
     com.windmill: INFO
+
+# 에러 리포팅(sentry.io). DSN 비어있으면 SDK가 자동으로 비활성화(no-op)됨 - 로컬 개발엔 기본 불필요.
+# sentry-logback은 별도 추가하지 않음(컨트롤러 예외 캡처와 중복 리포팅 우려, 브리프 권장사항).
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: development
+  traces-sample-rate: 1.0
+  send-default-pii: false

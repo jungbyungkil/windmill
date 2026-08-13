@@ -18,3 +18,8 @@ spring:
   h2:
     console:
       enabled: false
+
+sentry:
+  environment: production
+  # 무료 플랜 이벤트 한도 고려해 prod는 트레이스 샘플링을 낮춤(에러는 샘플링과 무관하게 전부 캡처됨)
+  traces-sample-rate: 0.2

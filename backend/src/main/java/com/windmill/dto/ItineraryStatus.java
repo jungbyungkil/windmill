@@ -1,6 +1,7 @@
 package com.windmill.dto;
 
 import com.windmill.util.KoreaClock;
+import com.windmill.util.SentryBreadcrumbs;
 
 import java.time.LocalDate;
 
@@ -13,10 +14,13 @@ public enum ItineraryStatus {
      * 아니면 여행일(scheduled_date)이 오늘보다 이전이면 종료.
      */
     public static ItineraryStatus of(LocalDate startDate, boolean hasTripRecord) {
+        LocalDate today = KoreaClock.today();
+        SentryBreadcrumbs.timeCalc("itinerary-status",
+                "startDate=" + startDate + " today(KST)=" + today + " hasTripRecord=" + hasTripRecord);
         if (hasTripRecord) {
             return ENDED;
         }
-        if (startDate != null && startDate.isBefore(KoreaClock.today())) {
+        if (startDate != null && startDate.isBefore(today)) {
             return ENDED;
         }
         return ACTIVE;

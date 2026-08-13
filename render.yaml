@@ -51,3 +51,17 @@ services:
       # 카카오맵 JS SDK (Docker 빌드 시 Vite에 주입). Dashboard에서 JavaScript 키 입력 후 Redeploy
       - key: VITE_KAKAO_JS_KEY
         sync: false
+      # 에러 리포팅(sentry.io) - 백엔드. 비어있으면 SDK가 자동 비활성화됨
+      - key: SENTRY_DSN
+        sync: false
+      # 에러 리포팅(sentry.io) - 프론트(Docker 빌드 시 Vite에 주입, VITE_KAKAO_JS_KEY와 동일 패턴)
+      - key: VITE_SENTRY_DSN
+        sync: false
+      # 소스맵 업로드용(선택) - SENTRY_AUTH_TOKEN/SENTRY_ORG/SENTRY_PROJECT 셋 다 있어야 활성화,
+      # 하나라도 없으면 빌드 시 업로드 단계만 조용히 건너뜀(vite.config.js 참고)
+      - key: SENTRY_AUTH_TOKEN
+        sync: false
+      - key: SENTRY_ORG
+        sync: false
+      - key: SENTRY_PROJECT
+        sync: false

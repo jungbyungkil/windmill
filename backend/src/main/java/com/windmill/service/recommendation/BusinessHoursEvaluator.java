@@ -2,6 +2,7 @@ package com.windmill.service.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.util.KoreaClock;
+import com.windmill.util.SentryBreadcrumbs;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -66,7 +67,9 @@ public final class BusinessHoursEvaluator {
         if (introFields == null || introFields.isEmpty()) {
             return true;
         }
-        return isOpenAt(field -> introFields.getOrDefault(field, ""), at == null ? KoreaClock.now() : at);
+        LocalDateTime resolved = at == null ? KoreaClock.now() : at;
+        SentryBreadcrumbs.timeCalc("business-hours", "isOpenAt 입력=" + at + " 판정기준=" + resolved);
+        return isOpenAt(field -> introFields.getOrDefault(field, ""), resolved);
     }
 
     /**
@@ -78,6 +81,7 @@ public final class BusinessHoursEvaluator {
         if (restText == null || restText.isBlank() || date == null) {
             return false;
         }
+        SentryBreadcrumbs.timeCalc("rest-date", "isClosedOnRestDate 판정일=" + date + " restText=" + restText);
         if (restText.contains("연중무휴") || restText.contains("휴무 없음") || restText.equals("없음")) {
             return false;
         }
