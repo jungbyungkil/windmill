@@ -4246,6 +4246,67 @@
   cursor: not-allowed;
 }
 
+/* ---------- 종료 확인 모달 ---------- */
+
+.exit-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.exit-confirm-modal {
+  width: min(100%, 340px);
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+  text-align: center;
+}
+
+.exit-confirm-title {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+}
+
+.exit-confirm-message {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.exit-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.exit-confirm-cancel,
+.exit-confirm-exit {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.exit-confirm-cancel {
+  border: 1px solid var(--sand-border);
+  background: #fff;
+  color: var(--ink);
+}
+
+.exit-confirm-exit {
+  border: none;
+  background: var(--level-danger);
+  color: #fff;
+}
+
 /* ---------- 전체 메뉴(GNB) ---------- */
 
 .global-menu-backdrop {
