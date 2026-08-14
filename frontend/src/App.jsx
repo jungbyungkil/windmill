@@ -99,9 +99,6 @@ export default function App() {
 
   const [recoResults, setRecoResults] = useState(null);
   const [recoLoading, setRecoLoading] = useState(false);
-  const [nameSearchResults, setNameSearchResults] = useState(null);
-  const [nameSearchLoading, setNameSearchLoading] = useState(false);
-  const [anchorPlanTarget, setAnchorPlanTarget] = useState(null);
   const [addingContentId, setAddingContentId] = useState(null);
   const [addingFestivalId, setAddingFestivalId] = useState(null);
 
@@ -221,10 +218,6 @@ export default function App() {
           return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
         })
     : [];
-  function openSmartPlanForDate(date) {
-    setSmartPlanDate(date || itinerary?.startDate || null);
-    navigate('/smart-plan');
-  }
 
   const refreshTrigger = useCallback(async () => {
     if (!itineraryId) return;
@@ -249,15 +242,19 @@ export default function App() {
     setCreating(true);
     setCreateError(null);
     try {
+      // anchor/anchorTime은 첫 화면에서 미리 등록한 고정 일정(선택) - 일정 생성 API 자체엔 안 보냄
+      const { anchor, anchorTime, ...tripFields } = formData;
       const created = await api.createItinerary(sessionId, {
-        ...formData,
-        endDate: formData.startDate, // 당일치기 고정
+        ...tripFields,
+        endDate: tripFields.startDate, // 당일치기 고정
       });
       setItineraryId(created.itineraryId);
       setActiveDate(created.startDate);
       setDuplicateConflict(null);
 
-      const finalItinerary = await autoApplySmartPlan(created);
+      const finalItinerary = anchor
+        ? await autoApplyAnchorPlan(created, anchor, anchorTime)
+        : await autoApplySmartPlan(created);
       setItinerary(finalItinerary);
       setSmartPlanDate(null);
       navigate('/trip');
@@ -322,6 +319,61 @@ export default function App() {
     if (stops.length >= 2 && (finalItinerary.items || []).length >= 2) {
       finalItinerary = await api.optimizeRoute(created.itineraryId, created.startDate);
       setAutoReplaceNotice(finalItinerary.routeHint || '스마트 일정을 자동으로 담았어요 - 이동거리를 최소화한 순서예요.');
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+    }
+    return finalItinerary;
+  }
+
+  /**
+   * 여행 생성 직후 - 첫 화면에서 미리 등록한 고정 일정(앵커)이 있으면 표준 4단계 대신 이 장소를
+   * 기준으로 하루를 채운다(사용자가 이미 계획이 있으면 그 순서로 시작). autoApplySmartPlan과 동일하게
+   * 리뷰 화면 없이 바로 담아 다음 화면을 시작한다.
+   */
+  async function autoApplyAnchorPlan(created, anchor, anchorTime) {
+    let stops = [];
+    try {
+      stops = await api.getAnchorPlan(created.itineraryId, { anchor, anchorTime });
+    } catch {
+      setAutoReplaceNotice('고정 일정을 만들지 못했어요. 직접 담아보세요.');
+      setTimeout(() => setAutoReplaceNotice(null), 6000);
+      return created;
+    }
+    if (!stops || stops.length === 0) {
+      return created;
+    }
+    for (const stop of stops) {
+      try {
+        await api.addItem(created.itineraryId, {
+          contentId: stop.contentId,
+          contentTypeId: stop.contentTypeId,
+          placeName: stop.placeName,
+          thumbnailUrl: stop.thumbnailUrl,
+          scheduledTime: stop.suggestedTime,
+          tags: stop.matchedTags,
+          crowdRate: stop.crowdRate,
+          visitDate: stop.visitDate || created.startDate,
+          addr1: stop.addr1,
+          tel: stop.tel,
+          useFeeText: stop.useFeeText,
+          isFree: stop.isFree,
+          restDateText: stop.restDateText,
+          closeTime: stop.closeTime,
+          useTimeText: stop.useTimeText,
+          homepageUrl: stop.homepageUrl,
+          strollerFriendly: stop.strollerFriendly,
+          accessibleFriendly: stop.accessibleFriendly,
+          category: stop.category,
+          mapX: stop.mapX,
+          mapY: stop.mapY,
+        });
+      } catch {
+        // 마감 임박 등으로 담기 실패한 곳은 건너뛰고 계속
+      }
+    }
+    let finalItinerary = await api.getItinerary(created.itineraryId);
+    if (stops.length >= 2 && (finalItinerary.items || []).length >= 2) {
+      finalItinerary = await api.optimizeRoute(created.itineraryId, created.startDate);
+      setAutoReplaceNotice(finalItinerary.routeHint || '등록한 고정 일정을 기준으로 하루 일정을 자동으로 담았어요.');
       setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
     return finalItinerary;
@@ -393,41 +445,31 @@ export default function App() {
     setRecoLoading(true);
     try {
       const excludeContentIds = itinerary.items.map((i) => i.contentId).filter(Boolean);
-      const lastItem = itinerary.items[itinerary.items.length - 1];
+      // 거리(km) 표시·주변 우선순위 기준점 - 고정(pin)한 장소가 있으면 그걸 최우선(가장 최근 고정분),
+      // 없으면 마지막 담은 장소 (없으면 거리 없이 반환됨)
+      const pinnedItems = itinerary.items.filter((i) => i.pinned);
+      const originItem = pinnedItems.length > 0
+        ? pinnedItems[pinnedItems.length - 1]
+        : itinerary.items[itinerary.items.length - 1];
       const results = await api.getRecommendations({
         regionCode: itinerary.signguFullCode,
         withPet: itinerary.withPet,
+        strollerFriendly: itinerary.strollerFriendly,
+        accessibleFriendly: itinerary.accessibleFriendly,
         companionType: itinerary.companionType,
         adultAgeGroup: itinerary.adultAgeGroup,
         childAges: itinerary.childAges,
         query,
         tags,
         excludeContentIds,
-        // 거리(km) 표시 기준점 - 이미 담긴 마지막 장소 (없으면 거리 없이 반환됨)
-        originContentId: lastItem?.contentId,
-        originContentTypeId: lastItem?.contentTypeId,
+        originContentId: originItem?.contentId,
+        originContentTypeId: originItem?.contentTypeId,
       });
       setRecoResults(results);
     } catch {
       setRecoResults([]);
     } finally {
       setRecoLoading(false);
-    }
-  }
-
-  /** 앵커(고정 일정) 등록 - 이름으로 직접 검색 */
-  async function handleSearchByName(query) {
-    setNameSearchLoading(true);
-    try {
-      const results = await api.searchPlacesByName({
-        regionCode: itinerary.signguFullCode,
-        query,
-      });
-      setNameSearchResults(results);
-    } catch {
-      setNameSearchResults([]);
-    } finally {
-      setNameSearchLoading(false);
     }
   }
 
@@ -486,53 +528,6 @@ export default function App() {
       /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
     } finally {
       setAddingContentId(null);
-    }
-  }
-
-  /** 앵커(고정 일정) 등록 - 이름으로 찾은 장소를 바로 담지 않고, 시작 시각 입력 모달을 연다 */
-  function handleSelectAnchorPlace(candidate) {
-    setAnchorPlanTarget(candidate);
-  }
-
-  function handleGenerateAnchorPlan(anchor, anchorTime) {
-    return api.getAnchorPlan(itineraryId, { anchor, anchorTime });
-  }
-
-  async function handleConfirmAnchorPlan(selected) {
-    let skipped = 0;
-    const visitDate = activeDate || itinerary.startDate;
-    for (const candidate of selected) {
-      try {
-        await addCandidateToItinerary(
-          { ...candidate, scheduledTime: candidate.suggestedTime },
-          visitDate,
-          false,
-        );
-      } catch {
-        skipped += 1;
-      }
-    }
-    let result = itinerary;
-    try {
-      result = await api.getItinerary(itineraryId);
-      setItinerary(result);
-    } catch {
-      /* keep local */
-    }
-    if (selected.length >= 2 && (result?.items || []).length >= 2) {
-      try {
-        result = await api.optimizeRoute(itineraryId, visitDate);
-        setItinerary(result);
-      } catch {
-        /* 동선 재계산 실패해도 이미 담긴 장소는 유지 */
-      }
-    }
-    const notice = skipped > 0
-      ? `마감 시간 때문에 ${skipped}곳은 자동으로 건너뛰었어요.`
-      : (result?.routeHint || (selected.length >= 2 ? '이 순서가 총 이동거리를 최소화한 순서예요.' : null));
-    if (notice) {
-      setAutoReplaceNotice(notice);
-      setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
   }
 
@@ -1144,7 +1139,6 @@ export default function App() {
                   onTogglePin={handleTogglePin}
                   onDelete={handleDeleteItem}
                   onOpenDocent={handleOpenDocent}
-                  onPlanDay={() => openSmartPlanForDate(tripDate)}
                   onSortByTime={handleSortByTime}
                   sortByTimeLoading={sortByTimeLoading}
                   onOptimizeFromGps={handleOptimizeFromGps}

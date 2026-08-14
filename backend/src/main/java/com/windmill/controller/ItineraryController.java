@@ -266,7 +266,7 @@ public class ItineraryController {
                 .map(item -> item.getContentId())
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
-        ItineraryItem origin = lastItem(itinerary);
+        ItineraryItem origin = originItem(itinerary);
         return RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
@@ -291,7 +291,7 @@ public class ItineraryController {
                 .map(item -> item.getContentId())
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
-        ItineraryItem origin = lastItem(itinerary);
+        ItineraryItem origin = originItem(itinerary);
         return RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
@@ -314,9 +314,21 @@ public class ItineraryController {
         return ItineraryResponse.from(itinerary, itineraryService.statusOf(itinerary));
     }
 
-    /** 거리(km) 표시 기준점 - "지금 있는 곳"을 대신할 정보가 없어 이미 담긴 마지막 장소를 기준으로 삼는다 */
-    private ItineraryItem lastItem(Itinerary itinerary) {
+    /**
+     * 거리(km)·주변 추천 기준점 - 사용자가 고정(pin)한 장소가 있으면 그걸 최우선으로 삼는다
+     * ("여기 근처로 채우고 싶다"는 명시적 의도), 없으면 "지금 있는 곳"을 대신할 정보가 없어
+     * 이미 담긴 마지막 장소를 기준으로 삼는다. 여러 곳을 고정했으면 가장 최근(뒤쪽)에 담긴 걸 우선.
+     */
+    private ItineraryItem originItem(Itinerary itinerary) {
         List<ItineraryItem> items = itinerary.getItems();
-        return items.isEmpty() ? null : items.get(items.size() - 1);
+        if (items.isEmpty()) {
+            return null;
+        }
+        for (int i = items.size() - 1; i >= 0; i--) {
+            if (items.get(i).isPinned()) {
+                return items.get(i);
+            }
+        }
+        return items.get(items.size() - 1);
     }
 }

@@ -76,7 +76,7 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         {candidate.matchedTags?.map((t) => <span key={t} className="tag-chip">{t}</span>)}
       </div>
 
-      <button className="btn-add" onClick={() => onAdd(candidate)} disabled={adding}>
+      <button type="button" className="btn-add" onClick={() => onAdd(candidate)} disabled={adding}>
         {adding ? addingLabel : addLabel}
       </button>
 

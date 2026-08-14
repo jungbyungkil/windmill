@@ -58,7 +58,6 @@ export default function ItineraryList({
   onTogglePin,
   onDelete,
   onOpenDocent,
-  onPlanDay,
   onSortByTime,
   sortByTimeLoading = false,
   onOptimizeFromGps,
@@ -147,11 +146,6 @@ export default function ItineraryList({
       {items.length === 0 ? (
         <div className="itinerary-empty">
           <p className="empty-state">아직 담은 장소가 없어요.</p>
-          {onPlanDay && (
-            <button type="button" className="btn-primary" onClick={onPlanDay}>
-              🌬️ 스마트 일정 짜기
-            </button>
-          )}
           <p className="itinerary-empty-hint">아래에서 장소를 검색해 직접 담을 수도 있어요.</p>
         </div>
       ) : (

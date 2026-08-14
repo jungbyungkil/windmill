@@ -272,9 +272,7 @@ public class SmartPlanService {
                 .filter(id -> id != null && !id.isBlank())
                 .collect(Collectors.toList());
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
-        ItineraryItem origin = itinerary.getItems().isEmpty()
-                ? null
-                : itinerary.getItems().get(itinerary.getItems().size() - 1);
+        ItineraryItem origin = originItem(itinerary);
 
         return RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
@@ -291,6 +289,24 @@ public class SmartPlanService {
                 .originContentId(origin == null ? null : origin.getContentId())
                 .originContentTypeId(origin == null ? null : origin.getContentTypeId())
                 .build();
+    }
+
+    /**
+     * 거리(km)·주변 추천 기준점 - 사용자가 고정(pin)한 장소가 있으면 그걸 최우선으로 삼는다
+     * ("여기 근처로 채우고 싶다"는 명시적 의도), 없으면 마지막 담은 장소를 기준으로 삼는다.
+     * 여러 곳을 고정했으면 가장 최근(뒤쪽)에 담긴 걸 우선(ItineraryController.originItem과 동일 규칙).
+     */
+    private ItineraryItem originItem(Itinerary itinerary) {
+        List<ItineraryItem> items = itinerary.getItems();
+        if (items.isEmpty()) {
+            return null;
+        }
+        for (int i = items.size() - 1; i >= 0; i--) {
+            if (items.get(i).isPinned()) {
+                return items.get(i);
+            }
+        }
+        return items.get(items.size() - 1);
     }
 
     private SmartPlanResponse assemble(List<RecommendationCandidate> attractionsRaw,

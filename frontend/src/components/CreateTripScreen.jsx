@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import PinwheelHero from './PinwheelHero';
+import PinwheelLoader from './PinwheelLoader';
 import TripStoryFeed from './TripStoryFeed';
+import RecommendationCard from './RecommendationCard';
 import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
 import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS, AGE_GROUP_OPTIONS, CHILD_AGE_OPTIONS } from '../constants';
@@ -50,6 +52,12 @@ export default function CreateTripScreen({
   const [ongoingTrips, setOngoingTrips] = useState([]);
   const [ongoingLoading, setOngoingLoading] = useState(Boolean(sessionId));
   const [deletingDraftId, setDeletingDraftId] = useState(null);
+  // 고정 일정(앵커) 등록 - 이미 계획(예: DDP 19:00 공연)이 있는 사용자를 위한 사전 등록
+  const [anchorQuery, setAnchorQuery] = useState('');
+  const [anchorResults, setAnchorResults] = useState(null);
+  const [anchorSearchLoading, setAnchorSearchLoading] = useState(false);
+  const [anchorCandidate, setAnchorCandidate] = useState(null);
+  const [anchorTime, setAnchorTime] = useState('19:00');
 
   useEffect(() => {
     api.getRegions()
@@ -148,7 +156,33 @@ export default function CreateTripScreen({
       accessibleFriendly,
       adultAgeGroup,
       childAges,
+      // 미리 등록한 고정 일정(앵커) - 있으면 표준 4단계 대신 이 장소를 기준으로 하루를 채운다
+      anchor: anchorCandidate || undefined,
+      anchorTime: anchorCandidate ? anchorTime : undefined,
     });
+  }
+
+  async function handleAnchorSearch() {
+    if (!anchorQuery.trim() || !signguFullCode) return;
+    setAnchorSearchLoading(true);
+    try {
+      const results = await api.searchPlacesByName({ regionCode: signguFullCode, query: anchorQuery.trim() });
+      setAnchorResults(results);
+    } catch {
+      setAnchorResults([]);
+    } finally {
+      setAnchorSearchLoading(false);
+    }
+  }
+
+  function handleSelectAnchor(candidate) {
+    setAnchorCandidate(candidate);
+    setAnchorResults(null);
+    setAnchorQuery('');
+  }
+
+  function handleClearAnchor() {
+    setAnchorCandidate(null);
   }
 
   function handleAddChild() {
@@ -187,6 +221,15 @@ export default function CreateTripScreen({
 
   return (
     <div className="create-trip-screen">
+      {loading && (
+        <PinwheelLoader
+          message={
+            anchorCandidate
+              ? `${anchorCandidate.placeName} 기준으로 동선을 찾고 있어요...`
+              : '가장 알맞은 동선을 찾고 있어요...'
+          }
+        />
+      )}
       <PinwheelHero />
       <h1 className="brand-title">바람따라</h1>
       <p className="brand-tagline">당일치기 여행의 날씨·혼잡·동선 변수를 미리 알려주고, 대안을 쌓아 모두가 참고하는 가이드</p>
@@ -315,6 +358,79 @@ export default function CreateTripScreen({
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="trip-form-row anchor-register-row">
+          <label className="trip-form-label">
+            고정 일정(앵커) 등록 <span className="trip-form-hint-inline">선택</span>
+          </label>
+          <p className="place-name-search-hint">
+            DDP 공연처럼 시각이 이미 정해진 장소가 있다면 이름으로 찾아 등록해 보세요. 시작 시각만
+            정하면 앞뒤 빈 시간(식사·가벼운 관광)을 자동으로 채워 바로 시작해 드려요.
+          </p>
+
+          {anchorCandidate ? (
+            <div className="anchor-selected-summary">
+              <span className="anchor-selected-name">📌 {anchorCandidate.placeName}</span>
+              <input
+                type="time"
+                className="anchor-selected-time"
+                value={anchorTime}
+                onChange={(e) => setAnchorTime(e.target.value)}
+              />
+              <button
+                type="button"
+                className="icon-btn danger"
+                aria-label="앵커 선택 해제"
+                onClick={handleClearAnchor}
+              >
+                🗑️
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="reco-search-form">
+                <input
+                  type="text"
+                  className="reco-query-input"
+                  placeholder="예: DDP, 청룡사(안성)"
+                  value={anchorQuery}
+                  onChange={(e) => setAnchorQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAnchorSearch();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleAnchorSearch}
+                  disabled={anchorSearchLoading || !anchorQuery.trim()}
+                >
+                  {anchorSearchLoading ? '찾는 중...' : '🔎 이름으로 검색'}
+                </button>
+              </div>
+
+              {anchorResults !== null && (
+                anchorResults.length === 0 ? (
+                  <p className="empty-state">'{anchorQuery}'(으)로 찾은 장소가 없어요. 다른 이름으로 검색해보세요.</p>
+                ) : (
+                  <div className="reco-grid">
+                    {anchorResults.map((c) => (
+                      <RecommendationCard
+                        key={c.contentId}
+                        candidate={c}
+                        onAdd={handleSelectAnchor}
+                        addLabel="📌 이 장소를 앵커로 등록"
+                      />
+                    ))}
+                  </div>
+                )
+              )}
+            </>
+          )}
         </div>
 
         {/* 지역·날짜·동반유형을 다 고른 뒤 - 기존 추천 기록을 참고하거나 아래 버튼으로 새로 시작 */}
