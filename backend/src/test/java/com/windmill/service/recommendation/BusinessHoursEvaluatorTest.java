@@ -86,10 +86,67 @@ class BusinessHoursEvaluatorTest {
     }
 
     @Test
+    void weekendClosesOnSaturdayAndSunday() {
+        // 실제 TourAPI 사례(가평문화원, contentId 129877): restdateculture="주말 /공휴일" -
+        // "주말"을 못 읽어 토요일에도 "영업중"으로 오판정하던 버그(2026-08-15 라이브 확인)
+        String rest = "주말 /공휴일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 15))); // 토요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 16))); // 일요일
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 14))); // 금요일
+    }
+
+    @Test
+    void weekdayRangeCloses() {
+        // 실제 TourAPI 사례(가평 소재 음식점): restdatefood="매주 월요일~수요일"
+        String rest = "매주 월요일~수요일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 17)));  // 월요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 18)));  // 화요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 19)));  // 수요일
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 20))); // 목요일
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 16))); // 일요일
+    }
+
+    @Test
+    void weekdayRangeWrapsAcrossWeekBoundary() {
+        // 금요일~월요일처럼 주 경계를 넘는 구간도 지원
+        String rest = "매주 금요일~월요일";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 14)));  // 금요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 15)));  // 토요일
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 17)));  // 월요일
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 18))); // 화요일
+    }
+
+    @Test
     void extractCloseTimeFromUseTime() {
         LocalTime close = BusinessHoursEvaluator.extractCloseTimeFromText("09:00 ~ 17:00");
         assertEquals(LocalTime.of(17, 0), close);
         assertEquals("17:00", BusinessHoursEvaluator.formatHhMm(close));
+    }
+
+    @Test
+    void extractCloseTimeHandlesKoreanAmPmFormat() {
+        // 24시간제 콜론 표기가 없을 때의 폴백 - "오전/오후 H시" 12시간제
+        assertEquals(LocalTime.of(18, 0),
+                BusinessHoursEvaluator.extractCloseTimeFromText("오전 9시~오후 6시"));
+        assertEquals(LocalTime.of(21, 30),
+                BusinessHoursEvaluator.extractCloseTimeFromText("오전 10시 30분~오후 9시 30분"));
+        // 오전/오후 없이 "시"만 쓴 24시간 표기("10시~18시")도 함께 커버
+        assertEquals(LocalTime.of(18, 0),
+                BusinessHoursEvaluator.extractCloseTimeFromText("10시~18시"));
+        // 콜론 24시간제가 있으면 그게 우선(폴백은 못 찾을 때만)
+        assertEquals(LocalTime.of(17, 0),
+                BusinessHoursEvaluator.extractCloseTimeFromText("09:00~17:00"));
+    }
+
+    @Test
+    void extractOpenTimeHandlesKoreanAmPmFormat() {
+        assertEquals(LocalTime.of(9, 0),
+                BusinessHoursEvaluator.extractOpenTimeFromText("오전 9시~오후 6시"));
+        // 오전 12시(자정)/오후 12시(정오) 경계값
+        assertEquals(LocalTime.of(0, 0),
+                BusinessHoursEvaluator.extractOpenTimeFromText("오전 12시~오전 6시"));
+        assertEquals(LocalTime.of(12, 0),
+                BusinessHoursEvaluator.extractOpenTimeFromText("오후 12시~오후 3시"));
     }
 
     @Test

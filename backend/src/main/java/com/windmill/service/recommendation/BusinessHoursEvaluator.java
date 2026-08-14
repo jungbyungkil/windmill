@@ -44,6 +44,12 @@ public final class BusinessHoursEvaluator {
     /** "13세~50세", "13세-50세" 같은 범위 표기 - 라이브 확인(2026-08-14, 번지점프 expagerangeleports="13세~50세") */
     private static final Pattern AGE_RANGE_TILDE = Pattern.compile("(\\d{1,2})\\s*세\\s*[~-]\\s*\\d{1,2}\\s*세");
     private static final Pattern TIME_RANGE = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[~-]\\s*(\\d{1,2}):(\\d{2})");
+    /**
+     * "오전/오후 H시(MM분)?~오전/오후 H시(MM분)?" 12시간제 표기 - TIME_RANGE(콜론 24시간제)가 못 찾을 때만
+     * 폴백으로 시도한다("HH시~HH시"처럼 오전/오후 없이 "시"만 쓴 24시간 표기도 함께 커버).
+     */
+    private static final Pattern AMPM_TIME_RANGE = Pattern.compile(
+            "(오전|오후)?\\s*(\\d{1,2})\\s*시\\s*(?:(\\d{1,2})\\s*분)?\\s*[~-]\\s*(오전|오후)?\\s*(\\d{1,2})\\s*시\\s*(?:(\\d{1,2})\\s*분)?");
     /** 마감 임박 버퍼(분) — close 1시간 전부터 선택 불가 */
     public static final int CLOSE_BUFFER_MINUTES = 60;
     /** 매월(매달) 마지막 (주) X요일 */
@@ -52,6 +58,9 @@ public final class BusinessHoursEvaluator {
     /** 매주 X요일 (매월 마지막 … 구문은 제외하고 볼 때 사용) */
     private static final Pattern EVERY_WEEKDAY = Pattern.compile(
             "매주\\s*([월화수목금토일])(?:요일)?");
+    /** 매주 X요일~Y요일 (요일 구간) - 예: "매주 월요일~수요일". 라이브 표본(2026-08-15, 가평 소재 음식점)에서 실제 확인 */
+    private static final Pattern EVERY_WEEKDAY_RANGE = Pattern.compile(
+            "매주\\s*([월화수목금토일])요일\\s*[~-]\\s*([월화수목금토일])요일");
     /**
      * 매월(매달) N번째(·M번째…) X요일 — "매월 두번째·네번째 수요일", "매달 셋째·넷째·다섯째 목요일",
      * "매월 2,4주 수요일", "매월 첫째주 화요일" 등. group(1)에 주차 표기(숫자·서수어 조합)를, group(2)에
@@ -148,6 +157,16 @@ public final class BusinessHoursEvaluator {
             }
         }
 
+        // 1.8) 매주 X요일~Y요일 (요일 구간) - 라이브 표본에서 실제 확인된 표기("매주 월요일~수요일")
+        Matcher weekdayRange = EVERY_WEEKDAY_RANGE.matcher(restText);
+        while (weekdayRange.find()) {
+            int from = weekdayIndex(weekdayRange.group(1));
+            int to = weekdayIndex(weekdayRange.group(2));
+            if (isWeekdayInRange(todayKo, from, to)) {
+                return true;
+            }
+        }
+
         // 2) 매주 X요일 — 같은 요일의 "마지막 주" 규칙만 있는 경우는 제외
         Matcher every = EVERY_WEEKDAY.matcher(restText);
         while (every.find()) {
@@ -160,6 +179,12 @@ public final class BusinessHoursEvaluator {
             if (matchedLastRule && restText.contains("마지막") && restText.contains(day + "요일")) {
                 continue;
             }
+            return true;
+        }
+
+        // 2.5) "주말" - 토요일·일요일 정기휴무의 흔한 축약 표기. 라이브 확인(2026-08-15, 가평문화원
+        //      restdateculture="주말 /공휴일") - 이 표기를 못 읽어 토요일에도 "영업중"으로 오판정하던 버그.
+        if (restText.contains("주말") && (todayKo.equals("토") || todayKo.equals("일"))) {
             return true;
         }
 
@@ -182,6 +207,28 @@ public final class BusinessHoursEvaluator {
     /** 해당 날짜가 그 달의 마지막 해당 요일인지 (예: 8월 마지막 일요일) */
     static boolean isLastWeekdayOfMonth(LocalDate date) {
         return date.plusWeeks(1).getMonth() != date.getMonth();
+    }
+
+    /** WEEKDAY_KO 배열 인덱스(0=월~6=일). 못 찾으면 -1 */
+    private static int weekdayIndex(String weekdayKo) {
+        for (int i = 0; i < WEEKDAY_KO.length; i++) {
+            if (WEEKDAY_KO[i].equals(weekdayKo)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** today가 from~to 요일 구간(월요일 기준 순환)에 포함되는지 - "금요일~월요일"처럼 주 경계를 넘는 구간도 지원 */
+    private static boolean isWeekdayInRange(String todayKo, int from, int to) {
+        int today = weekdayIndex(todayKo);
+        if (today < 0 || from < 0 || to < 0) {
+            return false;
+        }
+        if (from <= to) {
+            return today >= from && today <= to;
+        }
+        return today >= from || today <= to;
     }
 
     /** 그 달에서 몇 번째 주인지 (1~5) - "1~7일=첫째 주, 8~14일=둘째 주…" 통상 표기 기준 */
@@ -229,10 +276,10 @@ public final class BusinessHoursEvaluator {
 
         for (String field : USETIME_FIELDS) {
             String v = fieldAccessor.apply(field);
-            Matcher m = TIME_RANGE.matcher(v);
-            if (m.find()) {
-                LocalTime start = LocalTime.of(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
-                LocalTime end = LocalTime.of(Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)));
+            int[] range = parseTimeRange(v);
+            if (range != null) {
+                LocalTime start = LocalTime.of(range[0], range[1]);
+                LocalTime end = LocalTime.of(range[2], range[3]);
                 LocalTime nowTime = at.toLocalTime();
                 boolean open = end.isBefore(start)
                         ? (nowTime.isAfter(start) || nowTime.isBefore(end))
@@ -241,6 +288,49 @@ public final class BusinessHoursEvaluator {
             }
         }
         return BusinessStatus.OPEN;
+    }
+
+    /**
+     * "09:00~18:00"(24시간제, 우선) 또는 "오전 9시~오후 6시"/"10시~18시"(12시간제·오전오후 폴백)에서
+     * [시작시,시작분,종료시,종료분]을 뽑는다. 둘 다 못 찾거나 시/분이 범위를 벗어나면 null.
+     */
+    private static int[] parseTimeRange(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        Matcher m = TIME_RANGE.matcher(text);
+        if (m.find()) {
+            return validRangeOrNull(
+                    Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
+                    Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)));
+        }
+        Matcher am = AMPM_TIME_RANGE.matcher(text);
+        if (am.find()) {
+            int startH = resolveMeridiemHour(am.group(1), Integer.parseInt(am.group(2)));
+            int startM = am.group(3) != null ? Integer.parseInt(am.group(3)) : 0;
+            int endH = resolveMeridiemHour(am.group(4), Integer.parseInt(am.group(5)));
+            int endM = am.group(6) != null ? Integer.parseInt(am.group(6)) : 0;
+            return validRangeOrNull(startH, startM, endH, endM);
+        }
+        return null;
+    }
+
+    private static int[] validRangeOrNull(int startH, int startM, int endH, int endM) {
+        if (startH > 23 || startM > 59 || endH > 23 || endM > 59) {
+            return null;
+        }
+        return new int[]{startH, startM, endH, endM};
+    }
+
+    /** "오후 1~11시"는 +12, "오후 12시"는 정오 그대로, "오전 12시"는 자정(0시), 그 외 오전/미지정은 그대로 */
+    private static int resolveMeridiemHour(String meridiem, int hour) {
+        if ("오후".equals(meridiem)) {
+            return hour == 12 ? 12 : hour + 12;
+        }
+        if ("오전".equals(meridiem) && hour == 12) {
+            return 0;
+        }
+        return hour;
     }
 
     /**
@@ -298,34 +388,20 @@ public final class BusinessHoursEvaluator {
     }
 
     public static LocalTime extractCloseTimeFromText(String useTimeText) {
-        if (useTimeText == null || useTimeText.isBlank()) {
+        int[] range = parseTimeRange(useTimeText);
+        if (range == null) {
             return null;
         }
-        Matcher m = TIME_RANGE.matcher(useTimeText);
-        if (!m.find()) {
-            return null;
-        }
-        int h = Integer.parseInt(m.group(3));
-        int min = Integer.parseInt(m.group(4));
-        if (h > 23 || min > 59) {
-            return null;
-        }
-        return LocalTime.of(h, min);
+        return LocalTime.of(range[2], range[3]);
     }
 
     public static LocalTime extractOpenTimeFromText(String useTimeText) {
-        if (useTimeText == null || useTimeText.isBlank()) {
+        int[] range = parseTimeRange(useTimeText);
+        if (range == null) {
             return null;
         }
-        Matcher m = TIME_RANGE.matcher(useTimeText);
-        if (!m.find()) {
-            return null;
-        }
-        int h = Integer.parseInt(m.group(1));
-        int min = Integer.parseInt(m.group(2));
-        if (h > 23 || min > 59) {
-            return null;
-        }
+        int h = range[0];
+        int min = range[1];
         return LocalTime.of(h, min);
     }
 

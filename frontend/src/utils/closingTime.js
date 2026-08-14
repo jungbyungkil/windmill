@@ -80,11 +80,12 @@ export function estimateArrivalMinutes({ dayItems = [], visitDate, candidate, no
     const lastStart = parseHhMm(last.scheduledTime);
     cursor = lastStart != null ? lastStart + DEFAULT_STAY_MINUTES : 9 * 60;
   } else {
-    const isToday = visitDate && String(visitDate).slice(0, 10) === now.toISOString().slice(0, 10);
-    // visitDate may be "YYYY-MM-DD" local — compare with local date
+    // visitDate는 "YYYY-MM-DD" 로컬 날짜 - now도 로컬 기준으로만 비교한다.
+    // (예전엔 visitDate가 없을 때 now.toISOString() = UTC 날짜와 비교해, 자정~오전 9시 KST
+    //  구간에서 UTC 날짜가 하루 이전으로 나와 "오늘"을 "오늘 아님"으로 잘못 판정하는 버그가 있었음)
     const localYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const today = visitDate && String(visitDate).slice(0, 10) === localYmd;
-    if (today || (!visitDate && isToday)) {
+    const today = !visitDate || String(visitDate).slice(0, 10) === localYmd;
+    if (today) {
       let soon = now.getHours() * 60 + now.getMinutes() + 30;
       const m = soon % 60;
       if (m === 0) {
