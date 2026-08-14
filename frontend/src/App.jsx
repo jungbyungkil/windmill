@@ -14,8 +14,6 @@ import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
 import RecommendationSearch from './components/RecommendationSearch';
-import PlaceNameSearch from './components/PlaceNameSearch';
-import AnchorPlanModal from './components/AnchorPlanModal';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
@@ -1151,22 +1149,6 @@ export default function App() {
                   results={recoResults}
                   loading={recoLoading}
                   addingId={addingContentId}
-                />
-
-                <PlaceNameSearch
-                  onSearch={handleSearchByName}
-                  onAdd={handleSelectAnchorPlace}
-                  results={nameSearchResults}
-                  loading={nameSearchLoading}
-                  addingId={addingContentId}
-                />
-
-                <AnchorPlanModal
-                  open={Boolean(anchorPlanTarget)}
-                  anchor={anchorPlanTarget}
-                  onGenerate={handleGenerateAnchorPlan}
-                  onConfirm={handleConfirmAnchorPlan}
-                  onClose={() => setAnchorPlanTarget(null)}
                 />
 
                 <FestivalBanner
