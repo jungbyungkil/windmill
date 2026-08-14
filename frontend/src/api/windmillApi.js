@@ -120,6 +120,18 @@ export function getSmartPlan(itineraryId, { placeCount, date } = {}) {
   return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date })}`);
 }
 
+/**
+ * 목적지 직접 선택 플로우 - 사용자가 고른 장소(anchor)를 오전/오후에 배치하고
+ * 점심·주변 전시관/박물관·저녁 식사/카페로 빈 시간대를 채운 초안을 받는다.
+ * slot: "MORNING" | "AFTERNOON"
+ */
+export function getAnchorPlan(itineraryId, { anchor, durationMinutes, slot } = {}) {
+  return request(`/itineraries/${itineraryId}/anchor-plan`, {
+    method: 'POST',
+    body: { anchor, durationMinutes, slot },
+  });
+}
+
 export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
   return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }

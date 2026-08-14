@@ -4288,6 +4288,97 @@
   cursor: not-allowed;
 }
 
+/* ---------- 목적지 직접 선택 모달 ---------- */
+
+.anchor-plan-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.anchor-plan-modal {
+  width: min(100%, 420px);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+}
+
+.anchor-plan-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sea, #1d6b8a);
+}
+
+.anchor-plan-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.anchor-plan-message {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.anchor-plan-field {
+  margin-bottom: 16px;
+}
+
+.anchor-plan-field-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink, #1e293b);
+}
+
+.anchor-plan-duration-row,
+.anchor-plan-slot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.anchor-plan-chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--sand-border, #cbd5e1);
+  background: #fff;
+  color: var(--ink, #1e293b);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.anchor-plan-chip.selected {
+  background: var(--sea, #1d6b8a);
+  border-color: var(--sea, #1d6b8a);
+  color: #fff;
+}
+
+.anchor-plan-draft-list {
+  margin-bottom: 16px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.anchor-plan-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ---------- 종료 확인 모달 ---------- */
 
 .exit-confirm-backdrop {

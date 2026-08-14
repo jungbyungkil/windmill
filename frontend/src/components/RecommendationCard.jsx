@@ -3,7 +3,7 @@ import { recordView } from '../utils/viewHistory';
 
 const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
-export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [] }) {
+export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [], addLabel = '+ 일정에 추가', addingLabel = '담는 중...' }) {
   return (
     <article className="reco-card">
       <div className="reco-media">
@@ -77,7 +77,7 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
       </div>
 
       <button className="btn-add" onClick={() => onAdd(candidate)} disabled={adding}>
-        {adding ? '담는 중...' : '+ 일정에 추가'}
+        {adding ? addingLabel : addLabel}
       </button>
 
       {nextCandidates.length > 0 && (

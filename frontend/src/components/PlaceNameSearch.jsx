@@ -14,7 +14,7 @@ export default function PlaceNameSearch({ onSearch, onAdd, results, loading, add
   return (
     <div className="reco-search place-name-search">
       <h2 className="section-title">가고 싶은 곳 검색해서 담기</h2>
-      <p className="place-name-search-hint">이미 정해둔 장소가 있다면 이름으로 찾아 바로 담아보세요.</p>
+      <p className="place-name-search-hint">이미 정해둔 장소가 있다면 이름으로 찾아보세요. 체류시간과 오전/오후만 정하면 점심·주변 전시관·저녁까지 자동으로 채워드려요.</p>
       <form className="reco-search-form" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -39,6 +39,8 @@ export default function PlaceNameSearch({ onSearch, onAdd, results, loading, add
                 candidate={c}
                 onAdd={onAdd}
                 adding={addingId === c.contentId}
+                addLabel="🗓️ 이 곳으로 일정 채우기"
+                addingLabel="여는 중..."
               />
             ))}
           </div>

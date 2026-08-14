@@ -4,6 +4,7 @@ import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.AlternativesResponse;
+import com.windmill.dto.AnchorPlanRequest;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryListItemResponse;
@@ -16,6 +17,7 @@ import com.windmill.dto.SmartPlanResponse;
 import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.ItineraryService;
+import com.windmill.service.recommendation.AnchorPlanService;
 import com.windmill.service.recommendation.InitialPlanService;
 import com.windmill.service.recommendation.RecommendationPipeline;
 import com.windmill.service.recommendation.SmartPlanService;
@@ -43,6 +45,7 @@ public class ItineraryController {
     private final RecommendationPipeline recommendationPipeline;
     private final InitialPlanService initialPlanService;
     private final SmartPlanService smartPlanService;
+    private final AnchorPlanService anchorPlanService;
     private final TripRecordService tripRecordService;
 
     @PostMapping
@@ -227,6 +230,21 @@ public class ItineraryController {
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> initialPlanService.draft(buildAutoPlanRequest(itinerary, tags, query), placeCount))
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 목적지 직접 선택 플로우 - 사용자가 이름으로 검색해 고른 장소(anchor)를 오전/오후에 배치하고
+     * 앞뒤 빈 시간대(점심·주변 전시관/박물관·저녁 식사/카페)를 4단계 파이프라인으로 채운 초안을 돌려준다.
+     * auto-plan과 동일하게 바로 저장하지 않고, 프론트에서 검토(체크박스 해제 가능) 후 addItem으로 반영한다.
+     */
+    @PostMapping("/{id}/anchor-plan")
+    public Mono<ResponseEntity<List<RecommendationCandidate>>> anchorPlan(
+            @PathVariable Long id,
+            @RequestBody AnchorPlanRequest request) {
+        return Mono.fromCallable(() -> itineraryService.get(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(itinerary -> anchorPlanService.buildPlan(itinerary, request))
                 .map(ResponseEntity::ok);
     }
 

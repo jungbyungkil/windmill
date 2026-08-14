@@ -15,6 +15,7 @@ import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
 import RecommendationSearch from './components/RecommendationSearch';
 import PlaceNameSearch from './components/PlaceNameSearch';
+import AnchorPlanModal from './components/AnchorPlanModal';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
@@ -80,6 +81,7 @@ export default function App() {
   const [recoLoading, setRecoLoading] = useState(false);
   const [nameSearchResults, setNameSearchResults] = useState(null);
   const [nameSearchLoading, setNameSearchLoading] = useState(false);
+  const [anchorPlanTarget, setAnchorPlanTarget] = useState(null);
   const [addingContentId, setAddingContentId] = useState(null);
   const [addingFestivalId, setAddingFestivalId] = useState(null);
 
@@ -461,6 +463,53 @@ export default function App() {
       /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
     } finally {
       setAddingContentId(null);
+    }
+  }
+
+  /** 목적지 직접 선택 플로우 - 이름으로 찾은 장소를 바로 담지 않고, 체류시간/오전·오후 선택 모달을 연다 */
+  function handleSelectAnchorPlace(candidate) {
+    setAnchorPlanTarget(candidate);
+  }
+
+  function handleGenerateAnchorPlan(anchor, durationMinutes, slot) {
+    return api.getAnchorPlan(itineraryId, { anchor, durationMinutes, slot });
+  }
+
+  async function handleConfirmAnchorPlan(selected) {
+    let skipped = 0;
+    const visitDate = activeDate || itinerary.startDate;
+    for (const candidate of selected) {
+      try {
+        await addCandidateToItinerary(
+          { ...candidate, scheduledTime: candidate.suggestedTime },
+          visitDate,
+          false,
+        );
+      } catch {
+        skipped += 1;
+      }
+    }
+    let result = itinerary;
+    try {
+      result = await api.getItinerary(itineraryId);
+      setItinerary(result);
+    } catch {
+      /* keep local */
+    }
+    if (selected.length >= 2 && (result?.items || []).length >= 2) {
+      try {
+        result = await api.optimizeRoute(itineraryId, visitDate);
+        setItinerary(result);
+      } catch {
+        /* 동선 재계산 실패해도 이미 담긴 장소는 유지 */
+      }
+    }
+    const notice = skipped > 0
+      ? `마감 시간 때문에 ${skipped}곳은 자동으로 건너뛰었어요.`
+      : (result?.routeHint || (selected.length >= 2 ? '이 순서가 총 이동거리를 최소화한 순서예요.' : null));
+    if (notice) {
+      setAutoReplaceNotice(notice);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
   }
 
@@ -1081,10 +1130,18 @@ export default function App() {
 
                 <PlaceNameSearch
                   onSearch={handleSearchByName}
-                  onAdd={handleAddRecommendation}
+                  onAdd={handleSelectAnchorPlace}
                   results={nameSearchResults}
                   loading={nameSearchLoading}
                   addingId={addingContentId}
+                />
+
+                <AnchorPlanModal
+                  open={Boolean(anchorPlanTarget)}
+                  anchor={anchorPlanTarget}
+                  onGenerate={handleGenerateAnchorPlan}
+                  onConfirm={handleConfirmAnchorPlan}
+                  onClose={() => setAnchorPlanTarget(null)}
                 />
 
                 <RecommendationSearch

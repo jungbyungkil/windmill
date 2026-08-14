@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: windmill
+  mvc:
+    async:
+      # 목적지 직접 선택 플로우(anchor-plan)가 4단계 파이프라인을 최대 4회 순차 호출한다 -
+      # 호출당 15~20초대(data.go.kr 동시요청 취약으로 병렬화 대신 순차 유지, AnchorPlanService 주석 참고)라
+      # 기본 타임아웃(컨테이너 기본 30초)에 걸리는 걸 실측으로 확인해 넉넉히 늘림
+      request-timeout: 120000
   datasource:
     url: jdbc:h2:file:./data/windmill;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
