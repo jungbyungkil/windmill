@@ -86,6 +86,7 @@ public class RecommendationPipeline {
                             .flatMap(list -> stage3.filter(list, region))
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
                             .map(list -> AccessibilityRanking.rank(list, request.isStrollerFriendly(), request.isAccessibleFriendly()))
+                            .map(list -> AgeGroupRanking.rank(list, request.getAdultAgeGroup(), request.getChildAges()))
                             .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
                             .map(list -> enrichThemeTags(list, themes))
                             .doOnNext(list -> badgeAssembler.attach(list, condition));
@@ -140,6 +141,7 @@ public class RecommendationPipeline {
                 .strollerText(c.getStrollerText())
                 .strollerFriendly(c.getStrollerFriendly())
                 .accessibleFriendly(c.isAccessibleFriendly())
+                .ageRangeText(c.getAgeRangeText())
                 .build();
     }
 

@@ -1,5 +1,6 @@
 package com.windmill.controller;
 
+import com.windmill.domain.AgeGroup;
 import com.windmill.domain.CompanionType;
 import com.windmill.dto.CategoryPlaceGroup;
 import com.windmill.dto.RecommendationCandidate;
@@ -59,6 +60,8 @@ public class RecommendationController {
             @RequestParam(required = false, defaultValue = "false") boolean strollerFriendly,
             @RequestParam(required = false, defaultValue = "false") boolean accessibleFriendly,
             @RequestParam(required = false) CompanionType companionType,
+            @RequestParam(required = false) AgeGroup adultAgeGroup,
+            @RequestParam(required = false) List<Integer> childAges,
             @RequestParam(required = false) String seedPlaceName,
             @RequestParam(required = false) List<String> tags,
             @RequestParam(required = false) String query,
@@ -79,6 +82,8 @@ public class RecommendationController {
                     .strollerFriendly(strollerFriendly)
                     .accessibleFriendly(accessibleFriendly)
                     .companionType(companionType)
+                    .adultAgeGroup(adultAgeGroup)
+                    .childAges(childAges)
                     .seedPlaceName(seedPlaceName)
                     .tags(tags)
                     .naturalLanguageQuery(query)

@@ -1,5 +1,6 @@
 package com.windmill.dto;
 
+import com.windmill.domain.AgeGroup;
 import com.windmill.domain.CompanionType;
 import com.windmill.domain.Itinerary;
 import lombok.Builder;
@@ -24,6 +25,8 @@ public class ItineraryResponse {
     private boolean withPet;
     private boolean strollerFriendly;
     private boolean accessibleFriendly;
+    private AgeGroup adultAgeGroup;
+    private List<Integer> childAges;
     private List<ItineraryItemResponse> items;
     /** 확정된 날짜 목록 - 프론트 일자별 페이지 탭에서 체크표시/다음날 이동 가능 여부 판단에 사용 */
     private Set<LocalDate> confirmedDates;
@@ -54,6 +57,8 @@ public class ItineraryResponse {
                 .withPet(itinerary.isWithPet())
                 .strollerFriendly(itinerary.isStrollerFriendly())
                 .accessibleFriendly(itinerary.isAccessibleFriendly())
+                .adultAgeGroup(itinerary.getAdultAgeGroup())
+                .childAges(itinerary.getChildAges())
                 .items(itinerary.getItems().stream()
                         .sorted(java.util.Comparator
                                 .comparing((com.windmill.domain.ItineraryItem i) -> {

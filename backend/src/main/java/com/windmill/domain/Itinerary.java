@@ -45,6 +45,26 @@ public class Itinerary {
     @Enumerated(EnumType.STRING)
     private CompanionType companionType;
 
+    /**
+     * 성인 대표 연령대 - companionType과 별개 축(동반유형은 인원구성, 이건 나이대). 신규 컬럼이지만
+     * companionType과 동일하게 nullable로 둔다(NOT NULL로 걸면 이미 행이 있는 prod 테이블에서
+     * ALTER TABLE이 실패함 - "prod DB 컬럼 누락 사고" 교훈). 필수 여부는 CreateItineraryRequest의
+     * @NotNull(애플리케이션 레벨)로만 강제.
+     */
+    @Enumerated(EnumType.STRING)
+    private AgeGroup adultAgeGroup;
+
+    /**
+     * 동반 자녀 만 나이(0~17) - 성인과 달리 연령대가 아니라 정확한 나이를 받는다(추천 시 실제
+     * expAgeRange 하한과 직접 비교하기 위함, AgeGroupRanking 참고). 새 테이블이라 NOT NULL
+     * 컬럼 추가 위험 없음(빈 컬렉션이 기본값).
+     */
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "itinerary_child_ages", joinColumns = @JoinColumn(name = "itinerary_id"))
+    @Column(name = "child_age")
+    private List<Integer> childAges = new ArrayList<>();
+
     @Builder.Default
     @Column(nullable = false)
     private boolean withPet = false;

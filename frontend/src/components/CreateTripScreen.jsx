@@ -3,7 +3,7 @@ import PinwheelHero from './PinwheelHero';
 import TripStoryFeed from './TripStoryFeed';
 import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
 import * as api from '../api/windmillApi';
-import { COMPANION_TYPE_OPTIONS } from '../constants';
+import { COMPANION_TYPE_OPTIONS, AGE_GROUP_OPTIONS, CHILD_AGE_OPTIONS } from '../constants';
 
 const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
@@ -39,6 +39,8 @@ export default function CreateTripScreen({
   const [tripDate, setTripDate] = useState(todayIso());
   const [dateTouched, setDateTouched] = useState(false);
   const [companionType, setCompanionType] = useState('SOLO');
+  const [adultAgeGroup, setAdultAgeGroup] = useState('THIRTIES');
+  const [childAges, setChildAges] = useState([]);
   const [withPet, setWithPet] = useState(false);
   const [strollerFriendly, setStrollerFriendly] = useState(false);
   const [accessibleFriendly, setAccessibleFriendly] = useState(false);
@@ -144,7 +146,21 @@ export default function CreateTripScreen({
       withPet,
       strollerFriendly,
       accessibleFriendly,
+      adultAgeGroup,
+      childAges,
     });
+  }
+
+  function handleAddChild() {
+    setChildAges((prev) => [...prev, 10]);
+  }
+
+  function handleChangeChildAge(index, age) {
+    setChildAges((prev) => prev.map((a, i) => (i === index ? age : a)));
+  }
+
+  function handleRemoveChild(index) {
+    setChildAges((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleDeleteDraft(trip) {
@@ -253,6 +269,52 @@ export default function CreateTripScreen({
             />
             ♿ 무장애 이동 (장애인 동반 - 무장애 시설 우선 추천)
           </label>
+        </div>
+
+        <div className="trip-form-row">
+          <label className="trip-form-label">성인 연령대</label>
+          <div className="reco-tag-row">
+            {AGE_GROUP_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`tag ${adultAgeGroup === opt.value ? 'selected' : ''}`}
+                onClick={() => setAdultAgeGroup(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="trip-form-child-ages">
+            <div className="trip-form-child-ages-head">
+              <span className="trip-form-child-ages-label">동반 자녀 나이 (선택)</span>
+              <button type="button" className="btn-child-add" onClick={handleAddChild}>
+                + 자녀 추가
+              </button>
+            </div>
+            {childAges.map((age, index) => (
+              <div key={index} className="trip-form-child-row">
+                <span className="trip-form-child-index">자녀 {index + 1}</span>
+                <select
+                  value={age}
+                  onChange={(e) => handleChangeChildAge(index, Number(e.target.value))}
+                >
+                  {CHILD_AGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="icon-btn danger"
+                  aria-label="자녀 삭제"
+                  onClick={() => handleRemoveChild(index)}
+                >
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* 지역·날짜·동반유형을 다 고른 뒤 - 기존 추천 기록을 참고하거나 아래 버튼으로 새로 시작 */}

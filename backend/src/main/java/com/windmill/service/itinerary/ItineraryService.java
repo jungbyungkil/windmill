@@ -80,6 +80,8 @@ public class ItineraryService {
                 .withPet(request.isWithPet())
                 .strollerFriendly(request.isStrollerFriendly())
                 .accessibleFriendly(request.isAccessibleFriendly())
+                .adultAgeGroup(request.getAdultAgeGroup())
+                .childAges(request.getChildAges() == null ? new ArrayList<>() : new ArrayList<>(request.getChildAges()))
                 .build();
         return itineraryRepository.save(itinerary);
     }
@@ -120,6 +122,8 @@ public class ItineraryService {
                 .withPet(source.isWithPet())
                 .strollerFriendly(source.isStrollerFriendly())
                 .accessibleFriendly(source.isAccessibleFriendly())
+                .adultAgeGroup(source.getAdultAgeGroup())
+                .childAges(source.getChildAges() == null ? new ArrayList<>() : new ArrayList<>(source.getChildAges()))
                 .build();
 
         List<ItineraryItem> ordered = source.getItems().stream()

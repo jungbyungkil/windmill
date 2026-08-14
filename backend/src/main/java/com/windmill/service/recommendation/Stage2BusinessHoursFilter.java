@@ -85,6 +85,7 @@ public class Stage2BusinessHoursFilter {
         candidate.setStrollerFriendly(BusinessHoursEvaluator.isStrollerFriendly(strollerText));
         candidate.setAccessibleFriendly(BusinessHoursEvaluator.matchesAccessibleKeyword(
                 detail.getOverview(), candidate.getCategoryLcls(), candidate.getCategoryMcls(), candidate.getCategoryScls()));
+        candidate.setAgeRangeText(BusinessHoursEvaluator.extractAgeRangeText(detail.getIntroFields()));
         return candidate;
     }
 

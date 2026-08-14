@@ -145,6 +145,7 @@ public class Stage4TagMatchingService {
                 .strollerText(c.getStrollerText())
                 .strollerFriendly(c.getStrollerFriendly())
                 .accessibleFriendly(c.isAccessibleFriendly())
+                .ageRangeText(c.getAgeRangeText())
                 .build();
     }
 }

@@ -377,6 +377,8 @@ export default function App() {
         regionCode: itinerary.signguFullCode,
         withPet: itinerary.withPet,
         companionType: itinerary.companionType,
+        adultAgeGroup: itinerary.adultAgeGroup,
+        childAges: itinerary.childAges,
         query,
         tags,
         excludeContentIds,

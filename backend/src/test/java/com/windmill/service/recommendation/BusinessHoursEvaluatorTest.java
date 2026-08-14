@@ -120,4 +120,24 @@ class BusinessHoursEvaluatorTest {
         assertNull(BusinessHoursEvaluator.extractCloseTimeFromText("상시개방"));
         assertFalse(ClosingTimeGate.check(null, LocalTime.of(17, 0)).blocked());
     }
+
+    @Test
+    void parseMinAgeFromLowerBoundPhrase() {
+        assertEquals(7, BusinessHoursEvaluator.parseMinAge("만 7세 이상"));
+        assertEquals(8, BusinessHoursEvaluator.parseMinAge("8세이상 이용가능"));
+    }
+
+    @Test
+    void parseMinAgeFromRangePhrase() {
+        // 라이브 확인(2026-08-14): 엑스게임리조트(내린천 번지점프) expagerangeleports 실제 원문
+        assertEquals(13, BusinessHoursEvaluator.parseMinAge("13세~50세"));
+    }
+
+    @Test
+    void parseMinAgeIgnoresNonNumericGuidance() {
+        // 라이브 확인(2026-08-14): 다이나믹 메이즈 인사동 expagerange 실제 원문 - 숫자 하한이 없어 null이어야 함
+        assertNull(BusinessHoursEvaluator.parseMinAge("모든 어린이 보호자 동반 필수"));
+        assertNull(BusinessHoursEvaluator.parseMinAge(""));
+        assertNull(BusinessHoursEvaluator.parseMinAge(null));
+    }
 }

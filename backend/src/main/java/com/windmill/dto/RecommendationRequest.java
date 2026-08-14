@@ -1,5 +1,6 @@
 package com.windmill.dto;
 
+import com.windmill.domain.AgeGroup;
 import com.windmill.domain.CompanionType;
 import lombok.Builder;
 import lombok.Data;
@@ -9,6 +10,10 @@ import java.util.List;
 @Data
 @Builder
 public class RecommendationRequest {
+    /** 성인 대표 연령대 - AgeGroupRanking 가중치 기준 */
+    private AgeGroup adultAgeGroup;
+    /** 동반 자녀 만 나이 목록 - AgeGroupRanking이 expAgeRange 하한과 직접 비교 */
+    private List<Integer> childAges;
     /** region-codes.json의 signguFullCode - 이 지역 기준으로 Stage1/3가 조회한다 */
     private String regionCode;
     /** true면 Stage1이 TarRlteTarService1 대신 반려동물 동반여행 전용 API를 후보 소스로 사용 */

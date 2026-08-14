@@ -35,6 +35,14 @@ public final class BusinessHoursEvaluator {
     /** 무장애/휠체어 관련 구조화 필드가 API에 없어, overview·카테고리 텍스트 키워드 매칭으로 근사한다 */
     private static final List<String> ACCESSIBLE_KEYWORDS = List.of(
             "무장애", "배리어프리", "휠체어", "장애인", "저상", "경사로", "점자");
+    /** detailIntro2 체험가능연령 필드(contentType별 접미사) - 자유텍스트("만 7세 이상" 등), 라이브 확인(2026-08-14, contentTypeId=12) */
+    private static final List<String> AGE_RANGE_FIELDS = List.of(
+            "expagerange", "expagerangeculture", "expagerangeleports");
+    /** "만 7세 이상", "8세이상", "7세 부터" 같은 하한 나이 표기 - "이상"/"부터"가 붙은 숫자만 하한으로 인정
+     *  ("10세 미만 무료"처럼 상한을 나타내는 문장을 하한으로 오독하지 않기 위함) */
+    private static final Pattern AGE_LOWER_BOUND = Pattern.compile("(\\d{1,2})\\s*세\\s*(?:이상|부터)");
+    /** "13세~50세", "13세-50세" 같은 범위 표기 - 라이브 확인(2026-08-14, 번지점프 expagerangeleports="13세~50세") */
+    private static final Pattern AGE_RANGE_TILDE = Pattern.compile("(\\d{1,2})\\s*세\\s*[~-]\\s*\\d{1,2}\\s*세");
     private static final Pattern TIME_RANGE = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[~-]\\s*(\\d{1,2}):(\\d{2})");
     /** 마감 임박 버퍼(분) — close 1시간 전부터 선택 불가 */
     public static final int CLOSE_BUFFER_MINUTES = 60;
@@ -365,6 +373,38 @@ public final class BusinessHoursEvaluator {
             }
         }
         return false;
+    }
+
+    /** 체험가능연령 원문 (expagerange 계열 첫 non-blank) */
+    public static String extractAgeRangeText(Map<String, String> introFields) {
+        return firstNonBlank(introFields, AGE_RANGE_FIELDS);
+    }
+
+    /**
+     * "만 7세 이상"류 문구에서 하한 나이만 뽑는다. 못 찾으면 null(제한 없음/모름 - AgeGroupRanking은
+     * null이면 그 후보를 순위 조정 없이 그대로 둔다, isFree와 동일하게 단정하지 않는 원칙).
+     */
+    public static Integer parseMinAge(String ageRangeText) {
+        if (ageRangeText == null || ageRangeText.isBlank()) {
+            return null;
+        }
+        Matcher lower = AGE_LOWER_BOUND.matcher(ageRangeText);
+        if (lower.find()) {
+            return parseIntOrNull(lower.group(1));
+        }
+        Matcher range = AGE_RANGE_TILDE.matcher(ageRangeText);
+        if (range.find()) {
+            return parseIntOrNull(range.group(1));
+        }
+        return null;
+    }
+
+    private static Integer parseIntOrNull(String text) {
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static String firstNonBlank(Map<String, String> introFields, List<String> fields) {

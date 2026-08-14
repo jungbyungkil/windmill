@@ -150,6 +150,8 @@ public class SmartPlanService {
                 .strollerFriendly(itinerary.isStrollerFriendly())
                 .accessibleFriendly(itinerary.isAccessibleFriendly())
                 .companionType(itinerary.getCompanionType())
+                .adultAgeGroup(itinerary.getAdultAgeGroup())
+                .childAges(itinerary.getChildAges())
                 .tags(tags)
                 .excludeContentIds(excludeContentIds)
                 .excludePlaceNames(excludePlaceNames)

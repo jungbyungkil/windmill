@@ -54,11 +54,11 @@ export async function getPublicConfig() {
   return publicConfigCache;
 }
 
-export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, force }) {
+export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, adultAgeGroup, childAges, force }) {
   return request('/itineraries', {
     method: 'POST',
     sessionId,
-    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, force },
+    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, adultAgeGroup, childAges, force },
   });
 }
 
@@ -132,8 +132,8 @@ export function getAnchorPlan(itineraryId, { anchor, durationMinutes, slot } = {
   });
 }
 
-export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
-  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
+export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
+  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
 /** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(취향 추천이 아닌 정확한 이름 매칭) */

@@ -35,6 +35,7 @@ public class RecommendationCandidate {
     private String strollerText;    // 유모차 대여정보 원문, 없으면 null
     private Boolean strollerFriendly; // 유모차 이용 가능 추정, 모르면 null(단정하지 않음)
     private boolean accessibleFriendly; // 무장애 키워드 매칭 근사(휴리스틱) - 데이터 없다고 false로 단정하지 않도록 순위에만 반영
+    private String ageRangeText;    // 체험가능연령 원문(expagerange), 없으면 null - AgeGroupRanking 참고
     private String mapX;            // 경도 - 동선 최적화용
     private String mapY;            // 위도 - 동선 최적화용
     private String visitDate;       // 스마트 플랜 다일 배정용 "YYYY-MM-DD"

@@ -160,6 +160,8 @@ public class AnchorPlanService {
                 .strollerFriendly(itinerary.isStrollerFriendly())
                 .accessibleFriendly(itinerary.isAccessibleFriendly())
                 .companionType(itinerary.getCompanionType())
+                .adultAgeGroup(itinerary.getAdultAgeGroup())
+                .childAges(itinerary.getChildAges())
                 .tags(List.of(theme.getTag()))
                 .excludeContentIds(List.copyOf(exclude))
                 .originContentId(originContentId)
