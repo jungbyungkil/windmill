@@ -205,6 +205,16 @@ export function createTripRecord(sessionId, record) {
   return request('/trip-records', { method: 'POST', sessionId, body: record });
 }
 
+/** 여행 기록(일기) 상세 - 작성한 세션만 조회 가능 */
+export function getTripRecordDetail(id, sessionId) {
+  return request(`/trip-records/${id}`, { sessionId });
+}
+
+/** 여행 기록(일기) 수정 - 한줄 의견/장소별 태깅·메모를 나중에 고칠 때 */
+export function updateTripRecord(id, sessionId, patch) {
+  return request(`/trip-records/${id}`, { method: 'PATCH', sessionId, body: patch });
+}
+
 export function getRegionTripHighlights(signguFullCode) {
   return request(`/trip-records/region/${signguFullCode}/highlights`);
 }

@@ -8,6 +8,7 @@ import com.windmill.domain.VisitRating;
 import com.windmill.dto.CreateTripRecordRequest;
 import com.windmill.dto.TripRecordSummaryResponse;
 import com.windmill.dto.TripStoryFeedResponse;
+import com.windmill.dto.UpdateTripRecordRequest;
 import com.windmill.dto.VisitFeedbackRequest;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
@@ -59,6 +60,37 @@ public class TripRecordService {
     @Transactional(readOnly = true)
     public List<TripRecord> findBySession(String sessionUuid) {
         return tripRecordRepository.findBySessionUuid(sessionUuid);
+    }
+
+    /**
+     * 여행 기록(일기) 상세 조회 - 작성한 세션만 볼 수 있다. 소유권이 다르면 "존재하지 않음"과 동일한
+     * 404로 처리해 다른 세션에게 레코드 존재 여부조차 알리지 않는다(개인 메모라 최소 노출 원칙).
+     */
+    @Transactional(readOnly = true)
+    public TripRecord get(Long id, String sessionUuid) {
+        TripRecord record = tripRecordRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("여행 기록을 찾을 수 없습니다: " + id));
+        if (!record.getSessionUuid().equals(sessionUuid)) {
+            throw new EntityNotFoundException("여행 기록을 찾을 수 없습니다: " + id);
+        }
+        return record;
+    }
+
+    /**
+     * 여행 기록(일기) 수정 - 완료 시점엔 아이콘만 빠르게 태깅하고, 나중에 다시 열어 한줄 의견을
+     * 고치거나 장소별 메모를 보태는 흐름을 지원한다. visitFeedback은 항상 통째로 교체한다
+     * (orphanRemoval=true라 collection을 clear 후 다시 채우면 안전하게 삭제·재생성됨).
+     */
+    @Transactional
+    public TripRecord update(Long id, String sessionUuid, UpdateTripRecordRequest request) {
+        TripRecord record = get(id, sessionUuid);
+        record.setOverallNote(request.getOverallNote());
+        record.setOverallRating(request.getOverallRating());
+
+        List<VisitFeedback> feedback = toFeedbackEntities(request.getVisitFeedback(), record, record.getItinerary());
+        record.getVisitFeedback().clear();
+        record.getVisitFeedback().addAll(feedback);
+        return record;
     }
 
     /** GNB "여행 기록" 목록 - 완료한 당일치기를 여행일 기준 최신순으로, limit건까지만 */

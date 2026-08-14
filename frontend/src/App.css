@@ -4839,6 +4839,117 @@
   padding: 32px 0;
 }
 
+/* ---------- 여행 기록 상세(일기) ---------- */
+
+.trip-record-detail-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trip-record-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.trip-record-detail-date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.btn-edit-diary {
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sea-deep);
+}
+
+.trip-record-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sea-deep);
+  background: color-mix(in srgb, var(--sea) 12%, white);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.trip-record-rating-badge.bad {
+  color: #c45c4a;
+  background: color-mix(in srgb, #c45c4a 12%, white);
+}
+
+.trip-record-rating-badge.unrated {
+  color: var(--muted);
+  background: var(--panel-muted, #f1f5f9);
+  font-weight: 500;
+}
+
+.trip-record-detail-note {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.trip-record-detail-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sand-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trip-record-detail-item:last-child {
+  border-bottom: none;
+}
+
+.trip-record-item-memo {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.trip-record-item-memo-input {
+  width: 100%;
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.trip-record-item-memo-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--sea) 45%, var(--sand-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 12%, transparent);
+}
+
+.trip-record-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
 /* ---------- 이용 히스토리 ---------- */
 
 .history-screen {

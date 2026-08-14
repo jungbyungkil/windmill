@@ -25,6 +25,7 @@ import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
 import MyTripsScreen from './components/MyTripsScreen';
 import TripRecordsScreen from './components/TripRecordsScreen';
+import TripRecordDetailScreen from './components/TripRecordDetailScreen';
 import HistoryScreen from './components/HistoryScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
@@ -1223,7 +1224,16 @@ export default function App() {
         element={
           <>
             <BackHeader title="여행 기록" onMenuClick={() => setMenuOpen(true)} />
-            <TripRecordsScreen sessionId={sessionId} onView={handleResumeDraft} onStartNew={handleGoHome} />
+            <TripRecordsScreen sessionId={sessionId} onStartNew={handleGoHome} />
+          </>
+        }
+      />
+      <Route
+        path="/trip-records/:tripRecordId"
+        element={
+          <>
+            <BackHeader title="여행 기록" onMenuClick={() => setMenuOpen(true)} />
+            <TripRecordDetailScreen sessionId={sessionId} onViewItinerary={handleResumeDraft} />
           </>
         }
       />

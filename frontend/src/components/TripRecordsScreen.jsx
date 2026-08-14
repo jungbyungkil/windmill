@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as api from '../api/windmillApi';
 
 function formatFullDate(dateStr, dayOfWeek) {
@@ -7,8 +8,9 @@ function formatFullDate(dateStr, dayOfWeek) {
   return `${y}.${m}.${d}${dayOfWeek ? ` (${dayOfWeek})` : ''}`;
 }
 
-/** GNB "여행 기록" - 완료한 당일치기를 날짜순으로 훑어보는 화면. 카드 탭 시 그 일정으로 이동해 코스를 본다. */
-export default function TripRecordsScreen({ sessionId, onView, onStartNew }) {
+/** GNB "여행 기록" - 완료한 당일치기를 날짜순으로 훑어보는 화면. 카드 탭 시 그 여행의 일기 상세로 이동한다. */
+export default function TripRecordsScreen({ sessionId, onStartNew }) {
+  const navigate = useNavigate();
   const [records, setRecords] = useState(null); // null = 로딩 중
   const [error, setError] = useState(null);
 
@@ -48,8 +50,7 @@ export default function TripRecordsScreen({ sessionId, onView, onStartNew }) {
               <button
                 type="button"
                 className="trip-record-card"
-                onClick={() => r.itineraryId && onView?.(r.itineraryId)}
-                disabled={!r.itineraryId}
+                onClick={() => navigate(`/trip-records/${r.tripRecordId}`)}
               >
                 <span className="trip-record-date">
                   📅 {formatFullDate(r.scheduledDate, r.dayOfWeek)} — {r.regionDisplayName || '지역 미상'}

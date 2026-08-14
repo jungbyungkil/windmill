@@ -9,6 +9,7 @@ import com.windmill.dto.StartFromTripRecordRequest;
 import com.windmill.dto.TripRecordResponse;
 import com.windmill.dto.TripRecordSummaryResponse;
 import com.windmill.dto.TripStoryFeedResponse;
+import com.windmill.dto.UpdateTripRecordRequest;
 import com.windmill.service.itinerary.ItineraryService;
 import com.windmill.service.trip.CommunityScheduleService;
 import com.windmill.service.trip.TripRecordService;
@@ -38,6 +39,29 @@ public class TripRecordController {
             @RequestHeader("X-Session-Id") String sessionId,
             @RequestBody CreateTripRecordRequest request) {
         return Mono.fromCallable(() -> tripRecordService.create(sessionId, request))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(TripRecordResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
+    /** 여행 기록(일기) 상세 - 작성한 세션만 조회 가능(소유권 다르면 404) */
+    @GetMapping("/{id}")
+    public Mono<ResponseEntity<TripRecordResponse>> get(
+            @RequestHeader("X-Session-Id") String sessionId,
+            @PathVariable Long id) {
+        return Mono.fromCallable(() -> tripRecordService.get(id, sessionId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(TripRecordResponse::from)
+                .map(ResponseEntity::ok);
+    }
+
+    /** 여행 기록(일기) 수정 - 완료 시점엔 아이콘만 태깅, 나중에 한줄 의견/장소별 메모를 고치는 흐름 */
+    @PatchMapping("/{id}")
+    public Mono<ResponseEntity<TripRecordResponse>> update(
+            @RequestHeader("X-Session-Id") String sessionId,
+            @PathVariable Long id,
+            @RequestBody UpdateTripRecordRequest request) {
+        return Mono.fromCallable(() -> tripRecordService.update(id, sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(TripRecordResponse::from)
                 .map(ResponseEntity::ok);
