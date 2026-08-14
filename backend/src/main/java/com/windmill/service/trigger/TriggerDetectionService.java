@@ -1,36 +1,44 @@
 package com.windmill.service.trigger;
 
+import com.windmill.client.KakaoDirectionsClient;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.FestivalSuggestion;
+import com.windmill.dto.MapRouteRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.TourAttractionDetail;
+import com.windmill.dto.TransportMode;
 import com.windmill.dto.TriggerLevel;
 import com.windmill.dto.TriggerResult;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.OutdoorActivityClassifier;
 import com.windmill.util.TriggerThresholds;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 바람개비 실시간 변수 감지 - 기상(비)/폭염/혼잡도/영업상태.
+ * 바람개비 실시간 변수 감지 - 기상(비)/폭염/혼잡도/영업상태/(GPS 있으면) 다음 장소까지 이동시간.
  * 비·폭염은 야외 일정에만, 휴무는 정기휴무 문구를 날짜에 맞게 판정한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TriggerDetectionService {
@@ -39,9 +47,19 @@ public class TriggerDetectionService {
     private final RegionCodeService regionCodeService;
     private final TourAttractionService tourAttractionService;
     private final FestivalTriggerService festivalTriggerService;
+    private final KakaoDirectionsClient kakaoDirectionsClient;
 
-    /** 일정 전체 기준 - 트리거 조건을 항목들에 걸쳐 OR로 판정, 축제 제안은 별도로 얹는다 */
+    /** 일정 전체 기준(GPS 없이) - 기존 호출부 하위 호환용 */
     public Mono<TriggerResult> detectForItinerary(Itinerary itinerary) {
+        return detectForItinerary(itinerary, null, null);
+    }
+
+    /**
+     * 일정 전체 기준 - 트리거 조건을 항목들에 걸쳐 OR로 판정, 축제 제안은 별도로 얹는다.
+     * originLon/originLat(WGS84, 현재 위치)이 있으면 "다음 미방문 장소까지 이동시간" 트리거도 판정한다 -
+     * 없으면(위치 권한 거부 등) 그 트리거만 조용히 생략하고 나머지는 그대로 동작한다.
+     */
+    public Mono<TriggerResult> detectForItinerary(Itinerary itinerary, Double originLon, Double originLat) {
         RegionCode region = regionCodeService.find(itinerary.getSignguFullCode())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + itinerary.getSignguFullCode()));
         Mono<List<FestivalSuggestion>> festivalsMono = festivalTriggerService
@@ -59,7 +77,7 @@ public class TriggerDetectionService {
                     .crowdAffectedItemIds(List.of())
                     .festivalSuggestions(festivals).build());
         }
-        return triggerScheduler.ensureFresh(region)
+        Mono<TriggerResult> baseMono = triggerScheduler.ensureFresh(region)
                 .flatMap(condition -> Flux.fromIterable(itinerary.getItems())
                         .flatMap(item -> detect(item, condition, visitDateOf(item, itinerary))
                                 .map(result -> Map.entry(item.getId(), result)))
@@ -73,6 +91,81 @@ public class TriggerDetectionService {
                     result.setFestivalSuggestions(festivals);
                     return result;
                 });
+        return baseMono.flatMap(result -> attachTravelTimeTrigger(result, itinerary, originLon, originLat));
+    }
+
+    /**
+     * 다음 미방문 장소까지 이동시간이 부족해 마감 전 도착이 어려운지 판정 - 실제 도로 기준
+     * `KakaoDirectionsClient`(동선 재계산에서 쓰는 것과 동일 클라이언트)로 ETA를 구해
+     * 기존 `ClosingTimeGate`(마감 임박 게이트)와 동일한 기준으로 비교한다. GPS가 없거나, 다음 장소가
+     * 없거나(오늘 일정 전부 시작됨), 마감 정보가 없으면 조용히 건너뛴다(단정하지 않음, 기존 철학과 동일).
+     */
+    private Mono<TriggerResult> attachTravelTimeTrigger(TriggerResult result, Itinerary itinerary,
+                                                          Double originLon, Double originLat) {
+        if (originLon == null || originLat == null) {
+            return Mono.just(result);
+        }
+        ItineraryItem next = nextUpcomingItem(itinerary);
+        if (next == null || next.getMapX() == null || next.getMapY() == null) {
+            return Mono.just(result);
+        }
+        LocalTime close = ClosingTimeGate.parseHhMm(next.getCloseTime());
+        if (close == null) {
+            close = BusinessHoursEvaluator.extractCloseTimeFromText(next.getUseTimeText());
+        }
+        if (close == null) {
+            return Mono.just(result);
+        }
+        LocalTime closeTime = close;
+        List<MapRouteRequest.MapPoint> points = List.of(
+                MapRouteRequest.MapPoint.builder().lon(originLon).lat(originLat).build(),
+                MapRouteRequest.MapPoint.builder()
+                        .lon(Double.parseDouble(next.getMapX()))
+                        .lat(Double.parseDouble(next.getMapY()))
+                        .build());
+        return kakaoDirectionsClient.route(points, TransportMode.CAR)
+                .map(route -> {
+                    if (route.getDurationSeconds() == null) {
+                        return result;
+                    }
+                    int travelMinutes = (int) Math.ceil(route.getDurationSeconds() / 60.0);
+                    LocalTime estimatedArrival = KoreaClock.nowTime().plusMinutes(travelMinutes);
+                    ClosingTimeGate.CheckResult check = ClosingTimeGate.check(closeTime, estimatedArrival);
+                    if (check.blocked()) {
+                        applyTravelTimeTrigger(result, next, travelMinutes, check);
+                    }
+                    return result;
+                })
+                .onErrorResume(e -> {
+                    log.warn("[TriggerDetection] 이동시간 트리거 계산 실패, 생략: {}", e.getMessage());
+                    return Mono.just(result);
+                });
+    }
+
+    private void applyTravelTimeTrigger(TriggerResult result, ItineraryItem next, int travelMinutes,
+                                         ClosingTimeGate.CheckResult check) {
+        result.setTravelTimeTrigger(true);
+        result.setTravelTimeAffectedItemId(next.getId());
+        result.setTriggerCount(result.getTriggerCount() + 1);
+        List<String> details = new ArrayList<>(result.getTriggerDetails() == null ? List.of() : result.getTriggerDetails());
+        details.add(String.format("'%s'까지 약 %d분 예상돼요. %s", next.getPlaceName(), travelMinutes, check.message()));
+        result.setTriggerDetails(details);
+        // 이동시간 부족은 "계획 유지가 불가능"한 케이스라 곧장 변경 필요(DANGER)로 승격
+        result.setLevel(TriggerLevel.DANGER);
+    }
+
+    /** 오늘(방문일) 일정 중 아직 시작 전(scheduledTime이 현재 이후)인 첫 장소 - 없으면 null */
+    private ItineraryItem nextUpcomingItem(Itinerary itinerary) {
+        LocalTime now = KoreaClock.nowTime();
+        LocalDate today = KoreaClock.today();
+        return itinerary.getItems().stream()
+                .filter(item -> today.equals(visitDateOf(item, itinerary)))
+                .filter(item -> {
+                    LocalTime scheduled = ClosingTimeGate.parseHhMm(item.getScheduledTime());
+                    return scheduled != null && scheduled.isAfter(now);
+                })
+                .min(Comparator.comparing(item -> ClosingTimeGate.parseHhMm(item.getScheduledTime())))
+                .orElse(null);
     }
 
     private LocalDate visitDateOf(ItineraryItem item, Itinerary itinerary) {

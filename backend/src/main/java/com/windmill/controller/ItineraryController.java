@@ -131,12 +131,19 @@ public class ItineraryController {
                 .map(ResponseEntity::ok);
     }
 
-    /** 바람개비 상태 조회 - 프론트가 1~5분 주기로 폴링. 캐시된 지역 데이터만 사용해 즉시 응답. */
+    /**
+     * 바람개비 상태 조회 - 프론트가 1~5분 주기로 폴링. 캐시된 지역 데이터만 사용해 즉시 응답.
+     * originLon·originLat(WGS84, 현재 위치)을 주면 "다음 장소까지 이동시간" 트리거도 함께 판정한다 -
+     * 위치 권한이 없으면 그냥 생략하고 나머지 트리거는 그대로 응답한다.
+     */
     @GetMapping("/{id}/trigger-status")
-    public Mono<ResponseEntity<TriggerResult>> triggerStatus(@PathVariable Long id) {
+    public Mono<ResponseEntity<TriggerResult>> triggerStatus(
+            @PathVariable Long id,
+            @RequestParam(required = false) Double originLon,
+            @RequestParam(required = false) Double originLat) {
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(triggerDetectionService::detectForItinerary)
+                .flatMap(itinerary -> triggerDetectionService.detectForItinerary(itinerary, originLon, originLat))
                 .map(ResponseEntity::ok);
     }
 

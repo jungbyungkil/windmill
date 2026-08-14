@@ -25,6 +25,9 @@ public class TriggerResult {
     /** 동선 꼬임(비효율 경로) - 자동 재배치 제안 */
     private boolean routeTangleTrigger;
     private RouteTangleResult routeTangle;
+    /** 다음 장소까지 이동시간이 부족해 마감 전 도착이 어려움 - GPS(originLon/Lat) 제공 시에만 판정 */
+    private boolean travelTimeTrigger;
+    private Long travelTimeAffectedItemId;
     private int triggerCount;
     private TriggerLevel level;
     private List<String> triggerDetails;

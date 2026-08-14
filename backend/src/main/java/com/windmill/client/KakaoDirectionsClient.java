@@ -249,6 +249,7 @@ public class KakaoDirectionsClient {
     static MapRouteResponse straightFallback(List<MapRouteRequest.MapPoint> points, String message) {
         List<MapRouteResponse.LatLng> path = new ArrayList<>();
         double meters = 0;
+        int minutes = 0;
         MapRouteRequest.MapPoint prev = null;
         for (MapRouteRequest.MapPoint p : points) {
             path.add(MapRouteResponse.LatLng.builder().lat(p.getLat()).lng(p.getLon()).build());
@@ -259,12 +260,16 @@ public class KakaoDirectionsClient {
                 if (km != null) {
                     meters += km * 1000.0;
                 }
+                // TravelTimeMatrix와 동일한 "직선거리 → 분" 근사(haversineMinutes) 재사용 - 카카오 키가
+                // 없거나 실패했을 때도 이동시간 기반 판정(마감 게이트·이동시간 트리거)이 계속 동작하도록 함
+                minutes += haversineMinutes(prev, p);
             }
             prev = p;
         }
         return MapRouteResponse.builder()
                 .path(path)
                 .distanceMeters(meters > 0 ? (int) Math.round(meters) : null)
+                .durationSeconds(minutes > 0 ? minutes * 60 : null)
                 .roadBased(false)
                 .message(message)
                 .build();

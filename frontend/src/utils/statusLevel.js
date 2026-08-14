@@ -80,13 +80,19 @@ export function tipsFromTrigger(trigger) {
   if (trigger.routeTangleTrigger) {
     tips.push({ id: 'route', icon: '🔀', text: '동선이 꼬였어요. 자동 재배치로 이동을 줄여 보세요.' });
   }
+  if (trigger.travelTimeTrigger) {
+    tips.push({ id: 'travelTime', icon: '🚗', text: '다음 장소까지 이동시간이 부족해요. 마감 전 도착이 어려울 수 있어요.' });
+  }
   return tips;
 }
 
-/** 바람이 한 줄 코멘트 */
+/** 바람이 한 줄 코멘트 - 🟢순풍/🟡주의/🔴변경필요 3단계 브랜딩 */
 export function baramiCommentFromTrigger(trigger) {
   if (!trigger) {
-    return '오늘은 순항 중이에요. 이 코스대로 다녀도 좋아요!';
+    return '오늘은 순풍이 불고 있어요. 이 코스대로 다녀도 좋아요!';
+  }
+  if (trigger.travelTimeTrigger) {
+    return '다음 장소까지 이동시간이 빠듯해요. 지금 바로 대안을 확인해볼까요?';
   }
   if (trigger.heatTrigger) {
     return '더위가 세네요. 이 코스에서 야외만 실내로 바꾸면 훨씬 편해질 거예요.';
@@ -109,5 +115,5 @@ export function baramiCommentFromTrigger(trigger) {
   if (trigger.level === 'WARNING') {
     return '변수가 조금 보여요. 미리 대안만 봐 두면 안심이에요.';
   }
-  return '이 코스대로 가면 좋아요. 바람 따라 안전하게 다녀오세요!';
+  return '순풍이 불고 있어요. 이 코스대로 가면 좋아요, 바람 따라 안전하게 다녀오세요!';
 }

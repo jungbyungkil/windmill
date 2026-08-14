@@ -48,6 +48,25 @@ function formatTripDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()} (${weekday})`;
 }
 
+/**
+ * 트리거 폴링용 현재 위치 - 실패/권한거부/미지원이면 조용히 null(이동시간 트리거만 생략되고
+ * 나머지 트리거는 그대로 동작). 90초마다 도는 백그라운드 폴링이라 GPS를 매번 새로 켜지 않도록
+ * maximumAge를 넉넉히 둔다(handleOptimizeFromGps의 수동 재계산과는 다른 용도).
+ */
+function getCurrentPositionSafe() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 2 * 60 * 1000 },
+    );
+  });
+}
+
 /** "09:00" → 분. 없거나 잘못되면 null */
 function scheduleMinutes(scheduledTime) {
   if (!scheduledTime || typeof scheduledTime !== 'string') return null;
@@ -207,9 +226,10 @@ export default function App() {
     navigate('/smart-plan');
   }
 
-  const refreshTrigger = useCallback(() => {
+  const refreshTrigger = useCallback(async () => {
     if (!itineraryId) return;
-    api.getTriggerStatus(itineraryId).then(setTrigger).catch(() => {});
+    const origin = await getCurrentPositionSafe();
+    api.getTriggerStatus(itineraryId, origin).then(setTrigger).catch(() => {});
   }, [itineraryId]);
 
   useEffect(() => {

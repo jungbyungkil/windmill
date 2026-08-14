@@ -98,8 +98,12 @@ export function deleteItem(itineraryId, itemId) {
   return request(`/itineraries/${itineraryId}/items/${itemId}`, { method: 'DELETE' });
 }
 
-export function getTriggerStatus(itineraryId) {
-  return request(`/itineraries/${itineraryId}/trigger-status`);
+/** origin이 있으면 "다음 장소까지 이동시간" 트리거도 함께 판정됨 (위치 권한 없으면 생략) */
+export function getTriggerStatus(itineraryId, origin) {
+  return request(`/itineraries/${itineraryId}/trigger-status${qs({
+    originLon: origin?.lon,
+    originLat: origin?.lat,
+  })}`);
 }
 
 export function confirmDay(itineraryId, date, confirmed) {

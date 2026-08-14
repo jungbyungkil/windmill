@@ -1,10 +1,12 @@
 import BaramiBubble from './BaramiBubble';
 import { baramiCommentFromTrigger } from '../utils/statusLevel';
 
+// 바람따라 넛지 상태 3단계: 🟢 순풍(변수 없음) · 🟡 주의(대응 가능) · 🔴 변경 필요(계획 유지 불가) -
+// TriggerLevel(NORMAL/WARNING/DANGER)에 그대로 1:1로 라벨만 입힌다(우선순위·판정 로직은 안 바꿈).
 const LEVEL_META = {
-  NORMAL: { caption: '변수 없음 · 순항 중', sub: '날씨·혼잡·동선이 바뀌면 여기서 미리 알려드려요' },
-  WARNING: { caption: '변수 감지 · 미리 알려드려요', sub: '일정을 조금 바꾸면 더 편해질 수 있어요' },
-  DANGER: { caption: '변수 주의 · 대안이 필요해요', sub: '지금 코스를 바꾸면 낭비를 줄일 수 있어요' },
+  NORMAL: { caption: '🟢 순풍 · 계획대로 순항 중이에요', sub: '날씨·혼잡·동선이 바뀌면 여기서 미리 알려드려요' },
+  WARNING: { caption: '🟡 주의 · 변수가 감지됐어요', sub: '일정을 조금 바꾸면 더 편해질 수 있어요' },
+  DANGER: { caption: '🔴 변경 필요 · 지금 코스를 바꿔야 해요', sub: '이대로면 계획을 지키기 어려워요, 대안을 확인하세요' },
 };
 
 const CAUSE_META = {
@@ -14,10 +16,12 @@ const CAUSE_META = {
   hoursEndedTrigger: { icon: '🕐', label: '영업종료', avoid: 'BUSINESS' },
   crowdTrigger: { icon: '👥', label: '혼잡', avoid: 'CROWD' },
   routeTangleTrigger: { icon: '🔀', label: '동선 꼬임', avoid: null },
+  travelTimeTrigger: { icon: '🚗', label: '이동시간 부족', avoid: 'BUSINESS' },
 };
 
 function primaryAvoidHint(trigger) {
   if (!trigger) return undefined;
+  if (trigger.travelTimeTrigger) return 'BUSINESS';
   if (trigger.heatTrigger) return 'HEAT';
   if (trigger.weatherTrigger) return 'WEATHER';
   if (trigger.closedDayTrigger || trigger.hoursEndedTrigger) return 'BUSINESS';
@@ -49,7 +53,9 @@ export default function PinwheelHero({
   const heatMode = Boolean(trigger?.heatTrigger);
   const rainMode = Boolean(trigger?.weatherTrigger);
   const tangleMode = Boolean(trigger?.routeTangleTrigger);
+  const travelTimeMode = Boolean(trigger?.travelTimeTrigger);
   const weatherAlert = heatMode || rainMode;
+  const levelEmoji = { NORMAL: '🟢', WARNING: '🟡', DANGER: '🔴' }[level] || '🟢';
 
   function handleActivate() {
     if (!interactive || loading) return;
@@ -61,13 +67,18 @@ export default function PinwheelHero({
   }
 
   function caption() {
-    if (heatMode) return '폭염 소식 · 실내로 바꾸세요';
-    if (rainMode) return '비 소식 · 실내로 바꾸세요';
-    if (tangleMode) return '동선이 꼬였어요 · 자동 재배치';
+    if (travelTimeMode) return `${levelEmoji} 이동시간 부족 · 다음 장소 마감이 임박했어요`;
+    if (heatMode) return `${levelEmoji} 폭염 소식 · 실내로 바꾸세요`;
+    if (rainMode) return `${levelEmoji} 비 소식 · 실내로 바꾸세요`;
+    if (tangleMode) return `${levelEmoji} 동선이 꼬였어요 · 자동 재배치`;
     return meta.caption;
   }
 
   function sub() {
+    if (travelTimeMode) {
+      const detail = trigger?.triggerDetails?.find((d) => d.includes('까지 약'));
+      return detail || '지금 위치에서 다음 장소까지 이동시간이 부족해요. 대안을 확인해보세요.';
+    }
     if (heatMode) return '야외 일정이 있어요. 실내 활동으로 전환을 권해요.';
     if (rainMode) return '야외 일정이 있어요. 비에 맞는 실내 코스를 추천할게요.';
     if (tangleMode) {

@@ -68,6 +68,26 @@ export default function GuideScreen() {
     <div className="guide-screen">
       <p className="guide-intro">바람따라는 이런 순서로 쓰면 편해요. 버튼을 누르면 그 자리에서 바로 따라 해볼 수 있어요.</p>
 
+      <section className="guide-trust-section">
+        <h2 className="guide-trust-title">바람따라는 AI 챗봇이 아니에요</h2>
+        <ul className="guide-trust-list">
+          <li>
+            <span className="guide-trust-icon" aria-hidden="true">🔍</span>
+            <span>지금 이 순간의 혼잡도·영업시간은 한국관광공사·기상청 공식 데이터로만 확인해요.
+              "보통 주말엔 붐빕니다" 같은 짐작이 아니에요.</span>
+          </li>
+          <li>
+            <span className="guide-trust-icon" aria-hidden="true">🛡️</span>
+            <span>공공데이터로 걸러낸 후보만 추천해요. AI는 마지막 한 문장을 다듬을 뿐, 없는 장소를
+              지어내지 않아요.</span>
+          </li>
+          <li>
+            <span className="guide-trust-icon" aria-hidden="true">🌬️</span>
+            <span>물어봐야 답하는 챗봇과 달리, 위치·시간·날씨가 바뀌면 앱이 먼저 알아채고 알려드려요.</span>
+          </li>
+        </ul>
+      </section>
+
       <section className="guide-page">
         <h2 className="guide-page-title">
           <span className="guide-page-badge">PAGE 1</span>

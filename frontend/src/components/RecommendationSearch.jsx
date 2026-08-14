@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import RecommendationCard from './RecommendationCard';
+import TrustBadge from './TrustBadge';
 import { TAG_OPTIONS } from '../constants';
 
 export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId }) {
@@ -21,6 +22,7 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
   return (
     <div className="reco-search">
       <h2 className="section-title">새로운 장소 추천받기</h2>
+      <TrustBadge />
       <form className="reco-search-form" onSubmit={handleSubmit}>
         <input
           type="text"

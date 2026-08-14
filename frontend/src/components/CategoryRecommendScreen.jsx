@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as api from '../api/windmillApi';
 import BaramiBubble from './BaramiBubble';
+import TrustBadge from './TrustBadge';
 
 const ICON_GRID_CATEGORIES = new Set(['RESTAURANT', 'CAFE', '음식점', '카페', '맛집', '식당']);
 
@@ -65,6 +66,7 @@ export default function CategoryRecommendScreen({
         <p className="category-reco-sub">
           혼잡도가 낮은 곳부터 보여드려요. 스마트 동선 추천을 먼저 받아보셨다면, 여기서 더 골라보세요.
         </p>
+        <TrustBadge />
       </header>
 
       {loading && (
