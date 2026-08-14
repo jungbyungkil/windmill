@@ -43,14 +43,28 @@ public class Stage1RelatedAttractionService {
      * 장소명 직접 검색 - 가고 싶은 곳을 이미 알고 있을 때, 연관/추천 로직 없이 그 지역 안에서
      * 이름으로 바로 찾는다("DDP" 검색 → 앵커로 등록). LLM/집중률 필터 없이 KorService2
      * searchKeyword2 결과를 이름 관련도 순 그대로 사용한다.
+     *
+     * ⚠ 선택한 시/군/구로 좁혀 찾다가 0건이면 시/도 전체 → 전국 순으로 넓혀서 재시도한다(라이브로
+     * 실제 확인한 사례: "DDP"는 이름 때문에 동대문구로 착각하기 쉽지만 실제 행정구역은 중구라,
+     * 동대문구로 좁힌 검색은 0건이었음 - 서울 전체로 넓히면 정상적으로 찾아짐). 이름 검색은 정확한
+     * 장소명을 아는 사용자를 위한 경로라 카테고리 검색과 달리 넓혀도 결과가 산으로 갈 위험이 적다.
      */
     public Mono<List<RelatedCandidate>> searchByName(RegionCode region, String query) {
         if (query == null || query.isBlank()) {
             return Mono.just(List.of());
         }
-        return korServiceClient
-                .searchKeyword(query.trim(), null, region.getLDongRegnCd(), region.getLDongSignguCd(),
-                        MAX_CANDIDATES, 1)
+        String trimmed = query.trim();
+        return searchKeywordAsCandidates(trimmed, region.getLDongRegnCd(), region.getLDongSignguCd())
+                .flatMap(list -> !list.isEmpty()
+                        ? Mono.just(list)
+                        : searchKeywordAsCandidates(trimmed, region.getLDongRegnCd(), null))
+                .flatMap(list -> !list.isEmpty()
+                        ? Mono.just(list)
+                        : searchKeywordAsCandidates(trimmed, null, null));
+    }
+
+    private Mono<List<RelatedCandidate>> searchKeywordAsCandidates(String keyword, String regnCd, String signguCd) {
+        return korServiceClient.searchKeyword(keyword, null, regnCd, signguCd, MAX_CANDIDATES, 1)
                 .map(items -> mapKorItems(items, null));
     }
 
