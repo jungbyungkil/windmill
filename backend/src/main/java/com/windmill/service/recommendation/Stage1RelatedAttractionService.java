@@ -41,7 +41,7 @@ public class Stage1RelatedAttractionService {
 
     /**
      * 장소명 직접 검색 - 가고 싶은 곳을 이미 알고 있을 때, 연관/추천 로직 없이 그 지역 안에서
-     * 이름으로 바로 찾는다("청룡사(안성)" 검색 → 담기). LLM/집중률 필터 없이 KorService2
+     * 이름으로 바로 찾는다("DDP" 검색 → 앵커로 등록). LLM/집중률 필터 없이 KorService2
      * searchKeyword2 결과를 이름 관련도 순 그대로 사용한다.
      */
     public Mono<List<RelatedCandidate>> searchByName(RegionCode region, String query) {

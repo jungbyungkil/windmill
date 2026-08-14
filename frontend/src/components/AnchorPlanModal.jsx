@@ -1,23 +1,15 @@
 import { useEffect, useState } from 'react';
 import useModalHistory from '../hooks/useModalHistory';
 
-const DURATION_OPTIONS = [
-  { label: '30분', minutes: 30 },
-  { label: '1시간', minutes: 60 },
-  { label: '1시간 30분', minutes: 90 },
-  { label: '2시간', minutes: 120 },
-  { label: '3시간', minutes: 180 },
-];
-
 /**
- * 목적지 직접 선택 플로우 - "가고 싶은 곳 검색해서 담기"에서 장소를 고르면 바로 담는 대신
- * 이 모달을 거친다: 체류시간 + 오전/오후 배치를 정하면, 그 앞뒤 빈 시간대(점심·주변 전시관/박물관·
- * 저녁 식사/카페)를 자동으로 채운 초안을 보여주고, 체크된 곳만 일정에 담는다.
+ * 앵커(고정 일정) 등록 - "가고 싶은 곳 검색해서 찾기"에서 장소를 고르면 바로 담는 대신
+ * 이 모달을 거친다: 공연/이벤트 시작 시각을 정하면, 그 앞뒤 빈 시간대(점심·가벼운 도보 관광 /
+ * 저녁 식사·카페)를 관광공사 연관 관광지(TarRlteTarService1) 데이터로 채운 초안을 보여주고,
+ * 체크된 곳만 일정에 담는다.
  */
 export default function AnchorPlanModal({ open, anchor, onGenerate, onConfirm, onClose }) {
   const [step, setStep] = useState('setup');
-  const [durationMinutes, setDurationMinutes] = useState(120);
-  const [slot, setSlot] = useState('MORNING');
+  const [anchorTime, setAnchorTime] = useState('19:00');
   const [draft, setDraft] = useState(null);
   const [checked, setChecked] = useState({});
   const [generating, setGenerating] = useState(false);
@@ -29,8 +21,7 @@ export default function AnchorPlanModal({ open, anchor, onGenerate, onConfirm, o
   useEffect(() => {
     if (open) {
       setStep('setup');
-      setDurationMinutes(120);
-      setSlot('MORNING');
+      setAnchorTime('19:00');
       setDraft(null);
       setChecked({});
       setError(null);
@@ -44,10 +35,14 @@ export default function AnchorPlanModal({ open, anchor, onGenerate, onConfirm, o
   }
 
   async function handleGenerate() {
+    if (!anchorTime) {
+      setError('시작 시각을 선택해 주세요.');
+      return;
+    }
     setGenerating(true);
     setError(null);
     try {
-      const result = await onGenerate(anchor, durationMinutes, slot);
+      const result = await onGenerate(anchor, anchorTime);
       setDraft(result);
       setChecked(Object.fromEntries(result.map((c) => [c.contentId, true])));
       setStep('review');
@@ -79,47 +74,21 @@ export default function AnchorPlanModal({ open, anchor, onGenerate, onConfirm, o
       >
         {step === 'setup' ? (
           <>
-            <p className="anchor-plan-eyebrow">목적지 직접 선택</p>
+            <p className="anchor-plan-eyebrow">고정 일정(앵커) 등록</p>
             <h2 id="anchor-plan-title" className="anchor-plan-title">{anchor.placeName}</h2>
             <p className="anchor-plan-message">
-              얼마나 머무를지, 오전/오후 중 언제 갈지 정해주시면 나머지 빈 시간(점심·전시관/박물관·저녁)을
-              주변에서 자동으로 채워드려요.
+              공연·전시 등 시작 시각을 정해주시면, 그 앞뒤 빈 시간(점심·가벼운 도보 관광 / 저녁 식사·카페)을
+              이 장소 주변 연관 관광지 데이터로 자동으로 채워드려요.
             </p>
 
             <div className="anchor-plan-field">
-              <span className="anchor-plan-field-label">체류시간</span>
-              <div className="anchor-plan-duration-row">
-                {DURATION_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.minutes}
-                    type="button"
-                    className={`anchor-plan-chip ${durationMinutes === opt.minutes ? 'selected' : ''}`}
-                    onClick={() => setDurationMinutes(opt.minutes)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="anchor-plan-field">
-              <span className="anchor-plan-field-label">배치</span>
-              <div className="anchor-plan-slot-row">
-                <button
-                  type="button"
-                  className={`anchor-plan-chip ${slot === 'MORNING' ? 'selected' : ''}`}
-                  onClick={() => setSlot('MORNING')}
-                >
-                  오전
-                </button>
-                <button
-                  type="button"
-                  className={`anchor-plan-chip ${slot === 'AFTERNOON' ? 'selected' : ''}`}
-                  onClick={() => setSlot('AFTERNOON')}
-                >
-                  오후
-                </button>
-              </div>
+              <span className="anchor-plan-field-label">시작 시각</span>
+              <input
+                type="time"
+                className="anchor-plan-time-input"
+                value={anchorTime}
+                onChange={(e) => setAnchorTime(e.target.value)}
+              />
             </div>
 
             {error && <div className="error-msg">❌ {error}</div>}
@@ -133,7 +102,7 @@ export default function AnchorPlanModal({ open, anchor, onGenerate, onConfirm, o
           </>
         ) : (
           <>
-            <p className="anchor-plan-eyebrow">{anchor.placeName} · {slot === 'MORNING' ? '오전 배치' : '오후 배치'}</p>
+            <p className="anchor-plan-eyebrow">{anchor.placeName} · {anchorTime} 시작</p>
             <h2 id="anchor-plan-title" className="anchor-plan-title">채워진 일정 초안</h2>
             <p className="anchor-plan-message">체크된 장소만 일정에 담겨요.</p>
 

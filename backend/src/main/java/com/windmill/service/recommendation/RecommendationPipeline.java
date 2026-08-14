@@ -87,21 +87,21 @@ public class RecommendationPipeline {
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
                             .map(list -> AccessibilityRanking.rank(list, request.isStrollerFriendly(), request.isAccessibleFriendly()))
                             .map(list -> AgeGroupRanking.rank(list, request.getAdultAgeGroup(), request.getChildAges()))
-                            .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery()))
+                            .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery(), request.getChildAges()))
                             .map(list -> enrichThemeTags(list, themes))
                             .doOnNext(list -> badgeAssembler.attach(list, condition));
                 })
                 .map(list -> list.stream()
                         .filter(c -> !excludeNames.contains(c.getPlaceName()))
                         .collect(Collectors.toList()))
-                .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint()))
+                .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint(), request.getChildAges()))
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
     }
 
     /**
-     * 장소명 직접 검색 - "이미 가려는 곳이 정해진" 사용자를 위한 경로. 연관추천(Stage1 seed)이 아니라
-     * KorService2 키워드 검색으로 그 이름 자체를 찾는다. Stage3(집중률 정렬)·Stage4(LLM 태그/문장)는
-     * 건너뛴다 - 사용자가 정확한 이름으로 찾는 결과이지 취향 추천이 아니라 굳이 LLM이 필요 없다.
+     * 장소명 직접 검색 - "이미 가려는 곳이 정해진" 사용자를 위한 경로(앵커 등록에도 재사용). 연관추천
+     * (Stage1 seed)이 아니라 KorService2 키워드 검색으로 그 이름 자체를 찾는다. Stage3(집중률 정렬)·
+     * Stage4(LLM 태그/문장)는 건너뛴다 - 정확한 이름 매칭이지 취향 추천이 아니라 굳이 LLM이 필요 없다.
      */
     public Mono<List<RecommendationCandidate>> searchByName(String regionCode, String query) {
         RegionCode region = regionCodeService.find(regionCode)
@@ -173,20 +173,41 @@ public class RecommendationPipeline {
         return candidates;
     }
 
+    private static final String[] KIDS_INDOOR_KEYWORDS = {
+            "키즈카페", "실내놀이", "체험관", "박물관", "미술관", "전시", "과학관", "동물원", "수족관", "키즈"
+    };
+
     /**
      * 트리거 우선회피 정렬. 혼잡도 트리거는 Stage3에서 이미 여유율 순으로 정렬되어 있으므로 그대로 두고,
-     * 비/폭염 트리거는 #실내 태그가 매칭된 후보를 앞으로 당긴다.
+     * 비/폭염 트리거는 #실내 태그가 매칭된 후보를 앞으로 당긴다. 동반 자녀가 있으면 그 안에서도
+     * 아이 동반에 어울리는 실내 장소(체험관·키즈카페·박물관 등)를 한 번 더 앞으로 당긴다 - 폭염철
+     * 아이 동반 여행은 실내 중에서도 "아이가 할 게 있는 곳"이 우선이라는 요구 반영.
      */
     private List<RecommendationCandidate> applyAvoidanceOrdering(List<RecommendationCandidate> candidates,
-                                                                   RecommendationRequest.AvoidanceHint hint) {
+                                                                   RecommendationRequest.AvoidanceHint hint,
+                                                                   List<Integer> childAges) {
         if (hint == RecommendationRequest.AvoidanceHint.WEATHER
                 || hint == RecommendationRequest.AvoidanceHint.HEAT) {
+            boolean hasChildren = childAges != null && !childAges.isEmpty();
             return candidates.stream()
-                    .sorted(Comparator.comparing((RecommendationCandidate c) ->
-                            c.getMatchedTags() != null && c.getMatchedTags().contains("#실내") ? 0 : 1))
+                    .sorted(Comparator
+                            .comparing((RecommendationCandidate c) ->
+                                    c.getMatchedTags() != null && c.getMatchedTags().contains("#실내") ? 0 : 1)
+                            .thenComparing(c -> hasChildren && matchesKidsIndoorKeyword(c) ? 0 : 1))
                     .collect(Collectors.toList());
         }
         return candidates;
+    }
+
+    private boolean matchesKidsIndoorKeyword(RecommendationCandidate c) {
+        String text = (c.getCategory() == null ? "" : c.getCategory())
+                + " " + (c.getPlaceName() == null ? "" : c.getPlaceName());
+        for (String keyword : KIDS_INDOOR_KEYWORDS) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** #맛집 태그 또는 식당/맛집/레스토랑 등 검색어면 음식점 전용 Stage1 경로 */

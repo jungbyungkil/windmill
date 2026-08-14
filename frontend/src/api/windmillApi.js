@@ -119,30 +119,33 @@ export function getAutoPlan(itineraryId, { tags, query, placeCount } = {}) {
   return request(`/itineraries/${itineraryId}/auto-plan${qs({ tags, query, placeCount })}`);
 }
 
-/** 혼잡↓ · 날씨 · 동선 최적화 스마트 일정 (핵심 플로우). date면 해당 일자만 */
-export function getSmartPlan(itineraryId, { placeCount, date } = {}) {
-  return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date })}`);
-}
-
 /**
- * 목적지 직접 선택 플로우 - 사용자가 고른 장소(anchor)를 오전/오후에 배치하고
- * 점심·주변 전시관/박물관·저녁 식사/카페로 빈 시간대를 채운 초안을 받는다.
- * slot: "MORNING" | "AFTERNOON"
+ * 혼잡↓ · 날씨 · 동선 최적화 스마트 일정 (핵심 플로우). date면 해당 일자만.
+ * standard=true면 "당일치기 시작하기" 전용 - 아침 일정/점심 식사/오후 일정/저녁 식사 4단계를
+ * 현재 시각과 무관하게 무조건 채운 표준 하루 계획을 받는다.
  */
-export function getAnchorPlan(itineraryId, { anchor, durationMinutes, slot } = {}) {
-  return request(`/itineraries/${itineraryId}/anchor-plan`, {
-    method: 'POST',
-    body: { anchor, durationMinutes, slot },
-  });
+export function getSmartPlan(itineraryId, { placeCount, date, standard } = {}) {
+  return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date, standard })}`);
 }
 
 export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
   return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
-/** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(취향 추천이 아닌 정확한 이름 매칭) */
+/** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(취향 추천이 아닌 정확한 이름 매칭). 앵커 등록에도 재사용 */
 export function searchPlacesByName({ regionCode, query } = {}) {
   return request(`/recommendations/search${qs({ regionCode, query })}`);
+}
+
+/**
+ * 앵커(고정 일정) 등록 - 예: DDP 19:00 공연처럼 시각이 정해진 장소를 기준점으로 그 앞뒤
+ * 빈 시간대(점심·가벼운 도보 관광 / 저녁 식사·카페)를 채운 초안을 받는다. anchorTime: "HH:mm"
+ */
+export function getAnchorPlan(itineraryId, { anchor, anchorTime } = {}) {
+  return request(`/itineraries/${itineraryId}/anchor-plan`, {
+    method: 'POST',
+    body: { anchor, anchorTime },
+  });
 }
 
 /** 카테고리별 장소 추천 (식당/박물관/키즈카페/카페) - 방문자(집중률) 우선 */

@@ -4364,7 +4364,7 @@
   cursor: not-allowed;
 }
 
-/* ---------- 목적지 직접 선택 모달 ---------- */
+/* ---------- 앵커(고정 일정) 등록 모달 ---------- */
 
 .anchor-plan-backdrop {
   position: fixed;
@@ -4419,28 +4419,20 @@
   color: var(--ink, #1e293b);
 }
 
-.anchor-plan-duration-row,
-.anchor-plan-slot-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.anchor-plan-chip {
-  padding: 8px 14px;
-  border-radius: 999px;
+.anchor-plan-time-input {
+  width: 100%;
   border: 1px solid var(--sand-border, #cbd5e1);
-  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 15px;
   color: var(--ink, #1e293b);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+  background: #fff;
 }
 
-.anchor-plan-chip.selected {
-  background: var(--sea, #1d6b8a);
-  border-color: var(--sea, #1d6b8a);
-  color: #fff;
+.anchor-plan-time-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--sea) 45%, var(--sand-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 12%, transparent);
 }
 
 .anchor-plan-draft-list {

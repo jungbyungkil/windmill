@@ -31,25 +31,47 @@ public class Stage4TagMatchingService {
 
     public Mono<List<RecommendationCandidate>> match(List<RelatedCandidate> candidates, List<String> requestedTags,
                                                        String naturalLanguageQuery) {
+        return match(candidates, requestedTags, naturalLanguageQuery, null);
+    }
+
+    /**
+     * @param childAges 동반 자녀 만 나이 - 있으면 "#아이동반"을 명시적으로 고르지 않았어도 매칭 후보에
+     *                  자동으로 넣고, LLM 프롬프트에 나이대 힌트를 줘서 "아이랑 가기 좋은 곳" 같은
+     *                  문장이 자연스럽게 나오게 한다(Stage1 자체를 바꾸지 않고 이 단계에서만 반영 -
+     *                  실제 순위 보정은 이미 AgeGroupRanking이 Stage3 뒤·Stage4 앞에서 처리함).
+     */
+    public Mono<List<RecommendationCandidate>> match(List<RelatedCandidate> candidates, List<String> requestedTags,
+                                                       String naturalLanguageQuery, List<Integer> childAges) {
         if (candidates.isEmpty()) {
             return Mono.just(List.of());
         }
-        final List<String> requested = requestedTags == null ? List.of() : requestedTags;
-        if (!openAiService.isConfigured()) {
-            return Mono.just(fallback(candidates, requested));
+        List<String> requested = requestedTags == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(requestedTags);
+        String ageBand = AgeGroupRanking.youngestAgeBandLabel(childAges);
+        if (ageBand != null && !requested.contains("#아이동반")) {
+            requested.add("#아이동반");
         }
-        String prompt = buildPrompt(candidates, requested, naturalLanguageQuery);
+        final List<String> finalRequested = List.copyOf(requested);
+        if (!openAiService.isConfigured()) {
+            return Mono.just(fallback(candidates, finalRequested));
+        }
+        String prompt = buildPrompt(candidates, finalRequested, naturalLanguageQuery, ageBand);
         return openAiService.complete(prompt)
-                .map(response -> parseResponse(response, candidates, requested))
-                .onErrorReturn(fallback(candidates, requested));
+                .map(response -> parseResponse(response, candidates, finalRequested))
+                .onErrorReturn(fallback(candidates, finalRequested));
     }
 
-    private String buildPrompt(List<RelatedCandidate> candidates, List<String> requestedTags, String query) {
+    private String buildPrompt(List<RelatedCandidate> candidates, List<String> requestedTags, String query, String childAgeBand) {
         String candidateLines = candidates.stream()
                 .map(c -> String.format("- %s (분류: %s, 여유율: %s)", c.getPlaceName(), c.getCategoryLcls(),
                         c.getCrowdRate() == null ? "정보없음" : String.format("%.0f%%", 100 - c.getCrowdRate())))
                 .collect(Collectors.joining("\n"));
         String tagsText = (requestedTags == null || requestedTags.isEmpty()) ? "없음" : String.join(", ", requestedTags);
+        String childHint = childAgeBand == null ? "" : String.format("""
+
+                동반 자녀: %s. 자녀와 함께 가기 좋은 후보(체험관·키즈카페·실내 놀이시설·박물관 등)에는
+                자연스럽게 "아이랑 가기 좋은 곳"이라는 느낌이 드러나는 한 문장을 만들어주세요. 자녀와 안
+                맞는 곳(성인 전용, 유흥 시설 등)은 억지로 아이 동반 문구를 넣지 마세요.
+                """, childAgeBand);
 
         return String.format("""
                 아래는 이미 영업시간/혼잡도 기준으로 걸러지고 정렬이 끝난 관광지 후보 목록입니다.
@@ -57,7 +79,7 @@ public class Stage4TagMatchingService {
 
                 사용자 자연어 검색어: %s
                 요청 태그 후보: %s
-
+                %s
                 관광지 목록:
                 %s
 
@@ -70,7 +92,7 @@ public class Stage4TagMatchingService {
                 [
                   {"placeName": "장소명", "matchedTags": ["#태그"], "oneLiner": "한 문장 소개"}
                 ]
-                """, query == null ? "없음" : query, tagsText, candidateLines);
+                """, query == null ? "없음" : query, tagsText, childHint, candidateLines);
     }
 
     private List<RecommendationCandidate> parseResponse(String response, List<RelatedCandidate> candidates,

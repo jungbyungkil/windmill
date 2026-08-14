@@ -42,8 +42,8 @@ public class RecommendationController {
     }
 
     /**
-     * 장소명 직접 검색 - 가고 싶은 곳이 이미 정해진 사용자가 이름으로 찾아 바로 담을 수 있게 한다.
-     * (예: "청룡사(안성)"). 취향 추천이 아니라 정확한 이름 매칭이라 태그/자연어 추천과는 별도 경로.
+     * 장소명 직접 검색 - 가고 싶은 곳이 이미 정해진 사용자가 이름으로 찾아 앵커로 등록할 수 있게 한다.
+     * (예: "DDP"). 취향 추천이 아니라 정확한 이름 매칭이라 태그/자연어 추천과는 별도 경로.
      */
     @GetMapping("/search")
     public Mono<ResponseEntity<List<RecommendationCandidate>>> search(

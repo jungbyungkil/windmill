@@ -3,11 +3,12 @@ package com.windmill.service.recommendation;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.PlaceCategory;
-import com.windmill.domain.RecommendThemeTag;
 import com.windmill.dto.AnchorPlanRequest;
-import com.windmill.dto.DaySlot;
+import com.windmill.dto.CategoryPlaceGroup;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
+import com.windmill.util.ClosingTimeGate;
+import com.windmill.util.PlaceTagSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,38 +17,33 @@ import reactor.core.publisher.Mono;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 목적지 직접 선택 플로우 - 사용자가 고른 장소(anchor)를 오전/오후 슬롯에 배치하고, 그 앞뒤 빈 시간대를
- * 채운다. AI가 코스를 통째로 만드는 SmartPlan/AutoPlan과 달리 "사용자가 이미 정한 한 곳"을 기준점으로
- * 삼는 게 핵심이라, 채워 넣는 후보들은 전부 이 기준점(anchor)에서 가까운 순으로 4단계 파이프라인을
- * 재사용해 고른다(별도 추천 로직을 새로 만들지 않음).
+ * 앵커(고정 일정) 등록 - 예: "DDP에서 19:00 공연"처럼 이미 시각이 정해진 장소를 하루 일정의 기준점으로
+ * 삼고, 그 앞뒤 빈 시간대를 채운다. AI가 코스를 통째로 짜는 SmartPlan과 달리 "사용자가 이미 정한 한
+ * 곳+시각"이 기준점이라, 채워 넣는 후보는 관광공사 TarRlteTarService1(연관 관광지)로 앵커 장소 자체를
+ * seed로 조회한 "그 장소 근처의 실제 연관 명소"만 사용한다(독립적인 태그 검색이 아님 - 사용자 요구사항).
  *
- * 오전 배치: anchor → 점심(맛집) → 주변 전시관·박물관 → 저녁 식사/카페
- * 오후 배치: anchor → 저녁 식사/카페 (점심은 이미 지났다고 가정)
- *
- * ⚠ 점심/전시관/저녁을 Mono.zip으로 동시에 조회하면 더 빠를 것 같지만 실제로는 더 느려진다 -
- * data.go.kr가 동시 요청에 취약해(Stage2가 이미 EXTERNAL_CALL_CONCURRENCY=4로 자기 안에서 제한하는
- * 이유와 동일) 파이프라인 3~4개를 겹쳐 부르면 ReadTimeoutException이 무더기로 나는 걸 라이브
- * 호출로 확인함(2026-08-14). 그래서 순차 호출을 유지하고, 대신 컨트롤러 쪽 비동기 타임아웃을
- * 늘려서(WebConfig) 순차 호출의 누적 시간(호출당 15~20초대 × 최대 4회)을 버틸 여유를 준다.
+ * 공연 전(오전~공연 전): 점심 식사 + 가벼운 도보 관광지
+ * 공연 후: 저녁 식사 + (선택) 분위기 좋은 카페/야경 명소
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnchorPlanService {
 
-    private static final LocalTime MORNING_START = LocalTime.of(9, 0);
-    private static final LocalTime AFTERNOON_START = LocalTime.of(14, 0);
-    private static final LocalTime LUNCH_FLOOR = LocalTime.of(12, 0);
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final LocalTime LUNCH_TIME = LocalTime.of(12, 0);
     private static final LocalTime EVENING_FLOOR = LocalTime.of(18, 0);
     private static final int LUNCH_MINUTES = 60;
-    private static final int MUSEUM_MINUTES = 90;
-    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final int WALK_MINUTES = 60;
+    /** 공연/전시 평균 관람시간 가정치 - 사용자가 종료 시각까지 입력하진 않아 "공연 후" 슬롯 기준점 계산용 */
+    private static final int ASSUMED_EVENT_MINUTES = 120;
 
     private final RecommendationPipeline recommendationPipeline;
     private final CategoryRecommendationService categoryRecommendationService;
@@ -57,104 +53,18 @@ public class AnchorPlanService {
         if (anchor == null || anchor.getContentId() == null) {
             return Mono.error(new IllegalArgumentException("목적지 정보가 없습니다"));
         }
-        DaySlot slot = request.getSlot() == null ? DaySlot.MORNING : request.getSlot();
-        int duration = Math.max(request.getDurationMinutes(), 30);
-        LocalTime start = slot == DaySlot.MORNING ? MORNING_START : AFTERNOON_START;
-        anchor.setSuggestedTime(start.format(TIME_FORMAT));
-        anchor.setOneLiner(withSlotNote(anchor.getOneLiner(), "직접 선택한 장소"));
-
-        PlanState state = new PlanState();
-        state.items.add(anchor);
-        state.used.addAll(existingContentIds(itinerary));
-        state.used.add(anchor.getContentId());
-        state.anchorContentId = anchor.getContentId();
-        state.anchorContentTypeId = anchor.getContentTypeId();
-        state.lastContentId = anchor.getContentId();
-        state.lastContentTypeId = anchor.getContentTypeId();
-        state.cursor = start.plusMinutes(duration);
-
-        Mono<PlanState> chain = Mono.just(state);
-        if (slot == DaySlot.MORNING) {
-            chain = chain.flatMap(s -> appendLunch(itinerary, s))
-                    .flatMap(s -> appendMuseum(itinerary, s));
+        LocalTime anchorTime = ClosingTimeGate.parseHhMm(request.getAnchorTime());
+        if (anchorTime == null) {
+            return Mono.error(new IllegalArgumentException("공연/이벤트 시작 시각을 입력해주세요 (예: 19:00)"));
         }
-        return chain
-                .flatMap(s -> appendDinner(itinerary, s))
-                .flatMap(s -> appendCafe(itinerary, s))
-                .map(s -> s.items)
-                .doOnNext(list -> log.info("[AnchorPlan] anchor='{}' slot={} 채움 {}건",
-                        anchor.getPlaceName(), slot, list.size()));
-    }
+        anchor.setSuggestedTime(anchorTime.format(TIME_FORMAT));
+        anchor.setOneLiner(withSlotNote(anchor.getOneLiner(), "직접 등록한 고정 일정"));
+        LocalTime anchorEnd = anchorTime.plusMinutes(ASSUMED_EVENT_MINUTES);
 
-    private Mono<PlanState> appendLunch(Itinerary itinerary, PlanState state) {
-        return fetchNearest(itinerary, RecommendThemeTag.FOOD, state.anchorContentId, state.anchorContentTypeId, state.used)
-                .map(lunch -> {
-                    LocalTime time = laterOf(state.cursor, LUNCH_FLOOR);
-                    lunch.setSuggestedTime(time.format(TIME_FORMAT));
-                    lunch.setOneLiner(withSlotNote(lunch.getOneLiner(), "점심 식사로 추천"));
-                    state.items.add(lunch);
-                    state.used.add(lunch.getContentId());
-                    state.cursor = time.plusMinutes(LUNCH_MINUTES);
-                    return state;
-                })
-                .defaultIfEmpty(state);
-    }
+        Set<String> used = new HashSet<>(existingContentIds(itinerary));
+        used.add(anchor.getContentId());
 
-    private Mono<PlanState> appendMuseum(Itinerary itinerary, PlanState state) {
-        return fetchNearest(itinerary, RecommendThemeTag.INDOOR, state.anchorContentId, state.anchorContentTypeId, state.used)
-                .map(museum -> {
-                    museum.setSuggestedTime(state.cursor.format(TIME_FORMAT));
-                    museum.setOneLiner(withSlotNote(museum.getOneLiner(), "주변 전시관·박물관"));
-                    state.items.add(museum);
-                    state.used.add(museum.getContentId());
-                    state.lastContentId = museum.getContentId();
-                    state.lastContentTypeId = museum.getContentTypeId();
-                    state.cursor = state.cursor.plusMinutes(MUSEUM_MINUTES);
-                    return state;
-                })
-                .defaultIfEmpty(state);
-    }
-
-    private Mono<PlanState> appendDinner(Itinerary itinerary, PlanState state) {
-        return fetchNearest(itinerary, RecommendThemeTag.FOOD, state.lastContentId, state.lastContentTypeId, state.used)
-                .map(dinner -> {
-                    LocalTime time = laterOf(state.cursor, EVENING_FLOOR);
-                    dinner.setSuggestedTime(time.format(TIME_FORMAT));
-                    dinner.setOneLiner(withSlotNote(dinner.getOneLiner(), "저녁 식사로 추천"));
-                    state.items.add(dinner);
-                    state.used.add(dinner.getContentId());
-                    state.eveningTime = time;
-                    return state;
-                })
-                .defaultIfEmpty(state);
-    }
-
-    /** 저녁 식사와 별개 선택지 - "분위기 좋은 카페"는 CategoryRecommendationService(여유율 우선 정렬)에서 고른다 */
-    private Mono<PlanState> appendCafe(Itinerary itinerary, PlanState state) {
-        return categoryRecommendationService.recommendByCategory(itinerary.getSignguFullCode(), state.used)
-                .flatMap(groups -> groups.stream()
-                        .filter(g -> g.getCategory() == PlaceCategory.CAFE)
-                        .findFirst()
-                        .flatMap(g -> g.getPlaces().stream()
-                                .filter(c -> !state.used.contains(c.getContentId()))
-                                .findFirst())
-                        .map(Mono::just)
-                        .orElseGet(Mono::empty))
-                .map(cafe -> {
-                    LocalTime time = laterOf(state.cursor, state.eveningTime != null ? state.eveningTime : EVENING_FLOOR);
-                    cafe.setSuggestedTime(time.format(TIME_FORMAT));
-                    cafe.setOneLiner(withSlotNote(cafe.getOneLiner(), "분위기 좋은 카페로 추천 (선택)"));
-                    state.items.add(cafe);
-                    state.used.add(cafe.getContentId());
-                    return state;
-                })
-                .defaultIfEmpty(state);
-    }
-
-    /** 4단계 파이프라인을 재사용해 origin에서 가장 가까운 후보 1건을 고른다. 없으면 빈 Mono(Mono는 null을 못 담음) */
-    private Mono<RecommendationCandidate> fetchNearest(Itinerary itinerary, RecommendThemeTag theme,
-            String originContentId, Integer originContentTypeId, Set<String> exclude) {
-        RecommendationRequest req = RecommendationRequest.builder()
+        RecommendationRequest relatedReq = RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
                 .withPet(itinerary.isWithPet())
                 .strollerFriendly(itinerary.isStrollerFriendly())
@@ -162,23 +72,128 @@ public class AnchorPlanService {
                 .companionType(itinerary.getCompanionType())
                 .adultAgeGroup(itinerary.getAdultAgeGroup())
                 .childAges(itinerary.getChildAges())
-                .tags(List.of(theme.getTag()))
-                .excludeContentIds(List.copyOf(exclude))
-                .originContentId(originContentId)
-                .originContentTypeId(originContentTypeId)
+                .seedPlaceName(anchor.getPlaceName())
+                .excludeContentIds(List.copyOf(used))
+                .originContentId(anchor.getContentId())
+                .originContentTypeId(anchor.getContentTypeId())
                 .build();
-        return recommendationPipeline.recommend(req)
-                .flatMap(list -> list.stream()
-                        .filter(c -> c.getContentId() != null && !exclude.contains(c.getContentId()))
-                        .sorted((a, b) -> Double.compare(safeDistance(a), safeDistance(b)))
-                        .findFirst()
-                        .map(Mono::just)
-                        .orElseGet(Mono::empty))
-                .onErrorResume(e -> Mono.empty());
+
+        // TarRlteTarService1(연관 관광지)는 seed(앵커 장소)에 baseYm 데이터가 아예 없을 수 있다 -
+        // 라이브 검증(2026-08-14, DDP)에서 실제로 "최근 3개월간 데이터 미발행"으로 0건이 나옴을 확인함.
+        // 지역 카테고리 추천(식당/박물관/카페, 앵커 이름과 무관하게 지역 전체 기준)을 항상 함께 조회해
+        // 연관 관광지가 비어도 조용히 카테고리 추천으로 보강한다.
+        Mono<List<RecommendationCandidate>> relatedMono = recommendationPipeline.recommend(relatedReq)
+                .onErrorReturn(List.of());
+        Mono<List<CategoryPlaceGroup>> categoryMono = categoryRecommendationService
+                .recommendByCategory(itinerary.getSignguFullCode(), used)
+                .onErrorReturn(List.of());
+
+        return Mono.zip(relatedMono, categoryMono)
+                .map(tuple -> {
+                    List<RecommendationCandidate> related = tuple.getT1();
+                    List<CategoryPlaceGroup> categoryGroups = tuple.getT2();
+
+                    List<RecommendationCandidate> foodPool = new ArrayList<>();
+                    List<RecommendationCandidate> sightPool = new ArrayList<>();
+                    for (RecommendationCandidate c : related) {
+                        if (c.getContentId() == null || used.contains(c.getContentId())) {
+                            continue;
+                        }
+                        (isFood(c) ? foodPool : sightPool).add(c);
+                    }
+                    sortByDistance(foodPool);
+                    sortByDistance(sightPool);
+                    appendCategoryFallback(foodPool, categoryGroups, PlaceCategory.RESTAURANT, used);
+                    appendCategoryFallback(sightPool, categoryGroups, PlaceCategory.MUSEUM, used);
+
+                    List<RecommendationCandidate> out = new ArrayList<>();
+                    out.add(anchor);
+
+                    // 공연 전: 점심(공연보다 최소 100분 전이어야 자연스러움) → 여유 있으면 가벼운 도보 관광지
+                    if (anchorTime.isAfter(LUNCH_TIME.plusMinutes(LUNCH_MINUTES + 40))) {
+                        RecommendationCandidate lunch = takeNearest(foodPool, used);
+                        if (lunch != null) {
+                            tag(lunch, LUNCH_TIME, "공연 전 점심 식사로 추천");
+                            out.add(lunch);
+                            LocalTime walkTime = LUNCH_TIME.plusMinutes(LUNCH_MINUTES);
+                            if (anchorTime.isAfter(walkTime.plusMinutes(WALK_MINUTES + 30))) {
+                                RecommendationCandidate walk = takeNearest(sightPool, used);
+                                if (walk != null) {
+                                    tag(walk, walkTime, "공연 전 가볍게 둘러보기 좋은 곳");
+                                    out.add(walk);
+                                }
+                            }
+                        }
+                    }
+
+                    // 공연 후: 저녁 식사
+                    LocalTime dinnerTime = laterOf(anchorEnd, EVENING_FLOOR);
+                    RecommendationCandidate dinner = takeNearest(foodPool, used);
+                    if (dinner != null) {
+                        tag(dinner, dinnerTime, "공연 후 저녁 식사로 추천");
+                        out.add(dinner);
+                    }
+
+                    // 공연 후 선택지: 분위기 좋은 카페/야경 명소
+                    RecommendationCandidate cafe = pickFromCategory(categoryGroups, PlaceCategory.CAFE, used);
+                    if (cafe != null) {
+                        tag(cafe, dinnerTime, "공연 후 분위기 좋은 카페·야경 명소로 추천 (선택)");
+                        out.add(cafe);
+                    }
+                    return out;
+                })
+                .doOnNext(list -> log.info("[AnchorPlan] anchor='{}' anchorTime={} 채움 {}건",
+                        anchor.getPlaceName(), anchorTime, list.size()));
     }
 
-    private double safeDistance(RecommendationCandidate c) {
-        return c.getDistanceKm() == null ? Double.MAX_VALUE : c.getDistanceKm();
+    private boolean isFood(RecommendationCandidate c) {
+        return PlaceTagSanitizer.looksLikeFood(c.getContentTypeId(), c.getPlaceName(), c.getCategory());
+    }
+
+    /** 앵커와의 거리(distanceKm, Stage1에서 origin 기준으로 이미 계산됨) 가까운 순 정렬 */
+    private void sortByDistance(List<RecommendationCandidate> pool) {
+        pool.sort(Comparator.comparing(c -> c.getDistanceKm() == null ? Double.MAX_VALUE : c.getDistanceKm()));
+    }
+
+    /** 연관 관광지 풀이 비어 있을 때만(부분 보강은 안 함 - 가까운 연관 후보가 있으면 그게 항상 우선) 지역 카테고리로 채운다 */
+    private void appendCategoryFallback(List<RecommendationCandidate> pool, List<CategoryPlaceGroup> groups,
+                                         PlaceCategory category, Set<String> used) {
+        if (!pool.isEmpty()) {
+            return;
+        }
+        groups.stream()
+                .filter(g -> g.getCategory() == category)
+                .findFirst()
+                .ifPresent(g -> g.getPlaces().stream()
+                        .filter(c -> c.getContentId() != null && !used.contains(c.getContentId()))
+                        .forEach(pool::add));
+    }
+
+    private RecommendationCandidate pickFromCategory(List<CategoryPlaceGroup> groups, PlaceCategory category, Set<String> used) {
+        return groups.stream()
+                .filter(g -> g.getCategory() == category)
+                .findFirst()
+                .flatMap(g -> g.getPlaces().stream()
+                        .filter(c -> c.getContentId() != null && !used.contains(c.getContentId()))
+                        .findFirst())
+                .orElse(null);
+    }
+
+    private RecommendationCandidate takeNearest(List<RecommendationCandidate> pool, Set<String> used) {
+        for (int i = 0; i < pool.size(); i++) {
+            RecommendationCandidate c = pool.get(i);
+            if (!used.contains(c.getContentId())) {
+                pool.remove(i);
+                used.add(c.getContentId());
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private void tag(RecommendationCandidate c, LocalTime time, String note) {
+        c.setSuggestedTime(time.format(TIME_FORMAT));
+        c.setOneLiner(withSlotNote(c.getOneLiner(), note));
     }
 
     private LocalTime laterOf(LocalTime a, LocalTime b) {
@@ -193,17 +208,5 @@ public class AnchorPlanService {
         return itinerary.getItems().stream()
                 .map(ItineraryItem::getContentId)
                 .collect(Collectors.toList());
-    }
-
-    /** 채우는 동안 누적되는 상태 - 단일 구독(Mono 체인) 안에서만 순차 변형되므로 가변 상태로 둬도 안전 */
-    private static class PlanState {
-        final List<RecommendationCandidate> items = new ArrayList<>();
-        final Set<String> used = new HashSet<>();
-        String anchorContentId;
-        Integer anchorContentTypeId;
-        String lastContentId;
-        Integer lastContentTypeId;
-        LocalTime cursor;
-        LocalTime eveningTime;
     }
 }

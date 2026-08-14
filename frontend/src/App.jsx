@@ -279,7 +279,7 @@ export default function App() {
   async function autoApplySmartPlan(created) {
     let stops = [];
     try {
-      const plan = await api.getSmartPlan(created.itineraryId, { placeCount: 5, date: created.startDate });
+      const plan = await api.getSmartPlan(created.itineraryId, { date: created.startDate, standard: true });
       stops = plan?.stops || [];
     } catch {
       setAutoReplaceNotice('스마트 일정을 만들지 못했어요. 직접 담아보세요.');
@@ -415,7 +415,7 @@ export default function App() {
     }
   }
 
-  /** 가고 싶은 곳이 이미 정해진 경우 - 이름으로 직접 검색해 바로 담기 */
+  /** 앵커(고정 일정) 등록 - 이름으로 직접 검색 */
   async function handleSearchByName(query) {
     setNameSearchLoading(true);
     try {
@@ -489,13 +489,13 @@ export default function App() {
     }
   }
 
-  /** 목적지 직접 선택 플로우 - 이름으로 찾은 장소를 바로 담지 않고, 체류시간/오전·오후 선택 모달을 연다 */
+  /** 앵커(고정 일정) 등록 - 이름으로 찾은 장소를 바로 담지 않고, 시작 시각 입력 모달을 연다 */
   function handleSelectAnchorPlace(candidate) {
     setAnchorPlanTarget(candidate);
   }
 
-  function handleGenerateAnchorPlan(anchor, durationMinutes, slot) {
-    return api.getAnchorPlan(itineraryId, { anchor, durationMinutes, slot });
+  function handleGenerateAnchorPlan(anchor, anchorTime) {
+    return api.getAnchorPlan(itineraryId, { anchor, anchorTime });
   }
 
   async function handleConfirmAnchorPlan(selected) {
@@ -1151,6 +1151,14 @@ export default function App() {
                   gpsOptimizing={optimizeLoading}
                 />
 
+                <RecommendationSearch
+                  onSearch={handleSearch}
+                  onAdd={handleAddRecommendation}
+                  results={recoResults}
+                  loading={recoLoading}
+                  addingId={addingContentId}
+                />
+
                 <PlaceNameSearch
                   onSearch={handleSearchByName}
                   onAdd={handleSelectAnchorPlace}
@@ -1165,14 +1173,6 @@ export default function App() {
                   onGenerate={handleGenerateAnchorPlan}
                   onConfirm={handleConfirmAnchorPlan}
                   onClose={() => setAnchorPlanTarget(null)}
-                />
-
-                <RecommendationSearch
-                  onSearch={handleSearch}
-                  onAdd={handleAddRecommendation}
-                  results={recoResults}
-                  loading={recoLoading}
-                  addingId={addingContentId}
                 />
 
                 <FestivalBanner

@@ -87,4 +87,19 @@ final class AgeGroupRanking {
         }
         return List.of("액티비티", "체험", "테마파크");
     }
+
+    /** 막내 나이대 한글 라벨("유아/미취학"·"초등학생"·"청소년") - Stage4 LLM 프롬프트 힌트용. 자녀 없으면 null */
+    static String youngestAgeBandLabel(List<Integer> childAges) {
+        Integer youngest = youngestAge(childAges);
+        if (youngest == null) {
+            return null;
+        }
+        if (youngest <= 6) {
+            return "유아/미취학(" + youngest + "세)";
+        }
+        if (youngest <= 12) {
+            return "초등학생(" + youngest + "세)";
+        }
+        return "청소년(" + youngest + "세)";
+    }
 }

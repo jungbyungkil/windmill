@@ -171,15 +171,20 @@ public class ItineraryController {
     /**
      * 핵심 스마트 일정: TourAPI 후보 → 혼잡↓ 필터 → 날씨 실내 전환 → 동선 최적화 → 시각 배정.
      * AI가 장소를 만들지 않으며, 검증된 API 데이터만 사용한다.
+     * standard=true면 "당일치기 시작하기" 전용 표준 4단계(아침 일정·점심 식사·오후 일정·저녁 식사)를
+     * 현재 시각과 무관하게 무조건 채워서 돌려준다(placeCount/date는 이 모드에서는 무시).
      */
     @GetMapping("/{id}/smart-plan")
     public Mono<ResponseEntity<SmartPlanResponse>> smartPlan(
             @PathVariable Long id,
             @RequestParam(defaultValue = "0") int placeCount,
-            @RequestParam(required = false) LocalDate date) {
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(defaultValue = "false") boolean standard) {
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(itinerary -> smartPlanService.build(itinerary, placeCount, date))
+                .flatMap(itinerary -> standard
+                        ? smartPlanService.buildStandardDayPlan(itinerary)
+                        : smartPlanService.build(itinerary, placeCount, date))
                 .map(ResponseEntity::ok);
     }
 
@@ -241,9 +246,10 @@ public class ItineraryController {
     }
 
     /**
-     * 목적지 직접 선택 플로우 - 사용자가 이름으로 검색해 고른 장소(anchor)를 오전/오후에 배치하고
-     * 앞뒤 빈 시간대(점심·주변 전시관/박물관·저녁 식사/카페)를 4단계 파이프라인으로 채운 초안을 돌려준다.
-     * auto-plan과 동일하게 바로 저장하지 않고, 프론트에서 검토(체크박스 해제 가능) 후 addItem으로 반영한다.
+     * 앵커(고정 일정) 등록 - 예: DDP에서 19:00 공연처럼 시각이 정해진 장소를 하루 일정의 기준점으로
+     * 삼고 앞뒤 빈 시간대(점심·가벼운 도보 관광 / 저녁 식사·카페)를 TarRlteTarService1(연관 관광지,
+     * 앵커 장소 자체가 조회 기준)로 채운 초안을 돌려준다. auto-plan과 동일하게 바로 저장하지 않고
+     * 프론트에서 검토(체크박스 해제 가능) 후 addItem으로 반영한다.
      */
     @PostMapping("/{id}/anchor-plan")
     public Mono<ResponseEntity<List<RecommendationCandidate>>> anchorPlan(

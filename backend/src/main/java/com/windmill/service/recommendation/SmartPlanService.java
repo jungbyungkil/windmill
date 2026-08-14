@@ -69,6 +69,138 @@ public class SmartPlanService {
     }
 
     /**
+     * "당일치기 시작하기" 전용 표준 4단계 일정 - 아침 일정 → 점심 식사 → 오후 일정 → 저녁 식사를
+     * 무조건 채운다(사용자 요구사항: 후보 풀이 빡빡하거나 마감이 애매해도 슬롯을 비우지 않음).
+     * 기존 {@link #build}의 유연한 시간창 판정(현재 시각 기준 시작·후보 소진 시 슬롯 생략)은 여행 중
+     * "다시 짜기"에는 맞지만, 최초 생성 직후엔 "지금 몇 시든 하루 전체 틀"을 원한다는 게 이번 요구라
+     * 09:00/12:00/14:30/18:00 고정 슬롯의 별도 경로로 분리했다. 개인화(연령대/자녀나이/반려동물/유모차/
+     * 무장애)는 기존 {@link #buildRequest}를 그대로 재사용해 동일하게 반영된다.
+     */
+    public Mono<SmartPlanResponse> buildStandardDayPlan(Itinerary itinerary) {
+        RegionCode region = regionCodeService.find(itinerary.getSignguFullCode())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + itinerary.getSignguFullCode()));
+        LocalDate date = itinerary.getStartDate() != null ? itinerary.getStartDate() : KoreaClock.today();
+        CompanionType companion = itinerary.getCompanionType();
+        boolean familyPace = isFamilyPace(companion);
+
+        return triggerScheduler.ensureFresh(region)
+                .onErrorReturn(RegionCondition.builder().crowdRateByPlaceName(java.util.Map.of()).build())
+                .flatMap(condition -> {
+                    boolean rain = condition.getCurrentPop() != null
+                            && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
+                    boolean heat = condition.heatProxyTemp() != null
+                            && condition.heatProxyTemp() >= TriggerThresholds.HEAT_ADVISORY_TMX;
+                    RecommendationRequest.AvoidanceHint avoid = heat
+                            ? RecommendationRequest.AvoidanceHint.HEAT
+                            : rain ? RecommendationRequest.AvoidanceHint.WEATHER : null;
+
+                    List<String> attractionTags = familyPace
+                            ? List.of("#실내", "#자연", "#아이동반")
+                            : List.of("#실내", "#자연", "#역사");
+                    RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags);
+                    RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"));
+
+                    return Mono.zip(
+                                    recommendationPipeline.recommend(attractionReq).onErrorReturn(List.of()),
+                                    recommendationPipeline.recommend(foodReq).onErrorReturn(List.of()))
+                            .map(tuple -> assembleStandardDay(tuple.getT1(), tuple.getT2(), date, companion, rain, heat));
+                });
+    }
+
+    private SmartPlanResponse assembleStandardDay(List<RecommendationCandidate> attractionsRaw,
+                                                    List<RecommendationCandidate> foodRaw,
+                                                    LocalDate date, CompanionType companion,
+                                                    boolean rain, boolean heat) {
+        List<RecommendationCandidate> attrPool = new ArrayList<>(sortComfortable(attractionsRaw));
+        List<RecommendationCandidate> foodPool = new ArrayList<>(sortComfortable(foodRaw));
+        // 맛집 풀이 비면(지역 데이터 부족) 관광 풀에서 음식 후보를 분리해 최소한 식사 슬롯을 채운다
+        if (foodPool.isEmpty()) {
+            List<RecommendationCandidate> splitFood = new ArrayList<>();
+            List<RecommendationCandidate> splitAttr = new ArrayList<>();
+            for (RecommendationCandidate c : attrPool) {
+                (isFoodCandidate(c) ? splitFood : splitAttr).add(c);
+            }
+            if (!splitFood.isEmpty()) {
+                foodPool = splitFood;
+                attrPool = splitAttr;
+            }
+        }
+
+        List<RecommendationCandidate> day = new ArrayList<>();
+        RecommendationCandidate prev = null;
+
+        RecommendationCandidate morning = placeForced(attrPool, prev, LocalTime.of(9, 0), "아침 일정", false);
+        if (morning != null) {
+            day.add(morning);
+            prev = morning;
+        }
+
+        RecommendationCandidate lunch = placeForced(foodPool, prev, LocalTime.of(12, 0), "점심 식사", true);
+        if (lunch != null) {
+            day.add(lunch);
+            prev = lunch;
+        }
+
+        RecommendationCandidate afternoon = placeForced(attrPool, prev, LocalTime.of(14, 30), "오후 일정", false);
+        if (afternoon != null) {
+            day.add(afternoon);
+            prev = afternoon;
+        }
+
+        RecommendationCandidate dinner = placeForced(foodPool, prev, LocalTime.of(18, 0), "저녁 식사", true);
+        if (dinner != null) {
+            day.add(dinner);
+        }
+
+        fillDistances(day);
+        double dayKm = RouteOptimizer.totalDistanceKm(day);
+        int rank = 1;
+        for (RecommendationCandidate stop : day) {
+            stop.setVisitDate(date.toString());
+            stop.setRank(rank++);
+        }
+
+        boolean crowdFiltered = attractionsRaw.stream()
+                .anyMatch(c -> CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered());
+        String summary = buildSummary(rain, heat, crowdFiltered, dayKm, day, 1, null, isFamilyPace(companion));
+
+        log.info("[SmartPlan] 표준 4단계 일정 생성 - date={}, stops={}, family={}", date, day.size(), isFamilyPace(companion));
+
+        return SmartPlanResponse.builder()
+                .strategySummary(summary)
+                .weatherAdjusted(rain)
+                .heatAdjusted(heat)
+                .crowdFiltered(crowdFiltered)
+                .estimatedTotalDistanceKm(Math.round(dayKm * 10.0) / 10.0)
+                .candidateCount(attractionsRaw.size() + foodRaw.size())
+                .visitDate(date.toString())
+                .dayCount(1)
+                .days(List.of(SmartPlanResponse.DayPlan.builder()
+                        .dayIndex(1)
+                        .visitDate(date.toString())
+                        .label(formatMd(date))
+                        .estimatedDistanceKm(Math.round(dayKm * 10.0) / 10.0)
+                        .stops(day)
+                        .build()))
+                .stops(day)
+                .build();
+    }
+
+    /**
+     * pool에서 가장 가까운 후보 하나를 골라 targetTime에 강제 배치한다(무조건 채우기 - 마감 게이트에
+     * 걸려도 안전 시각으로 당기거나, 그마저 불가능하면 요청 시각 그대로 강행한다). pool이 비어 있으면 null.
+     */
+    private RecommendationCandidate placeForced(List<RecommendationCandidate> pool, RecommendationCandidate origin,
+                                                  LocalTime targetTime, String slotLabel, boolean meal) {
+        RecommendationCandidate candidate = takeNearest(pool, origin);
+        if (candidate == null) {
+            return null;
+        }
+        placeStop(candidate, targetTime, slotLabel, meal, true);
+        return candidate;
+    }
+
+    /**
      * @param forDate null이면 여행 기간 전체(최대 7일), 지정 시 해당 일자만
      * @param placeCount 하위 호환용(0이면 동행 유형별 자동). 명시 시 관광 상한으로만 참고.
      */
@@ -354,6 +486,15 @@ public class SmartPlanService {
     }
 
     private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal) {
+        placeStop(stop, time, slotLabel, meal, false);
+    }
+
+    /**
+     * @param forced true면 마감 게이트를 넘겨도 슬롯을 비우지 않는다 - 안전 시각으로 당겨보고,
+     *               그마저 불가능하면(안전 시각이 하루 시작보다 이르는 등) 요청 시각 그대로 강행한다.
+     *               "당일치기 시작하기"의 표준 4단계 일정처럼 슬롯을 무조건 채워야 하는 경로에서만 사용.
+     */
+    private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal, boolean forced) {
         LocalTime close = ClosingTimeGate.parseHhMm(stop.getCloseTime());
         if (close == null) {
             close = BusinessHoursEvaluator.extractCloseTimeFromText(stop.getUseTimeText());
@@ -362,12 +503,16 @@ public class SmartPlanService {
         ClosingTimeGate.CheckResult check = ClosingTimeGate.check(close, visit);
         if (check.blocked()) {
             LocalTime safe = close.minusMinutes(BusinessHoursEvaluator.CLOSE_BUFFER_MINUTES + 1L);
-            if (safe.isBefore(DAY_START) || ClosingTimeGate.check(close, safe).blocked()) {
+            boolean safeWorks = !safe.isBefore(DAY_START) && !ClosingTimeGate.check(close, safe).blocked();
+            if (safeWorks) {
+                visit = safe;
+            } else if (forced) {
+                visit = time;
+            } else {
                 // 마감에 맞춰 넣을 수 없으면 suggestedTime을 비워 이후 필터에서 탈락
                 stop.setSuggestedTime(null);
                 return;
             }
-            visit = safe;
         }
         stop.setSuggestedTime(visit.format(TIME_FORMAT));
         if (meal) {
