@@ -2,6 +2,7 @@ package com.windmill.service.itinerary;
 
 import com.windmill.domain.CompanionType;
 import com.windmill.domain.Itinerary;
+import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.exception.DuplicateActiveItineraryException;
@@ -10,8 +11,11 @@ import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -94,5 +99,41 @@ class ItineraryServiceTest {
         assertEquals(TOMORROW, created.getStartDate());
         verify(itineraryRepository).deleteAll(List.of(existing));
         verify(itineraryRepository).save(any(Itinerary.class));
+    }
+
+    @Test
+    void optimizeRoute_parsesStartTimeAndPassesItToRouteRecalculationService() {
+        ItineraryItem item1 = ItineraryItem.builder().id(1L).displayOrder(0).visitDate(TOMORROW).build();
+        ItineraryItem item2 = ItineraryItem.builder().id(2L).displayOrder(1).visitDate(TOMORROW).build();
+        Itinerary itinerary = Itinerary.builder()
+                .id(5L).sessionUuid(SESSION).startDate(TOMORROW)
+                .items(new ArrayList<>(List.of(item1, item2)))
+                .build();
+        when(itineraryRepository.findById(5L)).thenReturn(Optional.of(itinerary));
+        when(routeRecalculationService.recalculate(any(), any(), any(), any()))
+                .thenReturn(new RouteRecalculationService.Result(List.of(item1, item2), "재계산 완료", 30, true));
+
+        service.optimizeRoute(5L, TOMORROW, null, null, "17:00");
+
+        ArgumentCaptor<LocalTime> captor = ArgumentCaptor.forClass(LocalTime.class);
+        verify(routeRecalculationService).recalculate(any(), any(), any(), captor.capture());
+        assertEquals(LocalTime.of(17, 0), captor.getValue());
+    }
+
+    @Test
+    void optimizeRoute_blankStartTime_passesNullOverride() {
+        ItineraryItem item1 = ItineraryItem.builder().id(1L).displayOrder(0).visitDate(TOMORROW).build();
+        ItineraryItem item2 = ItineraryItem.builder().id(2L).displayOrder(1).visitDate(TOMORROW).build();
+        Itinerary itinerary = Itinerary.builder()
+                .id(6L).sessionUuid(SESSION).startDate(TOMORROW)
+                .items(new ArrayList<>(List.of(item1, item2)))
+                .build();
+        when(itineraryRepository.findById(6L)).thenReturn(Optional.of(itinerary));
+        when(routeRecalculationService.recalculate(any(), any(), any(), any()))
+                .thenReturn(new RouteRecalculationService.Result(List.of(item1, item2), "재계산 완료", 30, true));
+
+        service.optimizeRoute(6L, TOMORROW, null, null, null);
+
+        verify(routeRecalculationService).recalculate(any(), any(), any(), isNull());
     }
 }

@@ -190,17 +190,19 @@ public class ItineraryController {
 
     /**
      * 동선 재계산(카카오 이동시간 매트릭스 TSP + 시간표 재생성).
-     * originLon·originLat(WGS84)를 주면 GPS를 시작점으로 둔다.
+     * originLon·originLat(WGS84)를 주면 GPS를 시작점으로 둔다. startTime("HH:mm")을 주면
+     * 첫 장소 도착 시각을 그 시각으로 고정하고 나머지는 그 뒤로 자연스럽게 이어 붙인다.
      */
     @PostMapping("/{id}/optimize-route")
     public Mono<ResponseEntity<ItineraryResponse>> optimizeRoute(
             @PathVariable Long id,
             @RequestParam(required = false) LocalDate date,
             @RequestParam(required = false) Double originLon,
-            @RequestParam(required = false) Double originLat) {
+            @RequestParam(required = false) Double originLat,
+            @RequestParam(required = false) String startTime) {
         return Mono.fromCallable(() -> {
                     ItineraryService.OptimizeRouteResult result =
-                            itineraryService.optimizeRoute(id, date, originLon, originLat);
+                            itineraryService.optimizeRoute(id, date, originLon, originLat, startTime);
                     ItineraryResponse body = toResponse(result.itinerary());
                     body.setRouteHint(result.message());
                     body.setOptimizedDistanceKm(result.totalDistanceKm());

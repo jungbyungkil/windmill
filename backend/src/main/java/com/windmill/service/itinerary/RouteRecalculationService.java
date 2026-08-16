@@ -44,6 +44,16 @@ public class RouteRecalculationService {
     private final KakaoDirectionsClient kakaoDirectionsClient;
 
     public Result recalculate(List<ItineraryItem> targets, Double originLon, Double originLat) {
+        return recalculate(targets, originLon, originLat, null);
+    }
+
+    /**
+     * @param overrideStartTime 첫 장소 도착 시각을 사용자가 직접 지정 - 주어지면 오늘/미래 자동
+     *                          판정(resolveDayStart)을 건너뛰고 이 시각부터 시작해, 나머지는
+     *                          그 뒤로 실제 체류·이동시간만큼 자연스럽게 이어 붙는다.
+     */
+    public Result recalculate(List<ItineraryItem> targets, Double originLon, Double originLat,
+                               LocalTime overrideStartTime) {
         if (targets == null || targets.size() < 2) {
             return new Result(targets == null ? List.of() : targets, null, null, false);
         }
@@ -60,7 +70,7 @@ public class RouteRecalculationService {
         if (withCoords.size() <= 1) {
             List<ItineraryItem> order = new ArrayList<>(withCoords);
             order.addAll(without);
-            assignSchedule(order, null, null, null);
+            assignSchedule(order, null, null, null, overrideStartTime);
             return new Result(order, "좌표가 있는 장소가 적어 순서만 유지하고 시간표를 다시 잡았어요.", null, false);
         }
 
@@ -113,13 +123,13 @@ public class RouteRecalculationService {
         // 재계산을 돌리면 순수 거리 기준으로 다시 흩어놓아 마감을 넘겨버림). 마감을 넘기는 장소가
         // 있으면 그 장소만 더 이른(마감을 안 넘기는 가장 늦은) 자리로 옮긴다 - 정기휴무(closed)·
         // 좌표없음(without) 구간은 대상에서 제외(declump와 동일 스코프).
-        open = repairClosingTimeConflicts(open, matrix.minutes(), idToIdx);
+        open = repairClosingTimeConflicts(open, matrix.minutes(), idToIdx, overrideStartTime);
 
         List<ItineraryItem> finalOrder = new ArrayList<>(open);
         finalOrder.addAll(closed);
         finalOrder.addAll(without);
 
-        int totalTravel = assignSchedule(finalOrder, matrix.minutes(), idToIdx, fromOrigin);
+        int totalTravel = assignSchedule(finalOrder, matrix.minutes(), idToIdx, fromOrigin, overrideStartTime);
         String source = matrix.roadBased() ? "카카오 도로 이동시간" : "직선거리 추정";
         String message = useOrigin
                 ? String.format("현재 위치 기준으로 %s TSP 재계산 · 이동 약 %d분 · 시간표를 다시 잡았어요.", source, totalTravel)
@@ -137,7 +147,16 @@ public class RouteRecalculationService {
                                int[][] minutes,
                                Map<Long, Integer> idToIdx,
                                int[] fromOrigin) {
-        LocalTime[] arrivals = simulateArrivals(ordered, minutes, idToIdx);
+        return assignSchedule(ordered, minutes, idToIdx, fromOrigin, null);
+    }
+
+    // package-private: 테스트에서 직접 호출
+    int assignSchedule(List<ItineraryItem> ordered,
+                               int[][] minutes,
+                               Map<Long, Integer> idToIdx,
+                               int[] fromOrigin,
+                               LocalTime overrideStartTime) {
+        LocalTime[] arrivals = simulateArrivals(ordered, minutes, idToIdx, overrideStartTime);
         int totalTravel = 0;
         for (int i = 0; i < ordered.size(); i++) {
             ordered.get(i).setScheduledTime(arrivals[i].format(TIME_FMT));
@@ -159,9 +178,10 @@ public class RouteRecalculationService {
      * 위반 재배치(repairClosingTimeConflicts)가 후보 순서를 여러 번 가볍게 미리 계산해봐야 해서
      * assignSchedule과 로직을 공유하되 분리했다.
      */
-    private LocalTime[] simulateArrivals(List<ItineraryItem> ordered, int[][] minutes, Map<Long, Integer> idToIdx) {
+    private LocalTime[] simulateArrivals(List<ItineraryItem> ordered, int[][] minutes, Map<Long, Integer> idToIdx,
+                                          LocalTime overrideStartTime) {
         LocalTime[] arrivals = new LocalTime[ordered.size()];
-        LocalTime cursor = resolveDayStart(ordered);
+        LocalTime cursor = overrideStartTime != null ? overrideStartTime : resolveDayStart(ordered);
         boolean lunchUsed = false;
         boolean dinnerUsed = false;
 
@@ -216,9 +236,16 @@ public class RouteRecalculationService {
     // package-private: 테스트에서 직접 호출
     List<ItineraryItem> repairClosingTimeConflicts(List<ItineraryItem> ordered, int[][] minutes,
                                                               Map<Long, Integer> idToIdx) {
+        return repairClosingTimeConflicts(ordered, minutes, idToIdx, null);
+    }
+
+    // package-private: 테스트에서 직접 호출
+    List<ItineraryItem> repairClosingTimeConflicts(List<ItineraryItem> ordered, int[][] minutes,
+                                                              Map<Long, Integer> idToIdx,
+                                                              LocalTime overrideStartTime) {
         List<ItineraryItem> result = new ArrayList<>(ordered);
         for (int pass = 0; pass < result.size(); pass++) {
-            LocalTime[] arrivals = simulateArrivals(result, minutes, idToIdx);
+            LocalTime[] arrivals = simulateArrivals(result, minutes, idToIdx, overrideStartTime);
             List<Integer> violations = closingViolations(result, arrivals);
             if (violations.isEmpty()) {
                 break;
@@ -232,7 +259,7 @@ public class RouteRecalculationService {
                 List<ItineraryItem> candidate = new ArrayList<>(result);
                 candidate.remove(violationIdx);
                 candidate.add(p, moving);
-                LocalTime[] candArrivals = simulateArrivals(candidate, minutes, idToIdx);
+                LocalTime[] candArrivals = simulateArrivals(candidate, minutes, idToIdx, overrideStartTime);
                 if (ClosingTimeGate.check(close, candArrivals[p]).allowed()
                         && closingViolations(candidate, candArrivals).size() < violations.size()) {
                     bestPos = p;

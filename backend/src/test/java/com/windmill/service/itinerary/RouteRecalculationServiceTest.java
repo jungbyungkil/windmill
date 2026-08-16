@@ -4,6 +4,7 @@ import com.windmill.domain.ItineraryItem;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -148,6 +149,29 @@ class RouteRecalculationServiceTest {
         List<ItineraryItem> repaired = service.repairClosingTimeConflicts(ordered, null, null);
 
         assertEquals(ordered, repaired);
+    }
+
+    @Test
+    void assignSchedule_withOverrideStartTime_usesItInsteadOfAutoDayStart() {
+        // 사용자가 "동선 재계산" 시 첫 장소 도착 시각을 직접 지정(예: 17:00)하면 미래/오늘 자동
+        // 판정(DAY_START=09:00 등)을 건너뛰고 그 시각부터 시작, 나머지는 자연스럽게 이어 붙는다.
+        ItineraryItem attr1 = place(1, "서부감자국", false);
+        ItineraryItem attr2 = place(2, "서울기록원", false);
+
+        service.assignSchedule(List.of(attr1, attr2), null, null, null, LocalTime.of(17, 0));
+
+        assertEquals("17:00", attr1.getScheduledTime());
+        // 17:00 + 75(체류) + 20(이동) = 18:35
+        assertEquals("18:35", attr2.getScheduledTime());
+    }
+
+    @Test
+    void assignSchedule_noOverride_fallsBackToAutoDayStart() {
+        ItineraryItem attr1 = place(1, "농업박물관", false);
+
+        service.assignSchedule(List.of(attr1), null, null, null, null);
+
+        assertEquals("09:00", attr1.getScheduledTime()); // 미래 날짜라 기본 09:00
     }
 
     @Test

@@ -838,14 +838,15 @@ export default function App() {
     if (docentItem) await fetchDocent(docentItem, lang);
   }
 
-  /** 동선 재계산 — GPS 있으면 시작점, 없으면 장소만으로 매트릭스 TSP + 시간표 */
-  async function handleOptimizeRoute(origin) {
+  /** 동선 재계산 — GPS 있으면 시작점, 없으면 장소만으로 매트릭스 TSP + 시간표.
+   *  startTime("HH:mm")을 주면 첫 장소 시각을 사용자가 지정한 그대로 고정한다. */
+  async function handleOptimizeRoute(origin, startTime) {
     if (!itineraryId || optimizeLoading) return;
     autoOptimizedRef.current = true;
     setOptimizeLoading(true);
     setAutoReplaceNotice(null);
     try {
-      const result = await api.optimizeRoute(itineraryId, activeDate, origin);
+      const result = await api.optimizeRoute(itineraryId, activeDate, origin, startTime);
       setItinerary(result);
       setAutoReplaceNotice(
         result.routeHint
@@ -862,12 +863,13 @@ export default function App() {
     }
   }
 
-  /** 오늘 동선 「동선 재계산」 — GPS 시도 후 서버 TSP·시간표 */
-  function handleOptimizeFromGps() {
+  /** 오늘 동선 「동선 재계산」 — GPS 시도 후 서버 TSP·시간표.
+   *  startTime을 지정했으면 GPS 위치와 무관하게 그 시각을 첫 장소 도착 시각으로 고정한다. */
+  function handleOptimizeFromGps(startTime) {
     setOptimizeLoading(true);
     setAutoReplaceNotice('동선 재계산 중…');
     if (!navigator.geolocation) {
-      handleOptimizeRoute(null);
+      handleOptimizeRoute(null, startTime);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -875,11 +877,11 @@ export default function App() {
         handleOptimizeRoute({
           lon: pos.coords.longitude,
           lat: pos.coords.latitude,
-        });
+        }, startTime);
       },
       () => {
         // 위치 거부·실패여도 장소 간 매트릭스로 재계산
-        handleOptimizeRoute(null);
+        handleOptimizeRoute(null, startTime);
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );

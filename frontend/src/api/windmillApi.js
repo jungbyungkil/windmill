@@ -180,12 +180,16 @@ export function getMapRoute(points, mode) {
   });
 }
 
-/** 동선 최단 재배치 (optional GPS originLon/Lat = WGS84) */
-export function optimizeRoute(itineraryId, date, origin) {
+/** 동선 최단 재배치 (optional GPS originLon/Lat = WGS84). startTime("HH:mm")을 주면 첫 장소
+ *  도착 시각을 그 시각으로 고정하고 나머지는 그 뒤로 자연스럽게 이어 붙인다. */
+export function optimizeRoute(itineraryId, date, origin, startTime) {
   const params = { date };
   if (origin?.lon != null && origin?.lat != null) {
     params.originLon = origin.lon;
     params.originLat = origin.lat;
+  }
+  if (startTime) {
+    params.startTime = startTime;
   }
   return request(`/itineraries/${itineraryId}/optimize-route${qs(params)}`, { method: 'POST' });
 }

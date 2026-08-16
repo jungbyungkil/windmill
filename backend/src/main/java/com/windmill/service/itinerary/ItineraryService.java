@@ -525,6 +525,17 @@ public class ItineraryService {
     @Transactional
     public OptimizeRouteResult optimizeRoute(Long itineraryId, LocalDate date,
                                              Double originLon, Double originLat) {
+        return optimizeRoute(itineraryId, date, originLon, originLat, null);
+    }
+
+    /**
+     * @param startTime "HH:mm" - 첫 장소 도착 시각을 사용자가 직접 지정(선택). 주어지면 오늘/미래
+     *                  자동 판정을 건너뛰고 이 시각부터 시작해, 나머지는 실제 체류·이동시간만큼
+     *                  자연스럽게 이어 붙는다.
+     */
+    @Transactional
+    public OptimizeRouteResult optimizeRoute(Long itineraryId, LocalDate date,
+                                             Double originLon, Double originLat, String startTime) {
         Itinerary itinerary = get(itineraryId);
         List<ItineraryItem> targets = itinerary.getItems().stream()
                 .filter(i -> date == null
@@ -535,8 +546,9 @@ public class ItineraryService {
             return new OptimizeRouteResult(itinerary, null, null);
         }
 
+        LocalTime overrideStartTime = ClosingTimeGate.parseHhMm(startTime);
         RouteRecalculationService.Result recalc =
-                routeRecalculationService.recalculate(targets, originLon, originLat);
+                routeRecalculationService.recalculate(targets, originLon, originLat, overrideStartTime);
         List<ItineraryItem> finalOrder = recalc.ordered();
 
         int orderBase = itinerary.getItems().stream()
