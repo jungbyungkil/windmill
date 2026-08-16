@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -41,6 +42,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ItineraryService {
+
+    private static final int DEFAULT_STAY_MINUTES = 75;
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final ItineraryRepository itineraryRepository;
     private final TripRecordRepository tripRecordRepository;
@@ -228,21 +232,49 @@ public class ItineraryService {
     @Transactional
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);
-        int nextOrder = itinerary.getItems().size();
         LocalDate visitDate = request.getVisitDate() != null ? request.getVisitDate() : itinerary.getStartDate();
-        assertClosingGate(itinerary, request, visitDate);
         List<String> tags = PlaceTagSanitizer.sanitizeStored(
                 request.getTags(), request.getContentTypeId(), request.getPlaceName(), request.getCategory());
+
+        String scheduledTime = request.getScheduledTime();
+        List<ItineraryItem> dayItems = null;
+        Integer insertBeforeDayIndex = null;
+
+        if (scheduledTime == null) {
+            LocalTime close = ClosingTimeGate.parseHhMm(request.getCloseTime());
+            if (close == null) {
+                close = BusinessHoursEvaluator.extractCloseTimeFromText(request.getUseTimeText());
+            }
+            if (close != null) {
+                LocalTime endArrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
+                ClosingTimeGate.CheckResult endCheck = ClosingTimeGate.check(close, endArrival);
+                if (!endCheck.allowed()) {
+                    // 하루 맨 끝에는 마감 때문에 못 붙는다 - 마감을 안 넘기는 자리 중 가장 늦은(=기존
+                    // 앞쪽 일정을 최대한 안 건드리는) 위치를 찾아 그 자리에 끼워 넣는다. 못 찾으면
+                    // 기존처럼 차단.
+                    dayItems = dayItemsSorted(itinerary, visitDate);
+                    InsertionPlan plan = dayItems.isEmpty() ? null
+                            : findFeasibleInsertion(dayItems, visitDate, request.getMapX(), request.getMapY(), close);
+                    if (plan == null) {
+                        throw new IllegalArgumentException(endCheck.message());
+                    }
+                    insertBeforeDayIndex = plan.index();
+                    scheduledTime = plan.arrival().format(TIME_FMT);
+                }
+            }
+        } else {
+            assertClosingGate(itinerary, request, visitDate, scheduledTime);
+        }
+
         ItineraryItem item = ItineraryItem.builder()
                 .itinerary(itinerary)
                 .contentId(request.getContentId())
                 .contentTypeId(request.getContentTypeId())
                 .placeName(request.getPlaceName())
                 .thumbnailUrl(request.getThumbnailUrl())
-                .scheduledTime(request.getScheduledTime())
+                .scheduledTime(scheduledTime)
                 .tags(tags)
                 .crowdRate(request.getCrowdRate())
-                .displayOrder(nextOrder)
                 .visitDate(visitDate)
                 .addr1(request.getAddr1())
                 .tel(request.getTel())
@@ -259,6 +291,12 @@ public class ItineraryService {
                 .mapX(request.getMapX())
                 .mapY(request.getMapY())
                 .build();
+
+        if (insertBeforeDayIndex != null) {
+            reflowInsert(dayItems, insertBeforeDayIndex, item, ClosingTimeGate.parseHhMm(scheduledTime));
+        } else {
+            item.setDisplayOrder(itinerary.getItems().size());
+        }
         itinerary.getItems().add(item);
         return itineraryRepository.save(itinerary);
     }
@@ -267,7 +305,8 @@ public class ItineraryService {
      * close 시간이 있으면 도착 예상(또는 지정 scheduledTime)이 마감 임박 이내인지 검사.
      * 이동시간은 TarRlte에 없어 Haversine 추정(또는 기본 20분)을 사용한다.
      */
-    private void assertClosingGate(Itinerary itinerary, AddItineraryItemRequest request, LocalDate visitDate) {
+    private void assertClosingGate(Itinerary itinerary, AddItineraryItemRequest request, LocalDate visitDate,
+                                    String scheduledTime) {
         LocalTime close = ClosingTimeGate.parseHhMm(request.getCloseTime());
         if (close == null) {
             close = BusinessHoursEvaluator.extractCloseTimeFromText(request.getUseTimeText());
@@ -275,7 +314,7 @@ public class ItineraryService {
         if (close == null) {
             return;
         }
-        LocalTime arrival = ClosingTimeGate.parseHhMm(request.getScheduledTime());
+        LocalTime arrival = ClosingTimeGate.parseHhMm(scheduledTime);
         if (arrival == null) {
             arrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
         }
@@ -285,43 +324,110 @@ public class ItineraryService {
         }
     }
 
-    private LocalTime estimateArrivalTime(Itinerary itinerary, LocalDate visitDate, String mapX, String mapY) {
-        List<ItineraryItem> dayItems = itinerary.getItems().stream()
+    private List<ItineraryItem> dayItemsSorted(Itinerary itinerary, LocalDate visitDate) {
+        return itinerary.getItems().stream()
                 .filter(i -> visitDate == null
                         || visitDate.equals(i.getVisitDate())
                         || (i.getVisitDate() == null && visitDate.equals(itinerary.getStartDate())))
                 .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
-                .toList();
+                .collect(Collectors.toList());
+    }
+
+    private LocalTime estimateArrivalTime(Itinerary itinerary, LocalDate visitDate, String mapX, String mapY) {
+        List<ItineraryItem> dayItems = dayItemsSorted(itinerary, visitDate);
         LocalTime cursor;
         ItineraryItem last = dayItems.isEmpty() ? null : dayItems.get(dayItems.size() - 1);
         if (last != null && last.getScheduledTime() != null) {
             LocalTime lastStart = ClosingTimeGate.parseHhMm(last.getScheduledTime());
-            cursor = lastStart != null ? lastStart.plusMinutes(75) : LocalTime.of(9, 0);
-        } else if (visitDate != null && visitDate.equals(KoreaClock.today())) {
-            LocalTime soon = KoreaClock.nowTime().plusMinutes(30).withSecond(0).withNano(0);
-            int m = soon.getMinute();
-            if (m == 0) {
-                cursor = soon;
-            } else if (m <= 30) {
-                cursor = soon.withMinute(30);
-            } else {
-                cursor = soon.plusHours(1).withMinute(0);
-            }
-            if (cursor.isBefore(LocalTime.of(9, 0))) {
-                cursor = LocalTime.of(9, 0);
-            }
+            cursor = lastStart != null ? lastStart.plusMinutes(DEFAULT_STAY_MINUTES) : LocalTime.of(9, 0);
         } else {
-            cursor = LocalTime.of(9, 0);
+            cursor = resolveDayStart(visitDate);
         }
-        int travel = 20;
-        if (last != null && last.getMapX() != null && mapX != null) {
-            Double km = GeoUtils.distanceKmSafe(last.getMapX(), last.getMapY(), mapX, mapY);
-            if (km != null) {
-                travel = (int) Math.ceil(km * 12.0);
-                travel = Math.max(10, Math.min(travel, 90));
+        int travel = travelMinutes(last == null ? null : last.getMapX(), last == null ? null : last.getMapY(), mapX, mapY);
+        return cursor.plusMinutes(travel);
+    }
+
+    /** 오늘(KST)이면 지금부터 30분 뒤(반시간 단위 반올림), 미래 날짜면 하루 전체를 쓸 수 있으니 09:00 */
+    private LocalTime resolveDayStart(LocalDate visitDate) {
+        if (visitDate == null || !visitDate.equals(KoreaClock.today())) {
+            return LocalTime.of(9, 0);
+        }
+        LocalTime soon = KoreaClock.nowTime().plusMinutes(30).withSecond(0).withNano(0);
+        int m = soon.getMinute();
+        LocalTime rounded;
+        if (m == 0) {
+            rounded = soon;
+        } else if (m <= 30) {
+            rounded = soon.withMinute(30);
+        } else {
+            rounded = soon.plusHours(1).withMinute(0);
+        }
+        return rounded.isBefore(LocalTime.of(9, 0)) ? LocalTime.of(9, 0) : rounded;
+    }
+
+    /** Haversine 기반 이동시간 추정(km당 12분, 10~90분 클램프) - 마감 게이트 추정 전용, TarRlte에 이동시간 필드가 없어서 씀 */
+    private int travelMinutes(String mapX1, String mapY1, String mapX2, String mapY2) {
+        if (mapX1 == null || mapY1 == null || mapX2 == null || mapY2 == null) {
+            return 20;
+        }
+        Double km = GeoUtils.distanceKmSafe(mapX1, mapY1, mapX2, mapY2);
+        if (km == null) {
+            return 20;
+        }
+        return Math.max(10, Math.min((int) Math.ceil(km * 12.0), 90));
+    }
+
+    private record InsertionPlan(int index, LocalTime arrival) {
+    }
+
+    /**
+     * 하루 맨 끝은 마감 때문에 막혔을 때, 마감을 넘기지 않는 자리 중 가장 늦은 위치(day-local index,
+     * 그 인덱스 "앞"에 끼워 넣는다는 뜻)를 뒤에서부터 찾는다 - 앞쪽 일정을 최대한 안 건드리기 위함.
+     * 못 찾으면 null(어디에도 못 들어감 - 기존처럼 차단해야 함).
+     */
+    private InsertionPlan findFeasibleInsertion(List<ItineraryItem> dayItems, LocalDate visitDate,
+                                                  String mapX, String mapY, LocalTime close) {
+        for (int p = dayItems.size() - 1; p >= 0; p--) {
+            ItineraryItem predecessor = p == 0 ? null : dayItems.get(p - 1);
+            LocalTime prevEnd = predecessor == null
+                    ? resolveDayStart(visitDate)
+                    : parseOrDefault(predecessor.getScheduledTime()).plusMinutes(DEFAULT_STAY_MINUTES);
+            int travelToNew = travelMinutes(
+                    predecessor == null ? null : predecessor.getMapX(),
+                    predecessor == null ? null : predecessor.getMapY(),
+                    mapX, mapY);
+            LocalTime arrival = prevEnd.plusMinutes(travelToNew);
+            if (ClosingTimeGate.check(close, arrival).allowed()) {
+                return new InsertionPlan(p, arrival);
             }
         }
-        return cursor.plusMinutes(travel);
+        return null;
+    }
+
+    private static LocalTime parseOrDefault(String hhmm) {
+        LocalTime t = ClosingTimeGate.parseHhMm(hhmm);
+        return t != null ? t : LocalTime.of(9, 0);
+    }
+
+    /**
+     * index 위치(그 자리에 있던 항목부터) 뒤로 밀며 표시순서·시각을 다시 계산한다(같은 Haversine
+     * 추정 공식). 실제 도로 이동시간까지 반영하려면 사용자가 별도로 "동선 재계산"을 돌려야 한다.
+     */
+    private void reflowInsert(List<ItineraryItem> dayItems, int index, ItineraryItem newItem, LocalTime start) {
+        for (int i = 0; i < index; i++) {
+            dayItems.get(i).setDisplayOrder(i);
+        }
+        newItem.setDisplayOrder(index);
+        LocalTime cursor = start;
+        ItineraryItem prev = newItem;
+        for (int i = index; i < dayItems.size(); i++) {
+            ItineraryItem next = dayItems.get(i);
+            int travel = travelMinutes(prev.getMapX(), prev.getMapY(), next.getMapX(), next.getMapY());
+            cursor = cursor.plusMinutes(DEFAULT_STAY_MINUTES + travel);
+            next.setScheduledTime(cursor.format(TIME_FMT));
+            next.setDisplayOrder(i + 1);
+            prev = next;
+        }
     }
 
     @Transactional
