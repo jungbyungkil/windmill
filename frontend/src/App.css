@@ -4856,6 +4856,15 @@
   gap: 8px;
 }
 
+.my-trips-ended-course {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .my-trips-ended-note {
   margin: 2px 0 0;
   font-size: 13px;

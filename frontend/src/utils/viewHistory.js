@@ -21,11 +21,3 @@ export function recordView({ type, id, name, thumbnail }) {
     /* 저장 공간 부족 등 - 이번 조회 기록만 유실, 치명적이지 않음 */
   }
 }
-
-export function clearViewHistory() {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* ignore */
-  }
-}

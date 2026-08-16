@@ -8,8 +8,6 @@ export default function GlobalMenu({
   open,
   onClose,
   onNavigateMyTrips,
-  onNavigateTripRecords,
-  onNavigateHistory,
   onNavigateGuide,
 }) {
   useModalHistory(open, onClose);
@@ -32,16 +30,6 @@ export default function GlobalMenu({
           <li>
             <button type="button" className="global-menu-item" onClick={onNavigateMyTrips}>
               🗂️ 내 여행 관리
-            </button>
-          </li>
-          <li>
-            <button type="button" className="global-menu-item" onClick={onNavigateTripRecords}>
-              📔 여행 기록
-            </button>
-          </li>
-          <li>
-            <button type="button" className="global-menu-item" onClick={onNavigateHistory}>
-              🕘 이용 히스토리
             </button>
           </li>
           <li>

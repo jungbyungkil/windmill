@@ -117,6 +117,11 @@ export default function MyTripsScreen({ sessionId, onResume }) {
                       : ''}
                     {trip.withPet ? ' · 🐾' : ''}
                   </span>
+                  {trip.placeNames && trip.placeNames.length > 0 && (
+                    <p className="my-trips-ended-course">
+                      {trip.placeNames.join(' → ')}
+                    </p>
+                  )}
                   {trip.overallNote ? (
                     <p className="my-trips-ended-note">"{trip.overallNote}"</p>
                   ) : (

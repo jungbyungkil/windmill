@@ -23,9 +23,7 @@ import ClosingGateModal from './components/ClosingGateModal';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
 import MyTripsScreen from './components/MyTripsScreen';
-import TripRecordsScreen from './components/TripRecordsScreen';
 import TripRecordDetailScreen from './components/TripRecordDetailScreen';
-import HistoryScreen from './components/HistoryScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
@@ -183,16 +181,6 @@ export default function App() {
   function handleOpenMyTrips() {
     setMenuOpen(false);
     navigate('/my-trips');
-  }
-
-  function handleOpenTripRecords() {
-    setMenuOpen(false);
-    navigate('/trip-records');
-  }
-
-  function handleOpenHistory() {
-    setMenuOpen(false);
-    navigate('/history');
   }
 
   function handleOpenGuide() {
@@ -1013,8 +1001,6 @@ export default function App() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigateMyTrips={handleOpenMyTrips}
-        onNavigateTripRecords={handleOpenTripRecords}
-        onNavigateHistory={handleOpenHistory}
         onNavigateGuide={handleOpenGuide}
       />
       <ExitConfirmModal
@@ -1261,29 +1247,11 @@ export default function App() {
         }
       />
       <Route
-        path="/trip-records"
-        element={
-          <>
-            <BackHeader title="여행 기록" onMenuClick={() => setMenuOpen(true)} />
-            <TripRecordsScreen sessionId={sessionId} onStartNew={handleGoHome} />
-          </>
-        }
-      />
-      <Route
         path="/trip-records/:tripRecordId"
         element={
           <>
             <BackHeader title="여행 기록" onMenuClick={() => setMenuOpen(true)} />
             <TripRecordDetailScreen sessionId={sessionId} onViewItinerary={handleResumeDraft} />
-          </>
-        }
-      />
-      <Route
-        path="/history"
-        element={
-          <>
-            <BackHeader title="이용 히스토리" onMenuClick={() => setMenuOpen(true)} />
-            <HistoryScreen />
           </>
         }
       />
