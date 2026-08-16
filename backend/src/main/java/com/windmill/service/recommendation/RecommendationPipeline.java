@@ -87,6 +87,7 @@ public class RecommendationPipeline {
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
                             .map(list -> AccessibilityRanking.rank(list, request.isStrollerFriendly(), request.isAccessibleFriendly()))
                             .map(list -> AgeGroupRanking.rank(list, request.getAdultAgeGroup(), request.getChildAges()))
+                            .map(ReservationRequiredRanking::rank)
                             .map(ProximityRanking::rank)
                             .flatMap(list -> stage4.match(list, request.getTags(), request.getNaturalLanguageQuery(), request.getChildAges()))
                             .map(list -> enrichThemeTags(list, themes))
@@ -107,7 +108,7 @@ public class RecommendationPipeline {
     public Mono<List<RecommendationCandidate>> searchByName(String regionCode, String query) {
         RegionCode region = regionCodeService.find(regionCode)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + regionCode));
-        return stage1.searchByName(region, query)
+        return stage1.searchByNameViaKakao(region, query)
                 .flatMap(stage2::filter)
                 .flatMap(list -> resolveCondition(region).map(condition -> {
                     List<RecommendationCandidate> mapped = list.stream()
@@ -116,6 +117,32 @@ public class RecommendationPipeline {
                     badgeAssembler.attach(mapped, condition);
                     return mapped;
                 }));
+    }
+
+    /**
+     * 카카오 검색 결과로 화면에 보여준 후보 하나를 사용자가 실제로 골랐을 때, 그 이름으로
+     * TourAPI(KorService2)와 조인해 contentId 등을 채운 온전한 추천 카드로 되돌려준다. 이름매칭에
+     * 실패하면 빈 리스트를 돌려준다(프론트가 "관광공사 데이터에 없어 등록할 수 없어요" 안내).
+     */
+    public Mono<List<RecommendationCandidate>> resolveByName(String regionCode, String placeName,
+                                                                String mapX, String mapY) {
+        RegionCode region = regionCodeService.find(regionCode)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + regionCode));
+        RelatedCandidate raw = RelatedCandidate.builder().placeName(placeName).mapX(mapX).mapY(mapY).build();
+        return stage1.resolveByNameCascading(raw, region)
+                .flatMap(resolved -> {
+                    if (resolved.getContentId() == null) {
+                        return Mono.just(List.<RecommendationCandidate>of());
+                    }
+                    return stage2.filter(List.of(resolved))
+                            .flatMap(list -> resolveCondition(region).map(condition -> {
+                                List<RecommendationCandidate> mapped = list.stream()
+                                        .map(RecommendationPipeline::toSearchCandidate)
+                                        .collect(Collectors.toList());
+                                badgeAssembler.attach(mapped, condition);
+                                return mapped;
+                            }));
+                });
     }
 
     private static RecommendationCandidate toSearchCandidate(RelatedCandidate c) {

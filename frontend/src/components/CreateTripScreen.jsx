@@ -9,6 +9,11 @@ import { COMPANION_TYPE_OPTIONS, AGE_GROUP_OPTIONS, CHILD_AGE_OPTIONS } from '..
 
 const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
+/** 카카오 검색 결과는 contentId가 없어서(관광공사 매칭 전) 좌표+이름으로 목록 key/식별을 대신한다 */
+function anchorCandidateKey(candidate) {
+  return candidate.contentId || `${candidate.placeName}_${candidate.mapX}_${candidate.mapY}`;
+}
+
 function todayIso() {
   const d = new Date();
   const y = d.getFullYear();
@@ -58,6 +63,8 @@ export default function CreateTripScreen({
   const [anchorSearchLoading, setAnchorSearchLoading] = useState(false);
   const [anchorCandidate, setAnchorCandidate] = useState(null);
   const [anchorTime, setAnchorTime] = useState('19:00');
+  const [anchorResolvingKey, setAnchorResolvingKey] = useState(null);
+  const [anchorResolveError, setAnchorResolveError] = useState(null);
 
   useEffect(() => {
     api.getRegions()
@@ -165,6 +172,7 @@ export default function CreateTripScreen({
   async function handleAnchorSearch() {
     if (!anchorQuery.trim() || !signguFullCode) return;
     setAnchorSearchLoading(true);
+    setAnchorResolveError(null);
     try {
       const results = await api.searchPlacesByName({ regionCode: signguFullCode, query: anchorQuery.trim() });
       setAnchorResults(results);
@@ -175,14 +183,35 @@ export default function CreateTripScreen({
     }
   }
 
-  function handleSelectAnchor(candidate) {
-    setAnchorCandidate(candidate);
-    setAnchorResults(null);
-    setAnchorQuery('');
+  /** 카카오 검색 결과(contentId 없음)에서 고른 후보를 그 자리에서 관광공사 데이터로 매칭한다 */
+  async function handleSelectAnchor(candidate) {
+    const key = anchorCandidateKey(candidate);
+    setAnchorResolveError(null);
+    setAnchorResolvingKey(key);
+    try {
+      const resolved = await api.resolvePlaceByName({
+        regionCode: signguFullCode,
+        placeName: candidate.placeName,
+        mapX: candidate.mapX,
+        mapY: candidate.mapY,
+      });
+      if (!resolved || resolved.length === 0) {
+        setAnchorResolveError(`'${candidate.placeName}'은(는) 관광공사 데이터에 없어 등록할 수 없어요. 다른 이름으로 찾아보세요.`);
+        return;
+      }
+      setAnchorCandidate(resolved[0]);
+      setAnchorResults(null);
+      setAnchorQuery('');
+    } catch {
+      setAnchorResolveError('장소 정보를 불러오지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setAnchorResolvingKey(null);
+    }
   }
 
   function handleClearAnchor() {
     setAnchorCandidate(null);
+    setAnchorResolveError(null);
   }
 
   function handleAddChild() {
@@ -413,19 +442,26 @@ export default function CreateTripScreen({
                 </button>
               </div>
 
+              {anchorResolveError && <div className="error-msg">❌ {anchorResolveError}</div>}
+
               {anchorResults !== null && (
                 anchorResults.length === 0 ? (
                   <p className="empty-state">'{anchorQuery}'(으)로 찾은 장소가 없어요. 다른 이름으로 검색해보세요.</p>
                 ) : (
                   <div className="reco-grid">
-                    {anchorResults.map((c) => (
-                      <RecommendationCard
-                        key={c.contentId}
-                        candidate={c}
-                        onAdd={handleSelectAnchor}
-                        addLabel="📌 이 장소를 앵커로 등록"
-                      />
-                    ))}
+                    {anchorResults.map((c) => {
+                      const key = anchorCandidateKey(c);
+                      return (
+                        <RecommendationCard
+                          key={key}
+                          candidate={c}
+                          onAdd={handleSelectAnchor}
+                          adding={anchorResolvingKey === key}
+                          addLabel="📌 이 장소를 앵커로 등록"
+                          addingLabel="확인하는 중..."
+                        />
+                      );
+                    })}
                   </div>
                 )
               )}

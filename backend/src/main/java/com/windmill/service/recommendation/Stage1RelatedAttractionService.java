@@ -1,6 +1,7 @@
 package com.windmill.service.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.client.KakaoLocalSearchClient;
 import com.windmill.client.KorServiceClient;
 import com.windmill.client.PetFriendlyAttractionClient;
 import com.windmill.client.RelatedAttractionClient;
@@ -38,6 +39,7 @@ public class Stage1RelatedAttractionService {
     private final RelatedAttractionClient relatedAttractionClient;
     private final KorServiceClient korServiceClient;
     private final PetFriendlyAttractionClient petFriendlyAttractionClient;
+    private final KakaoLocalSearchClient kakaoLocalSearchClient;
 
     /**
      * 장소명 직접 검색 - 가고 싶은 곳을 이미 알고 있을 때, 연관/추천 로직 없이 그 지역 안에서
@@ -66,6 +68,24 @@ public class Stage1RelatedAttractionService {
     private Mono<List<RelatedCandidate>> searchKeywordAsCandidates(String keyword, String regnCd, String signguCd) {
         return korServiceClient.searchKeyword(keyword, null, regnCd, signguCd, MAX_CANDIDATES, 1)
                 .map(items -> mapKorItems(items, null));
+    }
+
+    /**
+     * 이름으로 검색 - 카카오맵 검색창과 동일한 결과를 우선 쓴다(2026-08-16 사용자 요청, 기존
+     * KorService2 자체 검색보다 훨씬 폭넓고 정확함). "강원도 속초 중앙시장"처럼 지역명을 쿼리 앞에
+     * 붙여 카카오맵에서 직접 검색하는 것과 같은 문맥을 준다. 카카오 키가 없거나 결과가 0건이면
+     * 기존 TourAPI 캐스케이드 검색(searchByName)으로 폴백해, 검색 기능 전체가 외부 신규 의존성
+     * 하나에만 묶이지 않도록 한다. 여기서 나온 카카오 결과는 contentId가 비어있다 - 화면엔 그대로
+     * 보여주고, 사용자가 실제로 하나를 고르면 resolveByNameCascading()으로 그때 매칭한다.
+     */
+    public Mono<List<RelatedCandidate>> searchByNameViaKakao(RegionCode region, String query) {
+        if (query == null || query.isBlank()) {
+            return Mono.just(List.of());
+        }
+        String trimmed = query.trim();
+        String prefixed = (region.getSidoName() + " " + region.getSignguName() + " " + trimmed).trim();
+        return kakaoLocalSearchClient.searchKeyword(prefixed)
+                .flatMap(list -> !list.isEmpty() ? Mono.just(list) : searchByName(region, trimmed));
     }
 
     public Mono<List<RelatedCandidate>> fetch(RegionCode region, String seedPlaceName, boolean withPet) {
@@ -398,18 +418,30 @@ public class Stage1RelatedAttractionService {
      */
     public Mono<List<RelatedCandidate>> resolveContentIds(List<RelatedCandidate> candidates, RegionCode region) {
         return Flux.fromIterable(candidates)
-                .flatMap(c -> resolveOne(c, region), EXTERNAL_CALL_CONCURRENCY)
+                .flatMap(c -> resolveOne(c, region.getLDongRegnCd(), region.getLDongSignguCd()), EXTERNAL_CALL_CONCURRENCY)
                 .filter(c -> c.getContentId() != null)
                 .collectList()
                 .doOnNext(list -> log.info("[Stage1] KorService2 이름매칭 성공 {}건 / {}건 중", list.size(), candidates.size()));
     }
 
-    private Mono<RelatedCandidate> resolveOne(RelatedCandidate candidate, RegionCode region) {
+    /**
+     * 카카오 로컬 검색처럼 TourAPI 밖에서 고른 단일 후보를 이름으로 KorService2와 조인한다.
+     * resolveContentIds(다건 병렬 조인)와 같은 이름매칭 로직이지만, 사용자가 이미 정확한 이름을
+     * 골라 확정한 단일 후보라 시/군/구→시/도→전국 순으로 넓혀가며 재시도한다(searchByName과 동일한
+     * 완화 전략 - "DDP"처럼 좁은 범위에서 0건이어도 넓히면 찾아지는 사례가 실제로 있었음).
+     */
+    public Mono<RelatedCandidate> resolveByNameCascading(RelatedCandidate candidate, RegionCode region) {
+        return resolveOne(candidate, region.getLDongRegnCd(), region.getLDongSignguCd())
+                .flatMap(r -> r.getContentId() != null ? Mono.just(r) : resolveOne(candidate, region.getLDongRegnCd(), null))
+                .flatMap(r -> r.getContentId() != null ? Mono.just(r) : resolveOne(candidate, null, null));
+    }
+
+    private Mono<RelatedCandidate> resolveOne(RelatedCandidate candidate, String regnCd, String signguCd) {
         if (candidate.getContentId() != null) {
             // 반려동물동반 소스(fetchPetFriendly)는 이미 contentId가 채워져 있어 재조회 불필요
             return Mono.just(candidate);
         }
-        return korServiceClient.searchKeyword(candidate.getPlaceName(), null, region.getLDongRegnCd(), region.getLDongSignguCd(), 1, 1)
+        return korServiceClient.searchKeyword(candidate.getPlaceName(), null, regnCd, signguCd, 1, 1)
                 .map(items -> {
                     if (items.isEmpty()) {
                         log.warn("[Stage1] '{}' KorService2 이름매칭 실패 - 후보에서 제외", candidate.getPlaceName());

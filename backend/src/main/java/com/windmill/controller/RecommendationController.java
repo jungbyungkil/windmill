@@ -52,6 +52,19 @@ public class RecommendationController {
         return recommendationPipeline.searchByName(regionCode, query).map(ResponseEntity::ok);
     }
 
+    /**
+     * 카카오 검색 결과(/search)에서 사용자가 실제로 고른 후보 하나를 TourAPI와 이름 매칭해
+     * contentId 등을 채운다. 매칭 실패 시 빈 배열(프론트가 안내 메시지 표시).
+     */
+    @GetMapping("/resolve")
+    public Mono<ResponseEntity<List<RecommendationCandidate>>> resolve(
+            @RequestParam String regionCode,
+            @RequestParam String placeName,
+            @RequestParam(required = false) String mapX,
+            @RequestParam(required = false) String mapY) {
+        return recommendationPipeline.resolveByName(regionCode, placeName, mapX, mapY).map(ResponseEntity::ok);
+    }
+
     @GetMapping
     public Mono<ResponseEntity<List<RecommendationCandidate>>> recommend(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,

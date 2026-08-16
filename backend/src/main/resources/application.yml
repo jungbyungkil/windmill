@@ -43,7 +43,7 @@ tourapi:
 
 # 카카오
 kakao:
-  # 길찾기 서버 프록시 REST 키
+  # 길찾기 서버 프록시 + 로컬 장소 검색(KakaoLocalSearchClient) 공용 REST 키
   rest-api-key: ${KAKAO_REST_API_KEY:}
   # 런타임 공개 JS 키(민감정보 아님). VITE 빌드키가 비었을 때 /api/public-config로 폴백
   js-key: ${KAKAO_JS_KEY:${VITE_KAKAO_JS_KEY:}}

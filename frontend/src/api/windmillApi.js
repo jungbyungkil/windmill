@@ -132,9 +132,15 @@ export function getRecommendations({ regionCode, withPet, strollerFriendly, acce
   return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
 }
 
-/** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(취향 추천이 아닌 정확한 이름 매칭). 앵커 등록에도 재사용 */
+/** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(카카오맵 검색과 동일한 결과). 앵커 등록에도 재사용.
+ *  결과는 contentId가 비어있을 수 있다 - 사용자가 실제로 고르면 resolvePlaceByName으로 매칭해야 한다. */
 export function searchPlacesByName({ regionCode, query } = {}) {
   return request(`/recommendations/search${qs({ regionCode, query })}`);
+}
+
+/** 카카오 검색 결과에서 고른 후보 하나를 관광공사 데이터로 매칭한다. 매칭 실패 시 빈 배열. */
+export function resolvePlaceByName({ regionCode, placeName, mapX, mapY } = {}) {
+  return request(`/recommendations/resolve${qs({ regionCode, placeName, mapX, mapY })}`);
 }
 
 /**
