@@ -65,6 +65,12 @@ function getCurrentPositionSafe() {
   });
 }
 
+/** 고정(pin)한 장소 중 가장 뒤쪽(나중에 담긴) 항목 - 새 장소 추천의 근접 검색 기준점 */
+function pinnedOriginItem(items) {
+  const pinnedItems = (items || []).filter((i) => i.pinned);
+  return pinnedItems.length > 0 ? pinnedItems[pinnedItems.length - 1] : null;
+}
+
 /** "09:00" → 분. 없거나 잘못되면 null */
 function scheduleMinutes(scheduledTime) {
   if (!scheduledTime || typeof scheduledTime !== 'string') return null;
@@ -216,6 +222,7 @@ export default function App() {
           return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
         })
     : [];
+  const pinnedOrigin = itinerary ? pinnedOriginItem(itinerary.items) : null;
 
   const refreshTrigger = useCallback(async () => {
     if (!itineraryId) return;
@@ -443,12 +450,8 @@ export default function App() {
     setRecoLoading(true);
     try {
       const excludeContentIds = itinerary.items.map((i) => i.contentId).filter(Boolean);
-      // 거리(km) 표시·주변 우선순위 기준점 - 고정(pin)한 장소가 있으면 그걸 최우선(가장 최근 고정분),
-      // 없으면 마지막 담은 장소 (없으면 거리 없이 반환됨)
-      const pinnedItems = itinerary.items.filter((i) => i.pinned);
-      const originItem = pinnedItems.length > 0
-        ? pinnedItems[pinnedItems.length - 1]
-        : itinerary.items[itinerary.items.length - 1];
+      // 근처 우선 추천은 고정(pin)한 장소가 있을 때만 동작 - 고정 전에는 기준점 없이(거리 미반영) 검색
+      const originItem = pinnedOriginItem(itinerary.items);
       const results = await api.getRecommendations({
         regionCode: itinerary.signguFullCode,
         withPet: itinerary.withPet,
@@ -1149,6 +1152,7 @@ export default function App() {
                   results={recoResults}
                   loading={recoLoading}
                   addingId={addingContentId}
+                  pinnedPlaceName={pinnedOrigin?.placeName}
                 />
 
                 <FestivalBanner

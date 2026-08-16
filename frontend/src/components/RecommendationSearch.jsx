@@ -3,7 +3,7 @@ import RecommendationCard from './RecommendationCard';
 import TrustBadge from './TrustBadge';
 import { TAG_OPTIONS } from '../constants';
 
-export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId }) {
+export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId, pinnedPlaceName }) {
   const [query, setQuery] = useState('');
   const [tags, setTags] = useState([]);
   const [freeOnly, setFreeOnly] = useState(false);
@@ -23,6 +23,11 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
     <div className="reco-search">
       <h2 className="section-title">새로운 장소 추천받기</h2>
       <TrustBadge />
+      <p className="place-name-search-hint">
+        {pinnedPlaceName
+          ? `📌 ${pinnedPlaceName} 근처로 추천해드리고 있어요. #실내·#맛집 같은 태그를 눌러보세요.`
+          : '지금은 근처 추천 기능이 꺼져있어요. 장소를 📌 고정하면 그때부터 이 장소 근처 위주로 추천해드려요.'}
+      </p>
       <form className="reco-search-form" onSubmit={handleSubmit}>
         <input
           type="text"

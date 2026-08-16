@@ -128,23 +128,33 @@ public class SmartPlanService {
 
         List<RecommendationCandidate> day = new ArrayList<>();
         RecommendationCandidate prev = null;
+        // 관광 풀과 맛집 풀을 별도 API 호출로 채우기 때문에 같은 장소가 두 풀 모두에 겹쳐 들어올 수 있다
+        // (예: 특정 장소가 두 테마 조회 모두에 매칭). 슬롯마다 고르기 직전에 이미 오늘 담긴 contentId를
+        // 상대편 풀에서도 제거해 같은 장소가 두 번 배치되는 걸 막는다.
+        Set<String> usedContentIds = new java.util.HashSet<>();
 
         RecommendationCandidate morning = placeForced(attrPool, prev, LocalTime.of(9, 0), "아침 일정", false);
         if (morning != null) {
             day.add(morning);
             prev = morning;
+            addUsed(usedContentIds, morning);
+            removeUsed(foodPool, usedContentIds);
         }
 
         RecommendationCandidate lunch = placeForced(foodPool, prev, LocalTime.of(12, 0), "점심 식사", true);
         if (lunch != null) {
             day.add(lunch);
             prev = lunch;
+            addUsed(usedContentIds, lunch);
+            removeUsed(attrPool, usedContentIds);
         }
 
         RecommendationCandidate afternoon = placeForced(attrPool, prev, LocalTime.of(14, 30), "오후 일정", false);
         if (afternoon != null) {
             day.add(afternoon);
             prev = afternoon;
+            addUsed(usedContentIds, afternoon);
+            removeUsed(foodPool, usedContentIds);
         }
 
         RecommendationCandidate dinner = placeForced(foodPool, prev, LocalTime.of(18, 0), "저녁 식사", true);
@@ -184,6 +194,16 @@ public class SmartPlanService {
                         .build()))
                 .stops(day)
                 .build();
+    }
+
+    private static void addUsed(Set<String> usedContentIds, RecommendationCandidate candidate) {
+        if (candidate.getContentId() != null) {
+            usedContentIds.add(candidate.getContentId());
+        }
+    }
+
+    private static void removeUsed(List<RecommendationCandidate> pool, Set<String> usedContentIds) {
+        pool.removeIf(c -> c.getContentId() != null && usedContentIds.contains(c.getContentId()));
     }
 
     /**

@@ -151,7 +151,14 @@ export default function ItineraryItemCard({
               {crowdAlerted && !isWeather && !businessAlerted && (
                 <span className="crowd-affected-badge" title="혼잡 주의">👥 혼잡</span>
               )}
-              {item.pinned && <span className="pin-badge" title={item.pinnedReason || '고정됨'}>📌</span>}
+              {item.pinned && (
+                <span
+                  className="pin-badge"
+                  title={item.pinnedReason || '고정됨 - 새 장소 추천에서 이 장소 근처를 우선 보여드려요'}
+                >
+                  📌
+                </span>
+              )}
             </div>
 
             {item.tags?.length > 0 && (
@@ -299,7 +306,11 @@ export default function ItineraryItemCard({
         )}
         <button
           className="icon-btn"
-          title={item.pinned ? '고정 해제' : '고정하기'}
+          title={
+            item.pinned
+              ? '고정 해제 - 지금은 이 장소 근처로 추천 중이에요'
+              : '고정하기 - 고정하면 아래 새로운 장소 추천에서 이 장소 근처를 우선 보여드려요'
+          }
           onClick={() => onTogglePin(item.itemId, !item.pinned)}
           disabled={editing}
         >
