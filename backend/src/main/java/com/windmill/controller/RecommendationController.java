@@ -104,6 +104,10 @@ public class RecommendationController {
                     .excludePlaceNames(badPlaceNames)
                     .originContentId(originContentId)
                     .originContentTypeId(originContentTypeId)
+                    // 태그가 세분화되면서(한식/중식/카페/박물관 등) "새로운 장소 추천받기" 검색도
+                    // 자주 반복해서 누르는 액션이 됨 - LLM(Stage4) 단계가 전체 시간의 상당 부분을
+                    // 차지해(2026-08-16 실측) 표준 일정과 동일하게 건너뛴다. 순위에는 영향 없음.
+                    .skipLlm(true)
                     .build();
 
             return recommendationPipeline.recommend(request);

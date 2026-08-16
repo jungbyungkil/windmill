@@ -40,6 +40,8 @@ tourapi:
   pet-friendly-base-url: https://apis.data.go.kr/B551011/KorPetTourService2
   # 별도 활용신청 승인 필요 (2026-08-03 기준 미승인) - OdiiClient 주석 참고
   odii-base-url: https://apis.data.go.kr/B551011/Odii
+  # 한국천문연구원 특일 정보(공휴일) - tourapi.key(data.go.kr 통합 서비스키) 재사용, 별도 키 불필요
+  holiday-base-url: https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
 
 # 카카오
 kakao:

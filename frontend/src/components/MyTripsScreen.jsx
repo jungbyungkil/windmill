@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS } from '../constants';
 
@@ -10,6 +11,22 @@ const TABS = [
   { value: 'ENDED', label: '종료' },
 ];
 
+const RATINGS = [
+  { value: 'GOOD', icon: '👍', label: '좋았음' },
+  { value: 'NEUTRAL', icon: '😐', label: '보통' },
+  { value: 'BAD', icon: '👎', label: '별로' },
+];
+
+function RatingBadge({ value }) {
+  const r = RATINGS.find((x) => x.value === value);
+  if (!r) return <span className="trip-record-rating-badge unrated">미평가</span>;
+  return (
+    <span className={`trip-record-rating-badge ${value === 'BAD' ? 'bad' : ''}`}>
+      {r.icon} {r.label}
+    </span>
+  );
+}
+
 function formatTripDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
@@ -19,6 +36,7 @@ function formatTripDate(dateStr) {
 
 /** GNB "내 여행 관리" - 전체 일정 ACTIVE/ENDED 통합 목록, 상태별 필터 + 정리(삭제) */
 export default function MyTripsScreen({ sessionId, onResume }) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState(undefined);
   const [trips, setTrips] = useState(null); // null = 로딩 중
   const [error, setError] = useState(null);
@@ -76,44 +94,35 @@ export default function MyTripsScreen({ sessionId, onResume }) {
       ) : (
         <ul className="my-trips-list">
           {trips.map((trip) => (
-            <li key={trip.itineraryId} className="my-trips-row">
-              <div className="my-trips-row-main">
-                <span className={`my-trips-badge ${trip.status === 'ACTIVE' ? 'active' : 'ended'}`}>
-                  {trip.status === 'ACTIVE' ? '진행 중' : '종료'}
-                </span>
-                <span className="my-trips-date">{formatTripDate(trip.startDate)}</span>
-                {trip.regionDisplayName && (
-                  <span className="my-trips-region">{trip.regionDisplayName}</span>
-                )}
-                <span className="my-trips-meta">
-                  {trip.placeCount ?? 0}곳
-                  {trip.companionType && COMPANION_LABEL[trip.companionType]
-                    ? ` · ${COMPANION_LABEL[trip.companionType]}`
-                    : ''}
-                  {trip.withPet ? ' · 🐾' : ''}
-                </span>
-                {trip.status === 'ENDED' && trip.overallNote && (
-                  <p className="my-trips-note">💬 {trip.overallNote}</p>
-                )}
-              </div>
-              <div className="my-trips-row-actions">
-                {trip.status === 'ACTIVE' ? (
-                  <button
-                    type="button"
-                    className="btn-primary my-trips-resume"
-                    onClick={() => onResume(trip.itineraryId)}
-                  >
-                    이어하기
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="my-trips-resume-disabled my-trips-view-btn"
-                    onClick={() => onResume(trip.itineraryId)}
-                  >
-                    코스 보기
-                  </button>
-                )}
+            trip.status === 'ENDED' ? (
+              <li key={trip.itineraryId} className="my-trips-ended-item">
+                <button
+                  type="button"
+                  className="my-trips-ended-card"
+                  onClick={() => (trip.tripRecordId
+                    ? navigate(`/trip-records/${trip.tripRecordId}`)
+                    : onResume(trip.itineraryId))}
+                >
+                  <div className="my-trips-ended-head">
+                    <span className="my-trips-date">🏁 {formatTripDate(trip.startDate)}</span>
+                    {trip.regionDisplayName && (
+                      <span className="my-trips-region">{trip.regionDisplayName}</span>
+                    )}
+                    <RatingBadge value={trip.overallRating} />
+                  </div>
+                  <span className="my-trips-meta">
+                    {trip.placeCount ?? 0}곳
+                    {trip.companionType && COMPANION_LABEL[trip.companionType]
+                      ? ` · ${COMPANION_LABEL[trip.companionType]}`
+                      : ''}
+                    {trip.withPet ? ' · 🐾' : ''}
+                  </span>
+                  {trip.overallNote ? (
+                    <p className="my-trips-ended-note">"{trip.overallNote}"</p>
+                  ) : (
+                    <p className="my-trips-ended-note my-trips-ended-note-empty">작성한 소감이 없어요.</p>
+                  )}
+                </button>
                 <button
                   type="button"
                   className="icon-btn danger my-trips-delete"
@@ -123,8 +132,43 @@ export default function MyTripsScreen({ sessionId, onResume }) {
                 >
                   {deletingId === trip.itineraryId ? '…' : '🗑️'}
                 </button>
-              </div>
-            </li>
+              </li>
+            ) : (
+              <li key={trip.itineraryId} className="my-trips-row">
+                <div className="my-trips-row-main">
+                  <span className="my-trips-badge active">진행 중</span>
+                  <span className="my-trips-date">{formatTripDate(trip.startDate)}</span>
+                  {trip.regionDisplayName && (
+                    <span className="my-trips-region">{trip.regionDisplayName}</span>
+                  )}
+                  <span className="my-trips-meta">
+                    {trip.placeCount ?? 0}곳
+                    {trip.companionType && COMPANION_LABEL[trip.companionType]
+                      ? ` · ${COMPANION_LABEL[trip.companionType]}`
+                      : ''}
+                    {trip.withPet ? ' · 🐾' : ''}
+                  </span>
+                </div>
+                <div className="my-trips-row-actions">
+                  <button
+                    type="button"
+                    className="btn-primary my-trips-resume"
+                    onClick={() => onResume(trip.itineraryId)}
+                  >
+                    이어하기
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn danger my-trips-delete"
+                    aria-label="일정 삭제"
+                    onClick={() => handleDelete(trip)}
+                    disabled={deletingId === trip.itineraryId}
+                  >
+                    {deletingId === trip.itineraryId ? '…' : '🗑️'}
+                  </button>
+                </div>
+              </li>
+            )
           ))}
         </ul>
       )}

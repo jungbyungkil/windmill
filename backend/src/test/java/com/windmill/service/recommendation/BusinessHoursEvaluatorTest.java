@@ -1,11 +1,13 @@
 package com.windmill.service.recommendation;
 
 import com.windmill.util.ClosingTimeGate;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,6 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BusinessHoursEvaluatorTest {
+
+    // KoreanHolidayCache는 JVM 전역 정적 캐시라(@SpringBootTest가 실제 빈을 띄우면 다른 테스트
+    // 클래스가 먼저 채워둘 수 있음) 이 클래스의 모든 테스트를 항상 빈 상태에서 시작하도록 매번 리셋한다.
+    @BeforeEach
+    void resetHolidayCache() {
+        KoreanHolidayCache.setForTesting(Map.of());
+    }
 
     @Test
     void lastSundayOfMonthOnly_notEverySunday() {
@@ -196,5 +205,45 @@ class BusinessHoursEvaluatorTest {
         assertNull(BusinessHoursEvaluator.parseMinAge("모든 어린이 보호자 동반 필수"));
         assertNull(BusinessHoursEvaluator.parseMinAge(""));
         assertNull(BusinessHoursEvaluator.parseMinAge(null));
+    }
+
+    /**
+     * 2026-08-16 사용자 제보 재현: 덕수궁·서울도시건축전시관 둘 다 "월요일, 단 공휴일이면 다음날 휴관"
+     * 조건이 있는데 8/17(월)이 광복절(8/15, 토) 대체공휴일이라 실제론 열려있어야 했음 - 요일만 보고
+     * 휴무로 오판정하던 버그. 8/17(대체공휴일)은 열려있고, 대신 8/18(화)이 밀린 휴무여야 한다.
+     */
+    private static void seed2026SubstituteHoliday() {
+        // 광복절(8/15, 토)의 대체공휴일 - 실제 2026년 관보 기준
+        KoreanHolidayCache.setForTesting(Map.of(2026, Set.of(LocalDate.of(2026, 8, 17))));
+    }
+
+    @Test
+    void holidayShiftClause_opensOnSubstituteHolidayMonday() {
+        seed2026SubstituteHoliday();
+        String seoulMuseum = "매주 월요일 (단, 월요일이 공휴일인 경우 다음날 휴관)";
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(seoulMuseum, LocalDate.of(2026, 8, 17))); // 대체공휴일 - 개방
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(seoulMuseum, LocalDate.of(2026, 8, 18)));  // 그 다음날로 휴무 이동
+
+        String deoksugung = "매주 월요일※ 단, 정기휴일이 공휴일 및 대체공휴일과 겹칠 경우에는 개방하며, "
+                + "그 다음의 첫 번째 비공휴일이 정기휴일임";
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(deoksugung, LocalDate.of(2026, 8, 17)));
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(deoksugung, LocalDate.of(2026, 8, 18)));
+    }
+
+    @Test
+    void holidayShiftClause_regularNonHolidayMondayStillCloses() {
+        seed2026SubstituteHoliday();
+        String rest = "매주 월요일 (단, 월요일이 공휴일인 경우 다음날 휴관)";
+        // 8/24는 평범한 월요일(공휴일 아님) - 예외 없이 그대로 휴무
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 24)));
+        // 8/25(화)는 밀릴 이유가 없는 평범한 화요일 - 개방
+        assertFalse(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 25)));
+    }
+
+    @Test
+    void holidayShiftClause_withoutHolidayCalendarData_fallsBackToWeekdayRule() {
+        // 캐시가 비어있으면(조회 실패 등) 공휴일 예외 없이 기존 요일 판정 그대로 - 안전한 폴백
+        String rest = "매주 월요일 (단, 월요일이 공휴일인 경우 다음날 휴관)";
+        assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 17)));
     }
 }

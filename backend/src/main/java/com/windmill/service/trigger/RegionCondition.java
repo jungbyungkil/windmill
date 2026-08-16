@@ -29,15 +29,16 @@ public class RegionCondition {
     Instant refreshedAt;
 
     public Double getCrowdRate(String placeName) {
-        return crowdRateByPlaceName == null ? null : crowdRateByPlaceName.get(placeName);
+        // Map.of() 등 불변 맵은 get(null)에서 NPE를 던지므로 placeName null도 방어한다.
+        return placeName == null || crowdRateByPlaceName == null ? null : crowdRateByPlaceName.get(placeName);
     }
 
     public String getCrowdCategory(String placeName) {
-        return crowdCategoryByPlaceName == null ? null : crowdCategoryByPlaceName.get(placeName);
+        return placeName == null || crowdCategoryByPlaceName == null ? null : crowdCategoryByPlaceName.get(placeName);
     }
 
     public Double getCrowdRelativePercent(String placeName) {
-        return crowdRelativePercentByPlaceName == null ? null : crowdRelativePercentByPlaceName.get(placeName);
+        return placeName == null || crowdRelativePercentByPlaceName == null ? null : crowdRelativePercentByPlaceName.get(placeName);
     }
 
     /**

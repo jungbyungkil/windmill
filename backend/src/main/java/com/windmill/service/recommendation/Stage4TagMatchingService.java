@@ -60,6 +60,25 @@ public class Stage4TagMatchingService {
                 .onErrorReturn(fallback(candidates, finalRequested));
     }
 
+    /**
+     * LLM을 아예 건너뛴다(RecommendationRequest.skipLlm) - OpenAI 미설정 시 쓰는 fallback과 동일한
+     * 키워드 기반 문장/태그를 즉시 반환한다. Stage1~3이 이미 순서를 정했으므로(이 클래스 상단 문서
+     * 참고) 어떤 장소가 뽑히는지는 LLM을 쓸 때와 동일하고, matchedTags/oneLiner만 더 단순해진다.
+     */
+    public Mono<List<RecommendationCandidate>> matchWithoutLlm(List<RelatedCandidate> candidates,
+                                                                  List<String> requestedTags,
+                                                                  List<Integer> childAges) {
+        if (candidates.isEmpty()) {
+            return Mono.just(List.of());
+        }
+        List<String> requested = requestedTags == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(requestedTags);
+        String ageBand = AgeGroupRanking.youngestAgeBandLabel(childAges);
+        if (ageBand != null && !requested.contains("#아이동반")) {
+            requested.add("#아이동반");
+        }
+        return Mono.just(fallback(candidates, List.copyOf(requested)));
+    }
+
     private String buildPrompt(List<RelatedCandidate> candidates, List<String> requestedTags, String query, String childAgeBand) {
         String candidateLines = candidates.stream()
                 .map(c -> String.format("- %s (분류: %s, 여유율: %s)", c.getPlaceName(), c.getCategoryLcls(),
@@ -85,8 +104,9 @@ public class Stage4TagMatchingService {
 
                 규칙:
                 - matchedTags는 반드시 위의 "요청 태그 후보"에 있는 것만 사용하세요. 없으면 빈 배열.
-                - 전시관·박물관·스테이션·체험관 등 관광/문화시설에 #맛집을 붙이지 마세요.
-                - 음식점·식당만 #맛집을 쓰세요.
+                - 전시관·박물관·스테이션·체험관 등 관광/문화시설에 #맛집·#카페·#한식·#중식·#일식·#양식 같은
+                  음식 관련 태그를 붙이지 마세요 - 실제 음식점·카페에만, 그것도 실제 업종에 맞는 태그만
+                  붙이세요(예: 한식당엔 #한식만, 카페엔 #카페만 - 여러 개를 억지로 겹쳐 붙이지 않기).
 
                 각 항목에 대해 아래 JSON 배열 형식으로만 반환하세요. 다른 설명은 하지 마세요.
                 [

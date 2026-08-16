@@ -933,6 +933,12 @@
   font-size: 15px;
   font-weight: 600;
   color: var(--sea-deep);
+  animation: pinwheel-message-fade 0.4s ease;
+}
+
+@keyframes pinwheel-message-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .pinwheel-causes {
@@ -2749,7 +2755,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pinwheel-blades, .pinwheel-graphic, .pinwheel-loading-blades, .skeleton-card, .skeleton-line {
+  .pinwheel-blades, .pinwheel-graphic, .pinwheel-loading-blades, .pinwheel-loading-message, .skeleton-card, .skeleton-line {
     animation: none !important;
   }
 }
@@ -4815,6 +4821,60 @@
 
 .my-trips-delete {
   color: var(--level-danger, #dc2626);
+}
+
+.my-trips-ended-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.my-trips-ended-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.my-trips-ended-card:hover {
+  background: color-mix(in srgb, var(--sea) 6%, var(--sand-card));
+  border-color: color-mix(in srgb, var(--sea) 24%, var(--sand-border));
+}
+
+.my-trips-ended-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-trips-ended-note {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.my-trips-ended-note-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.my-trips-ended-item .my-trips-delete {
+  flex-shrink: 0;
+  align-self: center;
 }
 
 /* ---------- 설정 ---------- */

@@ -34,6 +34,7 @@ export default function CreateTripScreen({
   onCreate,
   onStartFromStory,
   loading,
+  loadingStage,
   startingStoryId,
   error,
   draftItineraryId,
@@ -253,9 +254,10 @@ export default function CreateTripScreen({
       {loading && (
         <PinwheelLoader
           message={
-            anchorCandidate
-              ? `${anchorCandidate.placeName} 기준으로 장소를 찾고 동선을 준비하고 있어요...`
-              : '오전·점심·오후·저녁 장소를 찾고 동선을 준비하고 있어요...'
+            loadingStage
+              || (anchorCandidate
+                ? `${anchorCandidate.placeName} 기준으로 장소를 찾고 있어요...`
+                : '오전·점심·오후·저녁 장소를 찾고 있어요...')
           }
         />
       )}

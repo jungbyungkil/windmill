@@ -76,6 +76,9 @@ public class AnchorPlanService {
                 .excludeContentIds(List.copyOf(used))
                 .originContentId(anchor.getContentId())
                 .originContentTypeId(anchor.getContentTypeId())
+                // 표준 4단계 일정과 동일하게 "당일치기 시작하기" 첫 화면 스피드가 중요해 LLM(Stage4)
+                // 단계를 건너뛴다 - 순위 결정에는 관여하지 않아 뽑히는 장소는 동일함(SmartPlanService 참고)
+                .skipLlm(true)
                 .build();
 
         // TarRlteTarService1(연관 관광지)는 seed(앵커 장소)에 baseYm 데이터가 아예 없을 수 있다 -

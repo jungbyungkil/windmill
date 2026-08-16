@@ -36,6 +36,10 @@ public class RecommendationRequest {
     /** 거리(km) 계산 기준점 - 보통 일정에 이미 담긴 마지막 장소. null이면 distanceKm 없이 반환 */
     private String originContentId;
     private Integer originContentTypeId;
+    /** true면 Stage4(LLM 태그·문장 생성)를 건너뛰고 키워드 기반 폴백만 쓴다 - 표준 스마트 일정처럼
+     *  "최대한 빨리 큼직한 일정을 보여줘야" 하는 자동 생성 경로 전용. LLM은 순위를 안 바꾸므로
+     *  건너뛰어도 어떤 장소가 뽑히는지는 동일하고, matchedTags/oneLiner만 더 단순해진다. */
+    private boolean skipLlm;
 
     public enum AvoidanceHint { CROWD, WEATHER, HEAT, BUSINESS }
 }

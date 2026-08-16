@@ -115,9 +115,25 @@ public final class BusinessHoursEvaluator {
     }
 
     /**
+     * "매주 월요일(단, 월요일이 공휴일인 경우 다음날 휴관)"류 - 공휴일과 겹치면 휴무가 밀리는 안내
+     * 문구 감지. 실제 원문마다 "공휴일"과 트리거 단어의 순서·거리가 제각각이라(예: 덕수궁 원문은
+     * "그 다음의 첫 번째 비공휴일이 정기휴일임"처럼 "다음"이 "공휴일"보다 앞에 옴, "겹치다"도 어미가
+     * "겹칠"/"겹쳐"처럼 활용됨) 위치 기반 정규식 대신 단순 공존 여부로 판단한다.
+     */
+    private static boolean hasHolidayShiftClause(String restText) {
+        return restText.contains("공휴일")
+                && (restText.contains("다음") || restText.contains("겹치") || restText.contains("겹칠")
+                        || restText.contains("밀림") || restText.contains("이동"));
+    }
+
+    /**
      * 정기휴무 원문만으로 해당 날짜가 휴무인지 판정.
      * 예: "매월 마지막 주 일요일" → 그달 마지막 일요일만 true.
      *     "매주 일요일" → 모든 일요일 true.
+     * 정기휴무 요일이 공휴일과 겹치면 다음(비공휴일) 날로 밀린다는 안내가 원문에 있으면, 실제 공휴일
+     * 달력(KoreanHolidayCache)을 대조해 그 예외를 반영한다(2026-08-16 사용자 제보 - 덕수궁·서울도시
+     * 건축전시관 둘 다 "월요일, 단 공휴일이면 다음날 휴관" 조건이 있는데 8/17(월, 대체공휴일)을 요일만
+     * 보고 휴무로 오판정했음. 8/17은 열려있어야 하고 대신 8/18이 휴무여야 함).
      */
     public static boolean isClosedOnRestDate(String restText, LocalDate date) {
         if (restText == null || restText.isBlank() || date == null) {
@@ -128,6 +144,31 @@ public final class BusinessHoursEvaluator {
             return false;
         }
 
+        boolean weekdayClosed = isClosedByWeekdayRule(restText, date);
+        if (!hasHolidayShiftClause(restText)) {
+            return weekdayClosed;
+        }
+        if (weekdayClosed) {
+            // 정기휴무 요일인데 공휴일과 겹치면 그날은 예외로 개방
+            return !KoreanHolidayCache.isHoliday(date);
+        }
+        // 정기휴무 요일이 아니어도, 직전 정기휴무 요일이 공휴일이었고 그 뒤로 date 전날까지 전부
+        // 공휴일이 이어졌다면(연휴) date가 "그 다음 첫 비공휴일"로 밀린 휴무일이다.
+        LocalDate cursor = date.minusDays(1);
+        for (int i = 0; i < 7; i++) {
+            if (!KoreanHolidayCache.isHoliday(cursor)) {
+                return false;
+            }
+            if (isClosedByWeekdayRule(restText, cursor)) {
+                return true;
+            }
+            cursor = cursor.minusDays(1);
+        }
+        return false;
+    }
+
+    /** 공휴일 예외를 뺀 순수 요일/주차 규칙 판정 - isClosedOnRestDate 내부 전용 */
+    private static boolean isClosedByWeekdayRule(String restText, LocalDate date) {
         String todayKo = WEEKDAY_KO[date.getDayOfWeek().getValue() - 1];
         boolean lastWeekdayOfMonth = isLastWeekdayOfMonth(date);
 

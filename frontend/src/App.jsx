@@ -9,6 +9,7 @@ import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
+import PinwheelLoader from './components/PinwheelLoader';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
@@ -90,6 +91,7 @@ export default function App() {
   const [shareToken, setShareToken] = useState(() => readShareTokenFromHash());
   const [itinerary, setItinerary] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [creatingStage, setCreatingStage] = useState('');
   const [startingStoryId, setStartingStoryId] = useState(null);
   const [createError, setCreateError] = useState(null);
   const [duplicateConflict, setDuplicateConflict] = useState(null);
@@ -246,6 +248,7 @@ export default function App() {
   async function handleCreate(formData) {
     setCreating(true);
     setCreateError(null);
+    setCreatingStage('장소를 찾고 있어요...');
     try {
       // anchor/anchorTime은 첫 화면에서 미리 등록한 고정 일정(선택) - 일정 생성 API 자체엔 안 보냄
       const { anchor, anchorTime, ...tripFields } = formData;
@@ -271,6 +274,7 @@ export default function App() {
       }
     } finally {
       setCreating(false);
+      setCreatingStage('');
     }
   }
 
@@ -281,6 +285,7 @@ export default function App() {
   async function autoApplySmartPlan(created) {
     let stops = [];
     try {
+      setCreatingStage('오전·점심·오후·저녁 장소를 찾고 있어요...');
       const plan = await api.getSmartPlan(created.itineraryId, { date: created.startDate, standard: true });
       stops = plan?.stops || [];
     } catch {
@@ -291,7 +296,9 @@ export default function App() {
     if (stops.length === 0) {
       return created;
     }
-    for (const stop of stops) {
+    for (let i = 0; i < stops.length; i++) {
+      const stop = stops[i];
+      setCreatingStage(`일정에 담고 있어요 (${i + 1}/${stops.length})...`);
       try {
         await api.addItem(created.itineraryId, {
           contentId: stop.contentId,
@@ -322,6 +329,7 @@ export default function App() {
     }
     let finalItinerary = await api.getItinerary(created.itineraryId);
     if (stops.length >= 2 && (finalItinerary.items || []).length >= 2) {
+      setCreatingStage('이동 동선을 최적화하고 있어요...');
       finalItinerary = await api.optimizeRoute(created.itineraryId, created.startDate);
       setAutoReplaceNotice(finalItinerary.routeHint || '스마트 일정을 자동으로 담았어요 - 이동거리를 최소화한 순서예요.');
       setTimeout(() => setAutoReplaceNotice(null), 5000);
@@ -337,6 +345,7 @@ export default function App() {
   async function autoApplyAnchorPlan(created, anchor, anchorTime) {
     let stops = [];
     try {
+      setCreatingStage(`${anchor.placeName} 기준으로 장소를 찾고 있어요...`);
       stops = await api.getAnchorPlan(created.itineraryId, { anchor, anchorTime });
     } catch {
       setAutoReplaceNotice('고정 일정을 만들지 못했어요. 직접 담아보세요.');
@@ -346,7 +355,9 @@ export default function App() {
     if (!stops || stops.length === 0) {
       return created;
     }
-    for (const stop of stops) {
+    for (let i = 0; i < stops.length; i++) {
+      const stop = stops[i];
+      setCreatingStage(`일정에 담고 있어요 (${i + 1}/${stops.length})...`);
       try {
         await api.addItem(created.itineraryId, {
           contentId: stop.contentId,
@@ -377,6 +388,7 @@ export default function App() {
     }
     let finalItinerary = await api.getItinerary(created.itineraryId);
     if (stops.length >= 2 && (finalItinerary.items || []).length >= 2) {
+      setCreatingStage('이동 동선을 최적화하고 있어요...');
       finalItinerary = await api.optimizeRoute(created.itineraryId, created.startDate);
       setAutoReplaceNotice(finalItinerary.routeHint || '등록한 고정 일정을 기준으로 하루 일정을 자동으로 담았어요.');
       setTimeout(() => setAutoReplaceNotice(null), 5000);
@@ -579,33 +591,49 @@ export default function App() {
 
       if (affectedItem) {
         await api.deleteItem(itineraryId, affectedItem.itemId);
-        const result = await api.addItem(itineraryId, {
-          contentId: top.contentId,
-          contentTypeId: top.contentTypeId,
-          placeName: top.placeName,
-          thumbnailUrl: top.thumbnailUrl,
-          scheduledTime: affectedItem.scheduledTime,
-          tags: top.matchedTags,
-          crowdRate: top.crowdRate,
-          // 교체 대상이었던 항목이 속했던 날짜를 그대로 유지
-          visitDate: affectedItem.visitDate || itinerary.startDate,
-          addr1: top.addr1,
-          tel: top.tel,
-          useFeeText: top.useFeeText,
-          isFree: top.isFree,
-          restDateText: top.restDateText,
-          closeTime: top.closeTime,
-          useTimeText: top.useTimeText,
-          homepageUrl: top.homepageUrl,
-          strollerFriendly: top.strollerFriendly,
-          accessibleFriendly: top.accessibleFriendly,
-          category: top.category,
-          mapX: top.mapX,
-          mapY: top.mapY,
-          isAlternate: true,
-        });
+        // 원래 있던 시간대를 그대로 넘기다 보니(마감 임박 등으로) 1순위 후보가 그 시각엔 못
+        // 들어갈 수 있다 - 실패하면 다음 후보로 계속 시도하고, 전부 실패했을 때만 안내한다.
+        let result = null;
+        let replacedWith = null;
+        for (const candidate of candidates) {
+          try {
+            result = await api.addItem(itineraryId, {
+              contentId: candidate.contentId,
+              contentTypeId: candidate.contentTypeId,
+              placeName: candidate.placeName,
+              thumbnailUrl: candidate.thumbnailUrl,
+              scheduledTime: affectedItem.scheduledTime,
+              tags: candidate.matchedTags,
+              crowdRate: candidate.crowdRate,
+              // 교체 대상이었던 항목이 속했던 날짜를 그대로 유지
+              visitDate: affectedItem.visitDate || itinerary.startDate,
+              addr1: candidate.addr1,
+              tel: candidate.tel,
+              useFeeText: candidate.useFeeText,
+              isFree: candidate.isFree,
+              restDateText: candidate.restDateText,
+              closeTime: candidate.closeTime,
+              useTimeText: candidate.useTimeText,
+              homepageUrl: candidate.homepageUrl,
+              strollerFriendly: candidate.strollerFriendly,
+              accessibleFriendly: candidate.accessibleFriendly,
+              category: candidate.category,
+              mapX: candidate.mapX,
+              mapY: candidate.mapY,
+              isAlternate: true,
+            });
+            replacedWith = candidate;
+            break;
+          } catch {
+            // 이 후보는 그 시간대에 못 들어감(마감 임박 등) - 다음 후보로 계속
+          }
+        }
+        if (!result) {
+          setAutoReplaceNotice(`"${affectedItem.placeName}" 자리에 넣을 수 있는 대안을 찾지 못했어요.`);
+          return;
+        }
         setItinerary(result);
-        setAutoReplaceNotice(`"${affectedItem.placeName}"을(를) "${top.placeName}"(으)로 자동 교체했어요.${rainNote}`);
+        setAutoReplaceNotice(`"${affectedItem.placeName}"을(를) "${replacedWith.placeName}"(으)로 자동 교체했어요.${rainNote}`);
       } else {
         await addCandidateToItinerary(top, activeDate, true);
         setAutoReplaceNotice(`"${top.placeName}"을(를) 일정에 자동으로 추가했어요.${rainNote}`);
@@ -951,7 +979,11 @@ export default function App() {
       setTrigger(null);
       setRecoResults(null);
       setRerouteCount(0);
-      navigate('/');
+      // navigate('/')를 직접 부르지 않는다 - /trip 라우트 가드(!itinerary → <Navigate to="/"/>)가
+      // itinerary=null이 되는 순간 자연스럽게 처리한다. 여기서 navigate까지 같이 부르면, 모달이
+      // 방금 닫히며 useModalHistory 클린업이 실행하는 history.back()과 겹쳐 방금 이동한 "/"에서
+      // 다시 "/trip"(빈 화면)으로 되돌아가버리는 경합이 있었음(2026-08-16 사용자 제보 - 여행 마무리
+      // 후 첫 화면으로 안 넘어가고 빈 화면만 남음).
     } catch (e) {
       alert(e.message);
     } finally {
@@ -1004,6 +1036,7 @@ export default function App() {
                   onCreate={handleCreate}
                   onStartFromStory={handleStartFromStory}
                   loading={creating}
+                  loadingStage={creatingStage}
                   startingStoryId={startingStoryId}
                   error={createError}
                   draftItineraryId={draftItineraryId}
@@ -1088,6 +1121,12 @@ export default function App() {
         element={
           !itinerary ? <Navigate to="/" replace /> : (
             <div className="app">
+              {/* CreateTripScreen의 로딩 오버레이는 라우트가 "/trip"으로 바뀌는 순간 함께
+                  언마운트된다 - 그 사이 담긴 장소가 아직 반영 안 된 빈 화면이 잠깐 보이는 걸
+                  막기 위해 creating이 꺼질 때까지 이 라우트에서도 같은 오버레이를 이어서 띄운다. */}
+              {creating && (
+                <PinwheelLoader message={creatingStage || '지금 일정을 스마트하게 고르고 있어요...'} />
+              )}
               <BackHeader title="바람따라" onMenuClick={() => setMenuOpen(true)} />
               <header className="app-header">
                 <div className="header-inner">

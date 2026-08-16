@@ -205,7 +205,7 @@ public class ItineraryService {
                     TripRecord record = recordByItineraryId.get(i.getId());
                     return ItineraryListItemResponse.from(i,
                             ItineraryStatus.of(i.getStartDate(), record != null),
-                            record == null ? null : record.getOverallNote());
+                            record);
                 })
                 .filter(r -> statusFilter == null || r.getStatus() == statusFilter)
                 .limit(Math.max(1, limit))

@@ -216,8 +216,11 @@ public class Stage1RelatedAttractionService {
         if (themes.size() == 1 && themes.get(0) == RecommendThemeTag.FOOD) {
             return fetchFood(region, query);
         }
+        // 테마별 조회를 병렬로 돌린다(concatMap→flatMapSequential) - 순서는 그대로 보존하면서
+        // 실측상 테마 수만큼(최대 3개) 순차 대기하던 걸 동시 대기로 줄인다(2026-08-16 "당일치기
+        // 시작하기" 속도 개선 - 표준 4단계 일정 생성 26초 중 Stage1이 약 2.3초를 차지했음).
         return Flux.fromIterable(themes)
-                .concatMap(theme -> fetchOneTheme(region, theme, query))
+                .flatMapSequential(theme -> fetchOneTheme(region, theme, query), Math.max(themes.size(), 1))
                 .collectList()
                 .map(batches -> {
                     Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
@@ -240,11 +243,25 @@ public class Stage1RelatedAttractionService {
 
     private Mono<List<RelatedCandidate>> fetchOneTheme(RegionCode region, RecommendThemeTag theme, String query) {
         List<Mono<List<RelatedCandidate>>> calls = new ArrayList<>();
-        for (int typeId : theme.getContentTypeIds()) {
-            calls.add(korServiceClient
-                    .areaBasedList(typeId, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
-                    .map(items -> mapKorItems(items, theme.getLabel()))
-                    .onErrorReturn(List.of()));
+        RecommendThemeTag.CategoryCode[] categoryCodes = theme.getCategoryCodes();
+        if (categoryCodes.length > 0) {
+            // 분류코드(cat1/cat2/cat3)가 있는 태그는 정밀 조회를 우선 사용 - "사찰"/"온천" 같은 카테고리는
+            // 실제 상호명에 그 단어가 안 들어가 키워드 검색만으론 정확도가 낮다.
+            Integer primaryType = theme.getContentTypeIds().length > 0 ? theme.getContentTypeIds()[0] : null;
+            for (RecommendThemeTag.CategoryCode code : categoryCodes) {
+                calls.add(korServiceClient
+                        .areaBasedList(primaryType, code.cat1(), code.cat2(), code.cat3(),
+                                region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                        .map(items -> mapKorItems(items, theme.getLabel()))
+                        .onErrorReturn(List.of()));
+            }
+        } else {
+            for (int typeId : theme.getContentTypeIds()) {
+                calls.add(korServiceClient
+                        .areaBasedList(typeId, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                        .map(items -> mapKorItems(items, theme.getLabel()))
+                        .onErrorReturn(List.of()));
+            }
         }
         // 키워드 검색: 사용자 검색어 우선, 없으면 테마 기본 키워드 상위 3개
         List<String> searchWords = new ArrayList<>();

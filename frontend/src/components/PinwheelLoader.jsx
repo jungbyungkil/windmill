@@ -18,7 +18,7 @@ export default function PinwheelLoader({ message = '동선을 찾고 있어요..
         </g>
         <circle className="pinwheel-loading-hub" cx="100" cy="100" r="10" />
       </svg>
-      <p className="pinwheel-loading-message">{message}</p>
+      <p className="pinwheel-loading-message" key={message}>{message}</p>
     </div>
   );
 }

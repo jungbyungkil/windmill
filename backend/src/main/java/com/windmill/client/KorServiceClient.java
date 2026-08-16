@@ -39,6 +39,19 @@ public class KorServiceClient {
     /** 지역기반 관광정보 목록 조회 (areaBasedList2) */
     public Mono<List<JsonNode>> areaBasedList(Integer contentTypeId, String lDongRegnCd, String lDongSignguCd,
                                                int numOfRows, int pageNo, String arrange) {
+        return areaBasedList(contentTypeId, null, null, null, lDongRegnCd, lDongSignguCd, numOfRows, pageNo, arrange);
+    }
+
+    /**
+     * 지역기반 관광정보 목록 조회 (areaBasedList2) - cat1/cat2/cat3(대/중/소분류)까지 지정하는 버전.
+     * "사찰"/"온천"처럼 실제 상호명에 그 단어가 안 들어가는 카테고리는 키워드 검색만으론 정확도가
+     * 낮아(2026-08-16 라이브 확인 - "사찰" 키워드 검색은 종로구에서 엉뚱한 결과 1건뿐이었는데,
+     * cat3=A02010800(사찰) 코드로 조회하니 조계사 등 실제 사찰 5곳이 정확히 나옴) 공식 분류 코드로
+     * 좁혀 조회할 수 있게 별도 오버로드로 추가했다.
+     */
+    public Mono<List<JsonNode>> areaBasedList(Integer contentTypeId, String cat1, String cat2, String cat3,
+                                               String lDongRegnCd, String lDongSignguCd,
+                                               int numOfRows, int pageNo, String arrange) {
         return webClient.get()
                 .uri(uriBuilder -> {
                     uriBuilder.path("/areaBasedList2")
@@ -51,6 +64,15 @@ public class KorServiceClient {
                             .queryParam("arrange", arrange == null ? "C" : arrange);
                     if (contentTypeId != null) {
                         uriBuilder.queryParam("contentTypeId", contentTypeId);
+                    }
+                    if (cat1 != null) {
+                        uriBuilder.queryParam("cat1", cat1);
+                    }
+                    if (cat2 != null) {
+                        uriBuilder.queryParam("cat2", cat2);
+                    }
+                    if (cat3 != null) {
+                        uriBuilder.queryParam("cat3", cat3);
                     }
                     if (lDongRegnCd != null) {
                         uriBuilder.queryParam("lDongRegnCd", lDongRegnCd);

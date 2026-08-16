@@ -97,8 +97,8 @@ public class SmartPlanService {
                     List<String> attractionTags = familyPace
                             ? List.of("#실내", "#자연", "#아이동반")
                             : List.of("#실내", "#자연", "#역사");
-                    RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags);
-                    RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"));
+                    RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags, true);
+                    RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"), true);
 
                     return Mono.zip(
                                     recommendationPipeline.recommend(attractionReq).onErrorReturn(List.of()),
@@ -287,6 +287,19 @@ public class SmartPlanService {
     private RecommendationRequest buildRequest(Itinerary itinerary,
                                                  RecommendationRequest.AvoidanceHint avoid,
                                                  List<String> tags) {
+        return buildRequest(itinerary, avoid, tags, false);
+    }
+
+    /**
+     * @param skipLlm 표준 4단계 일정(buildStandardDayPlan) 전용 - LLM 태그·문장 생성(Stage4)이
+     *                전체 생성 시간의 상당 부분을 차지해(2026-08-16 실측 약 9초/파이프라인) 첫 화면
+     *                "당일치기 시작하기"가 오래 걸린다는 사용자 피드백으로 건너뛰게 함. 순위 결정에는
+     *                관여하지 않는 단계라 어떤 장소가 뽑히는지는 동일하다.
+     */
+    private RecommendationRequest buildRequest(Itinerary itinerary,
+                                                 RecommendationRequest.AvoidanceHint avoid,
+                                                 List<String> tags,
+                                                 boolean skipLlm) {
         List<String> excludeContentIds = itinerary.getItems().stream()
                 .map(ItineraryItem::getContentId)
                 .filter(id -> id != null && !id.isBlank())
@@ -308,6 +321,7 @@ public class SmartPlanService {
                 .avoidanceHint(avoid)
                 .originContentId(origin == null ? null : origin.getContentId())
                 .originContentTypeId(origin == null ? null : origin.getContentTypeId())
+                .skipLlm(skipLlm)
                 .build();
     }
 
