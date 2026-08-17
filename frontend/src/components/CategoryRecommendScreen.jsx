@@ -20,6 +20,7 @@ function isIconGridCategory(group) {
 export default function CategoryRecommendScreen({
   regionCode,
   excludeContentIds = [],
+  childAges = [],
   onAdd,
   onContinue,
   onTryAi,
@@ -35,7 +36,7 @@ export default function CategoryRecommendScreen({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api.getCategoryRecommendations({ regionCode, excludeContentIds })
+    api.getCategoryRecommendations({ regionCode, excludeContentIds, childAges })
       .then((data) => {
         if (cancelled) return;
         setGroups(data);

@@ -35,32 +35,46 @@ public class CategoryRecommendationService {
 
     private static final int MIN_PER_CATEGORY = 3;
     private static final int TARGET_PER_CATEGORY = 6;
+    /** TourAPI 표준분류 소분류 코드 - 음식점 "일식"(사시미/스시 위주). 라이브 확인(2026-08-17, 강수사=참치·광어
+     *  사시미 전문점, kidsfacility="0")으로 자녀 동반 여행에 그대로 1순위로 추천되던 문제의 원인이었음.
+     *  하드 필터가 아니라 순위만 뒤로 미룬다(다른 Ranking류와 동일 원칙) - 돈까스·우동처럼 일식이어도
+     *  아이가 먹을 수 있는 곳이 섞여 있어 완전히 제외하면 오히려 손해라서.*/
+    private static final String RAW_FISH_CUISINE_CODE = "A05020300";
 
     private final TourAttractionService tourAttractionService;
     private final RegionCodeService regionCodeService;
     private final TriggerScheduler triggerScheduler;
 
-    public Mono<List<CategoryPlaceGroup>> recommendByCategory(String regionCode, Set<String> excludeContentIds) {
+    public Mono<List<CategoryPlaceGroup>> recommendByCategory(String regionCode, Set<String> excludeContentIds,
+                                                                List<Integer> childAges) {
         RegionCode region = regionCodeService.find(regionCode)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + regionCode));
         Set<String> exclude = excludeContentIds == null ? Set.of() : excludeContentIds;
+        boolean hasChildren = childAges != null && !childAges.isEmpty();
 
         return triggerScheduler.ensureFresh(region)
                 .onErrorReturn(RegionCondition.builder().crowdRateByPlaceName(Map.of()).build())
                 .flatMap(condition -> Flux.fromArray(PlaceCategory.values())
-                        .concatMap(category -> buildGroup(category, region, condition, exclude))
+                        .concatMap(category -> buildGroup(category, region, condition, exclude, hasChildren))
                         .collectList());
     }
 
     private Mono<CategoryPlaceGroup> buildGroup(PlaceCategory category, RegionCode region,
-                                                  RegionCondition condition, Set<String> exclude) {
+                                                  RegionCondition condition, Set<String> exclude, boolean hasChildren) {
         return fetchCandidates(category, region)
                 .map(summaries -> {
+                    Map<String, String> cat3ByContentId = summaries.stream()
+                            .filter(s -> s.getContentId() != null)
+                            .collect(Collectors.toMap(TourAttractionSummary::getContentId,
+                                    s -> s.getCat3() == null ? "" : s.getCat3(), (a, b) -> a));
+                    Comparator<RecommendationCandidate> comparator =
+                            restaurantAwareComparator(category, hasChildren, cat3ByContentId);
+
                     List<RecommendationCandidate> places = summaries.stream()
                             .filter(s -> s.getContentId() != null && !exclude.contains(s.getContentId()))
                             .filter(s -> matchesCategory(category, s))
                             .map(s -> toCandidate(s, category, condition))
-                            .sorted(visitorPriorityComparator())
+                            .sorted(comparator)
                             .limit(TARGET_PER_CATEGORY)
                             .collect(Collectors.toCollection(ArrayList::new));
 
@@ -74,7 +88,7 @@ public class CategoryRecommendationService {
                                 .filter(s -> !already.contains(s.getContentId()))
                                 .filter(s -> !shouldExcludeTitle(category, s.getTitle()))
                                 .map(s -> toCandidate(s, category, condition))
-                                .sorted(visitorPriorityComparator())
+                                .sorted(comparator)
                                 .forEach(c -> {
                                     if (places.size() < MIN_PER_CATEGORY) {
                                         places.add(c);
@@ -221,6 +235,19 @@ public class CategoryRecommendationService {
             return placeName + " · 여유율 " + Math.round(100 - crowdRate) + "% " + category.getSubLabel();
         }
         return category.getSubLabel() + "으로 추천하는 " + placeName;
+    }
+
+    /** 자녀 동반 여행이면 음식점만 일식(사시미 위주) 순위를 뒤로 미룬 뒤 기존 방문자 우선순위를 적용 */
+    private Comparator<RecommendationCandidate> restaurantAwareComparator(PlaceCategory category, boolean hasChildren,
+                                                                            Map<String, String> cat3ByContentId) {
+        Comparator<RecommendationCandidate> base = visitorPriorityComparator();
+        if (category != PlaceCategory.RESTAURANT || !hasChildren) {
+            return base;
+        }
+        return Comparator
+                .comparingInt((RecommendationCandidate c) ->
+                        RAW_FISH_CUISINE_CODE.equals(cat3ByContentId.get(c.getContentId())) ? 1 : 0)
+                .thenComparing(base);
     }
 
     /** 방문자(집중률) 낮은 순 = 여유로운 곳 우선 → 썸네일 있는 곳 → 이름 */

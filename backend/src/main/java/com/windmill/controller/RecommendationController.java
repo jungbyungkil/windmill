@@ -35,9 +35,10 @@ public class RecommendationController {
     @GetMapping("/by-category")
     public Mono<ResponseEntity<List<CategoryPlaceGroup>>> byCategory(
             @RequestParam String regionCode,
-            @RequestParam(required = false) List<String> excludeContentIds) {
+            @RequestParam(required = false) List<String> excludeContentIds,
+            @RequestParam(required = false) List<Integer> childAges) {
         Set<String> exclude = excludeContentIds == null ? Set.of() : new HashSet<>(excludeContentIds);
-        return categoryRecommendationService.recommendByCategory(regionCode, exclude)
+        return categoryRecommendationService.recommendByCategory(regionCode, exclude, childAges)
                 .map(ResponseEntity::ok);
     }
 

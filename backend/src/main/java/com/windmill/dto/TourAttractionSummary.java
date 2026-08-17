@@ -17,6 +17,8 @@ public class TourAttractionSummary {
     private String firstImage;
     private String firstImage2;
     private String tel;
+    /** TourAPI 표준분류 소분류 코드(예: 음식점 "A05020300"=일식) - 가족(자녀 동반) 음식점 순위 보정용 */
+    private String cat3;
 
     public static TourAttractionSummary fromJson(JsonNode node) {
         return TourAttractionSummary.builder()
@@ -30,6 +32,7 @@ public class TourAttractionSummary {
                 .firstImage(node.path("firstimage").asText(null))
                 .firstImage2(node.path("firstimage2").asText(null))
                 .tel(node.path("tel").asText(null))
+                .cat3(node.path("cat3").asText(null))
                 .build();
     }
 }

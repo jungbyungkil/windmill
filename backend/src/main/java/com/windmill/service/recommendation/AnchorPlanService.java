@@ -88,7 +88,7 @@ public class AnchorPlanService {
         Mono<List<RecommendationCandidate>> relatedMono = recommendationPipeline.recommend(relatedReq)
                 .onErrorReturn(List.of());
         Mono<List<CategoryPlaceGroup>> categoryMono = categoryRecommendationService
-                .recommendByCategory(itinerary.getSignguFullCode(), used)
+                .recommendByCategory(itinerary.getSignguFullCode(), used, itinerary.getChildAges())
                 .onErrorReturn(List.of());
 
         return Mono.zip(relatedMono, categoryMono)

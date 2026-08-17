@@ -149,9 +149,10 @@ export function getAnchorPlan(itineraryId, { anchor, anchorTime } = {}) {
   });
 }
 
-/** 카테고리별 장소 추천 (식당/박물관/키즈카페/카페) - 방문자(집중률) 우선 */
-export function getCategoryRecommendations({ regionCode, excludeContentIds } = {}) {
-  return request(`/recommendations/by-category${qs({ regionCode, excludeContentIds })}`);
+/** 카테고리별 장소 추천 (식당/박물관/키즈카페/카페) - 방문자(집중률) 우선.
+ * childAges를 넘기면 음식점 카테고리에서 일식(사시미 위주) 순위가 뒤로 밀린다. */
+export function getCategoryRecommendations({ regionCode, excludeContentIds, childAges } = {}) {
+  return request(`/recommendations/by-category${qs({ regionCode, excludeContentIds, childAges })}`);
 }
 
 export function getWeather(nx, ny) {

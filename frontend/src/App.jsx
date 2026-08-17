@@ -1071,6 +1071,7 @@ export default function App() {
               <CategoryRecommendScreen
                 regionCode={itinerary.signguFullCode}
                 excludeContentIds={itinerary.items.map((i) => i.contentId).filter(Boolean)}
+                childAges={itinerary.childAges}
                 onAdd={async (place) => {
                   setAddingContentId(place.contentId);
                   try {
