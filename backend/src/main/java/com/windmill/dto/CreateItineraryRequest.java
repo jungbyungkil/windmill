@@ -4,6 +4,7 @@ import com.windmill.domain.AgeGroup;
 import com.windmill.domain.CompanionType;
 import com.windmill.util.KoreaClock;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -30,6 +31,9 @@ public class CreateItineraryRequest {
     private AgeGroup adultAgeGroup;
     /** 동반 자녀 만 나이(0~17) 목록 - 자녀 없으면 빈 리스트/null */
     private List<Integer> childAges;
+    /** 전체 인원수 - 슬롯별/전체 예상 비용 합산 기준. 미지정(null) 시 서비스에서 1명으로 처리 */
+    @Min(value = 1, message = "인원수는 1명 이상이어야 합니다.")
+    private Integer partySize;
     /** true면 같은 날짜의 기존 진행 중 일정을 덮어쓰기(삭제 후 신규 생성) 확인한 것으로 간주 */
     private boolean force;
 

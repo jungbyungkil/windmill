@@ -246,4 +246,32 @@ class BusinessHoursEvaluatorTest {
         String rest = "매주 월요일 (단, 월요일이 공휴일인 경우 다음날 휴관)";
         assertTrue(BusinessHoursEvaluator.isClosedOnRestDate(rest, LocalDate.of(2026, 8, 17)));
     }
+
+    @Test
+    void extractCostAmount_free_returnsZero() {
+        assertEquals(0, BusinessHoursEvaluator.extractCostAmount("무료"));
+    }
+
+    @Test
+    void extractCostAmount_singleAmount_returnsThatAmount() {
+        assertEquals(5000, BusinessHoursEvaluator.extractCostAmount("성인 5,000원"));
+    }
+
+    @Test
+    void extractCostAmount_multipleTiers_prefersAdultLabel() {
+        assertEquals(5000, BusinessHoursEvaluator.extractCostAmount("청소년 3,000원 / 성인 5,000원"));
+        assertEquals(5000, BusinessHoursEvaluator.extractCostAmount("어른 5,000원, 학생 3,000원"));
+    }
+
+    @Test
+    void extractCostAmount_noAdultLabel_fallsBackToFirstAmount() {
+        assertEquals(3000, BusinessHoursEvaluator.extractCostAmount("1인 3,000원"));
+    }
+
+    @Test
+    void extractCostAmount_noAmountFound_returnsNull() {
+        assertNull(BusinessHoursEvaluator.extractCostAmount("별도 문의"));
+        assertNull(BusinessHoursEvaluator.extractCostAmount(null));
+        assertNull(BusinessHoursEvaluator.extractCostAmount(""));
+    }
 }

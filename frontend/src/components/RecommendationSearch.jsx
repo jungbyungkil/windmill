@@ -1,20 +1,26 @@
 import { useState } from 'react';
 import RecommendationCard from './RecommendationCard';
 import TrustBadge from './TrustBadge';
-import { TAG_OPTIONS } from '../constants';
+import TagGroupPicker from './TagGroupPicker';
+import { BUDGET_OPTIONS } from '../constants';
 
 export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId, pinnedPlaceName }) {
   const [query, setQuery] = useState('');
   const [tags, setTags] = useState([]);
   const [freeOnly, setFreeOnly] = useState(false);
+  const [budget, setBudget] = useState(null);
 
   function toggleTag(tag) {
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
   }
 
+  function toggleBudget(value) {
+    setBudget((prev) => (prev === value ? null : value));
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
-    onSearch({ query, tags });
+    onSearch({ query, tags, maxBudgetPerPerson: budget });
   }
 
   const visibleResults = freeOnly ? (results || []).filter((c) => c.isFree) : results;
@@ -36,17 +42,21 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="reco-tag-row">
-          {TAG_OPTIONS.map((tag) => (
-            <button
-              type="button"
-              key={tag}
-              className={`tag ${tags.includes(tag) ? 'selected' : ''}`}
-              onClick={() => toggleTag(tag)}
-            >
-              {tag}
-            </button>
-          ))}
+        <TagGroupPicker selected={tags} onToggle={toggleTag} />
+        <div className="reco-budget-row">
+          <span className="reco-budget-label">💰 예산(1인 기준)</span>
+          <div className="reco-tag-row">
+            {BUDGET_OPTIONS.map((opt) => (
+              <button
+                type="button"
+                key={opt.value}
+                className={`tag ${budget === opt.value ? 'selected' : ''}`}
+                onClick={() => toggleBudget(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
         <label className="trip-form-checkbox reco-free-filter">
           <input type="checkbox" checked={freeOnly} onChange={(e) => setFreeOnly(e.target.checked)} />

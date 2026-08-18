@@ -214,6 +214,20 @@ export default function App() {
     : [];
   const pinnedOrigin = itinerary ? pinnedOriginItem(itinerary.items) : null;
 
+  // 슬롯별 예상 비용(1인 기준 × 인원수) 합산 - 정보없음 항목은 합계에서 빼고 별도로 안내한다(0원과 구분)
+  const costSummary = visibleItems.reduce(
+    (acc, item) => {
+      if (item.estimatedCostPerPerson === null || item.estimatedCostPerPerson === undefined) {
+        acc.unknownCount += 1;
+      } else {
+        acc.total += item.estimatedCostPerPerson * (itinerary?.partySize || 1);
+        acc.hasKnown = true;
+      }
+      return acc;
+    },
+    { total: 0, unknownCount: 0, hasKnown: false },
+  );
+
   const refreshTrigger = useCallback(async () => {
     if (!itineraryId) return;
     const origin = await getCurrentPositionSafe();
@@ -301,6 +315,7 @@ export default function App() {
           tel: stop.tel,
           useFeeText: stop.useFeeText,
           isFree: stop.isFree,
+          estimatedCostPerPerson: stop.estimatedCostPerPerson,
           restDateText: stop.restDateText,
           closeTime: stop.closeTime,
           useTimeText: stop.useTimeText,
@@ -360,6 +375,7 @@ export default function App() {
           tel: stop.tel,
           useFeeText: stop.useFeeText,
           isFree: stop.isFree,
+          estimatedCostPerPerson: stop.estimatedCostPerPerson,
           restDateText: stop.restDateText,
           closeTime: stop.closeTime,
           useTimeText: stop.useTimeText,
@@ -446,7 +462,7 @@ export default function App() {
     setItinerary(result);
   }
 
-  async function handleSearch({ query, tags }) {
+  async function handleSearch({ query, tags, maxBudgetPerPerson }) {
     setRecoLoading(true);
     try {
       const excludeContentIds = itinerary.items.map((i) => i.contentId).filter(Boolean);
@@ -462,6 +478,7 @@ export default function App() {
         childAges: itinerary.childAges,
         query,
         tags,
+        maxBudgetPerPerson,
         excludeContentIds,
         originContentId: originItem?.contentId,
         originContentTypeId: originItem?.contentTypeId,
@@ -496,6 +513,7 @@ export default function App() {
       tel: candidate.tel,
       useFeeText: candidate.useFeeText,
       isFree: candidate.isFree,
+      estimatedCostPerPerson: candidate.estimatedCostPerPerson,
       restDateText: candidate.restDateText,
       closeTime: candidate.closeTime,
       useTimeText: candidate.useTimeText,
@@ -599,6 +617,7 @@ export default function App() {
               tel: candidate.tel,
               useFeeText: candidate.useFeeText,
               isFree: candidate.isFree,
+              estimatedCostPerPerson: candidate.estimatedCostPerPerson,
               restDateText: candidate.restDateText,
               closeTime: candidate.closeTime,
               useTimeText: candidate.useTimeText,
@@ -699,6 +718,7 @@ export default function App() {
           tel: next.tel,
           useFeeText: next.useFeeText,
           isFree: next.isFree,
+          estimatedCostPerPerson: next.estimatedCostPerPerson,
           restDateText: next.restDateText,
           homepageUrl: next.homepageUrl,
           strollerFriendly: next.strollerFriendly,
@@ -1149,6 +1169,12 @@ export default function App() {
                 <div className="daytrip-chip-row">
                   <span className="daytrip-chip">당일치기</span>
                   {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
+                  {visibleItems.length > 0 && (
+                    <span className="daytrip-cost" title={costSummary.unknownCount > 0 ? `정보없음 ${costSummary.unknownCount}곳 제외` : undefined}>
+                      💰 Σ {costSummary.total.toLocaleString()}원
+                      {costSummary.unknownCount > 0 && ` (정보없음 ${costSummary.unknownCount}곳 제외)`}
+                    </span>
+                  )}
                   <span className="daytrip-count">{visibleItems.length}곳</span>
                 </div>
 

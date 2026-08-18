@@ -54,11 +54,11 @@ export async function getPublicConfig() {
   return publicConfigCache;
 }
 
-export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, adultAgeGroup, childAges, force }) {
+export function createItinerary(sessionId, { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, adultAgeGroup, childAges, partySize, force }) {
   return request('/itineraries', {
     method: 'POST',
     sessionId,
-    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, adultAgeGroup, childAges, force },
+    body: { signguFullCode, startDate, endDate, companionType, withPet, strollerFriendly, accessibleFriendly, adultAgeGroup, childAges, partySize, force },
   });
 }
 
@@ -123,8 +123,8 @@ export function getSmartPlan(itineraryId, { placeCount, date, standard } = {}) {
   return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date, standard })}`);
 }
 
-export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId } = {}) {
-  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId })}`);
+export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId, maxBudgetPerPerson } = {}) {
+  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId, maxBudgetPerPerson })}`);
 }
 
 /** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(카카오맵 검색과 동일한 결과). 앵커 등록에도 재사용.

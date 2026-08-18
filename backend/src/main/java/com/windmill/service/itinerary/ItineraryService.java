@@ -86,6 +86,7 @@ public class ItineraryService {
                 .accessibleFriendly(request.isAccessibleFriendly())
                 .adultAgeGroup(request.getAdultAgeGroup())
                 .childAges(request.getChildAges() == null ? new ArrayList<>() : new ArrayList<>(request.getChildAges()))
+                .partySize(request.getPartySize() != null ? request.getPartySize() : 1)
                 .build();
         return itineraryRepository.save(itinerary);
     }
@@ -128,6 +129,7 @@ public class ItineraryService {
                 .accessibleFriendly(source.isAccessibleFriendly())
                 .adultAgeGroup(source.getAdultAgeGroup())
                 .childAges(source.getChildAges() == null ? new ArrayList<>() : new ArrayList<>(source.getChildAges()))
+                .partySize(source.getPartySize())
                 .build();
 
         List<ItineraryItem> ordered = source.getItems().stream()
@@ -153,6 +155,7 @@ public class ItineraryService {
                     .tel(src.getTel())
                     .useFeeText(src.getUseFeeText())
                     .isFree(src.getIsFree())
+                    .estimatedCostPerPerson(src.getEstimatedCostPerPerson())
                     .restDateText(src.getRestDateText())
                     .closeTime(src.getCloseTime())
                     .useTimeText(src.getUseTimeText())
@@ -280,6 +283,7 @@ public class ItineraryService {
                 .tel(request.getTel())
                 .useFeeText(request.getUseFeeText())
                 .isFree(request.getIsFree())
+                .estimatedCostPerPerson(request.getEstimatedCostPerPerson())
                 .restDateText(request.getRestDateText())
                 .closeTime(request.getCloseTime())
                 .useTimeText(request.getUseTimeText())
@@ -471,6 +475,12 @@ public class ItineraryService {
         }
         if (request.getIsFree() != null) {
             item.setIsFree(request.getIsFree());
+            if (Boolean.TRUE.equals(request.getIsFree())) {
+                item.setEstimatedCostPerPerson(0);
+            }
+        }
+        if (request.getEstimatedCostPerPerson() != null) {
+            item.setEstimatedCostPerPerson(request.getEstimatedCostPerPerson());
         }
         if (request.getRestDateText() != null) {
             item.setRestDateText(request.getRestDateText().isBlank() ? null : request.getRestDateText().trim());

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TAG_OPTIONS } from '../constants';
+import TagGroupPicker from './TagGroupPicker';
 
 export default function AutoPlanScreen({ onGenerate, onConfirm, onSkip }) {
   const [tags, setTags] = useState([]);
@@ -50,18 +50,7 @@ export default function AutoPlanScreen({ onGenerate, onConfirm, onSkip }) {
         <h2 className="section-title">AI가 일정을 짜드릴까요?</h2>
         <p className="auto-plan-desc">관심사를 골라주시면 실제 속초 관광지 중에서 하루 코스를 추천해드려요.</p>
 
-        <div className="reco-tag-row">
-          {TAG_OPTIONS.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              className={`tag ${tags.includes(tag) ? 'selected' : ''}`}
-              onClick={() => toggleTag(tag)}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
+        <TagGroupPicker selected={tags} onToggle={toggleTag} />
 
         <button className="btn-primary" onClick={handleGenerate} disabled={generating}>
           {generating ? 'AI가 일정 짜는 중...' : '🪄 AI가 일정 짜주기'}

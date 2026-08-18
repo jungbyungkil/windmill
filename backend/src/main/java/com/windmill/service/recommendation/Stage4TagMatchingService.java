@@ -175,6 +175,7 @@ public class Stage4TagMatchingService {
                 .tel(c.getTel())
                 .isFree(c.getIsFree())
                 .useFeeText(c.getUseFeeText())
+                .estimatedCostPerPerson(c.getEstimatedCostPerPerson())
                 .restDateText(c.getRestDateText())
                 .closeTime(c.getCloseTime())
                 .useTimeText(c.getUseTimeText())

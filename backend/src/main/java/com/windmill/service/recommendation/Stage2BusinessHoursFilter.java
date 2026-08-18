@@ -68,6 +68,7 @@ public class Stage2BusinessHoursFilter {
         String useFeeText = BusinessHoursEvaluator.extractUseFeeText(detail.getIntroFields());
         candidate.setUseFeeText(useFeeText);
         candidate.setIsFree(BusinessHoursEvaluator.isFree(useFeeText));
+        candidate.setEstimatedCostPerPerson(BusinessHoursEvaluator.extractCostAmount(useFeeText));
         candidate.setRestDateText(BusinessHoursEvaluator.extractRestDateText(detail.getIntroFields()));
         candidate.setTel(BusinessHoursEvaluator.extractPhone(detail.getTel(), detail.getIntroFields()));
 

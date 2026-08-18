@@ -52,6 +52,8 @@ public class ItineraryItem {
     private String tel;
     private String useFeeText;
     private Boolean isFree;
+    /** useFeeText로 추정한 1인 기준 예상 비용(원) - 모르면 null("무료"인 0원과 구분) */
+    private Integer estimatedCostPerPerson;
     private String restDateText;
 
     /** TourAPI usetime 파싱 스냅샷 "HH:mm" — 선택 시 마감 게이트에 사용 */

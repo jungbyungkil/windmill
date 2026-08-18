@@ -42,7 +42,14 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         {(candidate.isFree || candidate.useFeeText) && (
           <div className="reco-info-row">🎫 {candidate.isFree ? '무료' : candidate.useFeeText}</div>
         )}
-        {candidate.tel && <div className="reco-info-row">☎️ {candidate.tel}</div>}
+        {candidate.estimatedCostPerPerson !== null && candidate.estimatedCostPerPerson !== undefined && (
+          <div className="reco-info-row">
+            💰 {candidate.estimatedCostPerPerson === 0 ? '무료' : `1인 ${candidate.estimatedCostPerPerson.toLocaleString()}원`}
+          </div>
+        )}
+        {candidate.tel && (
+          <a className="reco-info-row reco-info-link" href={`tel:${candidate.tel}`}>☎️ {candidate.tel}</a>
+        )}
         {candidate.strollerFriendly === true && <div className="reco-info-row">🍼 유모차 이용 가능</div>}
         {candidate.accessibleFriendly && <div className="reco-info-row">♿ 무장애 시설</div>}
         {candidate.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {candidate.restDateText}</div>}

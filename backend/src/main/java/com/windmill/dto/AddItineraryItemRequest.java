@@ -23,6 +23,7 @@ public class AddItineraryItemRequest {
     private String tel;
     private String useFeeText;
     private Boolean isFree;
+    private Integer estimatedCostPerPerson;
     private String restDateText;
     /** "HH:mm" 영업 종료 스냅샷 */
     private String closeTime;

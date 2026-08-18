@@ -20,6 +20,7 @@ public class UpdateItineraryItemRequest {
     private String tel;
     private String useFeeText;
     private Boolean isFree;
+    private Integer estimatedCostPerPerson;
     private String restDateText;
     private String category;
 }

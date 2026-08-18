@@ -98,6 +98,7 @@ public class RecommendationPipeline {
                 })
                 .map(list -> list.stream()
                         .filter(c -> !excludeNames.contains(c.getPlaceName()))
+                        .filter(c -> withinBudget(c, request.getMaxBudgetPerPerson()))
                         .collect(Collectors.toList()))
                 .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint(), request.getChildAges()))
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
@@ -172,6 +173,7 @@ public class RecommendationPipeline {
                 .tel(c.getTel())
                 .isFree(c.getIsFree())
                 .useFeeText(c.getUseFeeText())
+                .estimatedCostPerPerson(c.getEstimatedCostPerPerson())
                 .restDateText(c.getRestDateText())
                 .closeTime(c.getCloseTime())
                 .useTimeText(c.getUseTimeText())
@@ -250,6 +252,20 @@ public class RecommendationPipeline {
             }
         }
         return false;
+    }
+
+    /**
+     * 예산 필터(1인 기준, 이하만 통과) - Stage1~4에서는 걸러내지 않고 후보 풀을 그대로 유지하다가
+     * (유모차 필터가 AccessibilityRanking에서 속성만 참고하고 후보를 안 줄이는 것과 같은 이유 -
+     * 앞 단계 랭킹/LLM이 온전한 풀을 보고 판단하게 하기 위함) 최종 목록에서만 실제로 제거한다.
+     * estimatedCostPerPerson이 null(정보없음)이면 "비싸다"고 단정하지 않고 통과시킨다.
+     */
+    private static boolean withinBudget(RecommendationCandidate c, Integer maxBudgetPerPerson) {
+        if (maxBudgetPerPerson == null) {
+            return true;
+        }
+        Integer cost = c.getEstimatedCostPerPerson();
+        return cost == null || cost <= maxBudgetPerPerson;
     }
 
     /** #맛집 태그 또는 식당/맛집/레스토랑 등 검색어면 음식점 전용 Stage1 경로 */

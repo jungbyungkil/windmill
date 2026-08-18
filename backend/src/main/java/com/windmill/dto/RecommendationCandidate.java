@@ -26,6 +26,7 @@ public class RecommendationCandidate {
     private String tel;
     private Boolean isFree;         // 무료 여부 추정, 모르면 null(단정하지 않음)
     private String useFeeText;      // 이용요금 원문 텍스트
+    private Integer estimatedCostPerPerson; // 1인 기준 예상 비용(원) 추정, 모르면 null(단정하지 않음)
     private String restDateText;    // 정기휴무 원문 텍스트
     /** "HH:mm" 영업 종료. 선택 게이트·카드 표시용 */
     private String closeTime;

@@ -47,6 +47,7 @@ export default function CreateTripScreen({
   const [tripDate, setTripDate] = useState(todayIso());
   const [dateTouched, setDateTouched] = useState(false);
   const [companionType, setCompanionType] = useState('SOLO');
+  const [partySize, setPartySize] = useState(1);
   const [adultAgeGroup, setAdultAgeGroup] = useState('THIRTIES');
   const [childAges, setChildAges] = useState([]);
   const [withPet, setWithPet] = useState(false);
@@ -159,6 +160,7 @@ export default function CreateTripScreen({
       startDate: tripDate,
       endDate: tripDate,
       companionType,
+      partySize,
       withPet,
       strollerFriendly,
       accessibleFriendly,
@@ -323,6 +325,20 @@ export default function CreateTripScreen({
               </button>
             ))}
           </div>
+          <label className="trip-form-party-size">
+            총 인원수
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={partySize}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                setPartySize(Number.isNaN(n) || n < 1 ? 1 : n);
+              }}
+            />
+            <span className="trip-form-hint-inline">명 - 슬롯별/전체 예상 비용 계산에 쓰여요</span>
+          </label>
           <label className="trip-form-checkbox">
             <input type="checkbox" checked={withPet} onChange={(e) => setWithPet(e.target.checked)} />
             🐾 반려동물과 함께해요

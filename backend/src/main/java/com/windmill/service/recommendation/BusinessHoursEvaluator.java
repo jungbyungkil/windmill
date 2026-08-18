@@ -27,6 +27,9 @@ public final class BusinessHoursEvaluator {
             "restdate", "restdateculture", "restdateshopping", "restdatefood", "restdateleports");
     private static final List<String> USEFEE_FIELDS = List.of(
             "usefee", "usefeeculture", "usefeeleports", "usefeefestival");
+    /** "성인 5,000원", "어른 5,000원 / 청소년 3,000원" 같은 표기에서 라벨+금액을 뽑는다 */
+    private static final Pattern COST_AMOUNT = Pattern.compile("([가-힣]*)\\s*(\\d[,\\d]*)\\s*원");
+    private static final List<String> ADULT_FEE_LABELS = List.of("성인", "어른", "대인");
     private static final List<String> PHONE_FIELDS = List.of(
             "infocenter", "infocenterculture", "infocenterleports", "infocenterfood", "infocenterfestival", "infocenterlodging");
     /** detailIntro2 유모차 대여정보 필드(contentType별 접미사) - 자유텍스트("가능"/"불가능"/공란 등) */
@@ -405,6 +408,37 @@ public final class BusinessHoursEvaluator {
             return false;
         }
         return null;
+    }
+
+    /**
+     * useFeeText에서 1인 기준 예상 비용(원)을 추정한다. isFree=true(무료)면 0, "성인"/"어른"/"대인"
+     * 라벨이 붙은 금액이 있으면 그 금액을, 없으면 텍스트에서 처음 찾은 금액을 쓴다. 금액 패턴을 하나도
+     * 못 찾으면(예: "별도 문의", 원문 자체가 없음) null - "무료"(0원)와 구분해야 하므로 0으로 단정하지 않는다.
+     */
+    public static Integer extractCostAmount(String useFeeText) {
+        if (Boolean.TRUE.equals(isFree(useFeeText))) {
+            return 0;
+        }
+        if (useFeeText == null || useFeeText.isBlank()) {
+            return null;
+        }
+        Matcher m = COST_AMOUNT.matcher(useFeeText);
+        Integer firstAmount = null;
+        while (m.find()) {
+            int amount = parseAmount(m.group(2));
+            if (firstAmount == null) {
+                firstAmount = amount;
+            }
+            String label = m.group(1);
+            if (label != null && ADULT_FEE_LABELS.stream().anyMatch(label::contains)) {
+                return amount;
+            }
+        }
+        return firstAmount;
+    }
+
+    private static int parseAmount(String digits) {
+        return Integer.parseInt(digits.replace(",", ""));
     }
 
     public static String extractPhone(String tel, Map<String, String> introFields) {

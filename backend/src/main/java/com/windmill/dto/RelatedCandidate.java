@@ -27,6 +27,7 @@ public class RelatedCandidate {
     private String mapY;           // 위도(latitude), WGS84
     private String useFeeText;     // 이용요금 원문 텍스트 (예: "무료", "성인 3,000원")
     private Boolean isFree;        // useFeeText로 추정한 무료 여부 - 모르면 null
+    private Integer estimatedCostPerPerson; // useFeeText로 추정한 1인 기준 비용(원) - 모르면 null
     private String restDateText;   // 정기휴무 원문 텍스트 (예: "매주 월요일")
     /** Stage2: "HH:mm" 영업 종료 시각. 파싱 실패 시 null */
     private String closeTime;

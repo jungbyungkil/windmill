@@ -27,6 +27,7 @@ public class ItineraryItemResponse {
     private String tel;
     private String useFeeText;
     private Boolean isFree;
+    private Integer estimatedCostPerPerson;
     private String restDateText;
     private String closeTime;
     private String useTimeText;
@@ -58,6 +59,7 @@ public class ItineraryItemResponse {
                 .tel(item.getTel())
                 .useFeeText(item.getUseFeeText())
                 .isFree(item.getIsFree())
+                .estimatedCostPerPerson(item.getEstimatedCostPerPerson())
                 .restDateText(item.getRestDateText())
                 .closeTime(item.getCloseTime())
                 .useTimeText(item.getUseTimeText())

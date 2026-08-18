@@ -580,6 +580,12 @@
   padding: 3px 10px;
 }
 
+.daytrip-cost {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .trip-form select,
 .trip-form input[type='date'] {
   flex: 1;
@@ -606,6 +612,26 @@
   font-size: 14px;
   color: var(--ink);
   margin-top: 4px;
+}
+
+.trip-form-party-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 10px;
+}
+
+.trip-form-party-size input[type='number'] {
+  width: 60px;
+  padding: 6px 8px;
+  border: 1px solid var(--sand-border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--ink);
 }
 
 .trip-form-child-ages {
@@ -1532,6 +1558,8 @@
   background: transparent;
   font: inherit;
   text-align: left;
+  text-decoration: none;
+  color: inherit;
   cursor: pointer;
 }
 
@@ -1770,6 +1798,77 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.reco-budget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reco-budget-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.tag-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-group {
+  border: 1px solid var(--sand-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--sand-card);
+}
+
+.tag-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-group-header:hover {
+  background: color-mix(in srgb, var(--sea) 6%, transparent);
+}
+
+.tag-group-title {
+  flex: 1;
+}
+
+.tag-group-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--sea);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-group-caret {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tag-group-body {
+  padding: 0 12px 12px;
 }
 
 .reco-grid {
@@ -2778,6 +2877,11 @@
 
 .reco-restdate {
   color: var(--level-warning);
+}
+
+.reco-cost-unknown {
+  font-style: italic;
+  opacity: 0.75;
 }
 
 .reco-close {

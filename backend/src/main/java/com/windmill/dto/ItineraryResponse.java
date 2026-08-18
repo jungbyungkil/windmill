@@ -27,6 +27,8 @@ public class ItineraryResponse {
     private boolean accessibleFriendly;
     private AgeGroup adultAgeGroup;
     private List<Integer> childAges;
+    /** 전체 인원수 - 프론트 예상 총액(Σ) 계산에 쓰임(1인 요금 × partySize) */
+    private int partySize;
     private List<ItineraryItemResponse> items;
     /** 확정된 날짜 목록 - 프론트 일자별 페이지 탭에서 체크표시/다음날 이동 가능 여부 판단에 사용 */
     private Set<LocalDate> confirmedDates;
@@ -59,6 +61,7 @@ public class ItineraryResponse {
                 .accessibleFriendly(itinerary.isAccessibleFriendly())
                 .adultAgeGroup(itinerary.getAdultAgeGroup())
                 .childAges(itinerary.getChildAges())
+                .partySize(itinerary.getPartySize())
                 .items(itinerary.getItems().stream()
                         .sorted(java.util.Comparator
                                 .comparing((com.windmill.domain.ItineraryItem i) -> {
