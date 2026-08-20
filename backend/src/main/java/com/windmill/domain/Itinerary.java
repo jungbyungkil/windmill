@@ -1,5 +1,6 @@
 package com.windmill.domain;
 
+import com.windmill.dto.TriggerLevel;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -115,6 +116,18 @@ public class Itinerary {
     /** 일정 공유용 공개 토큰 - 생성 전까지 null */
     @Column(unique = true, length = 64)
     private String shareToken;
+
+    /** 알림 스케줄러가 직전 틱에서 관측한 바람개비 상태 - 상태 악화(Type3) 즉시 알림의 판정 기준선.
+     *  null이면 아직 비교 대상이 없다는 뜻(첫 관측 틱은 기준선만 세우고 알림은 보내지 않는다). 발송
+     *  여부와 무관하게 매 틱 최신 레벨로 갱신한다 - "WARNING→NORMAL→WARNING"처럼 되돌아온 경우도
+     *  다시 악화로 감지하기 위함. adultAgeGroup과 동일하게 nullable Enum이라 ColumnDefault 불필요. */
+    @Enumerated(EnumType.STRING)
+    private TriggerLevel lastKnownTriggerLevel;
+
+    /** 정기 상태 알림(30분 주기)의 마지막 발송 시각. 같은 일정에 구독(탭/기기)이 여러 개여도
+     *  "발송 대상인가"는 일정 단위로 한 번만 판정하고 대상이면 전체 구독에 팬아웃한다. null이면
+     *  아직 한 번도 안 보낸 상태로 취급해 여행 시작 후 첫 유효 틱에 바로 발송 대상이 된다. */
+    private LocalDateTime lastPeriodicNotifiedAt;
 
     @PrePersist
     void onCreate() {

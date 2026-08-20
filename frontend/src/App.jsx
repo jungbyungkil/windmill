@@ -144,6 +144,31 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // 알림 탭으로 새 탭이 열린 경우 - sw.js가 붙여준 "?open={itineraryId}"를 읽어 그 일정으로 바로 진입
+  useEffect(() => {
+    const openId = new URLSearchParams(window.location.search).get('open');
+    if (!openId) return;
+    resumeDraftItinerary(openId);
+    navigate('/trip');
+    // 새로고침/재진입 시 같은 파라미터로 반복 리다이렉트되지 않도록 정리
+    window.history.replaceState({}, '', window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 알림 탭 시점에 이미 앱 탭이 열려 있던 경우 - sw.js의 notificationclick이 새 탭을 열지 않고
+  // 기존 탭에 postMessage로 딥링크를 알려준다(위 쿼리 파라미터 effect와 동일한 목적지로 라우팅)
+  useEffect(() => {
+    function onMessage(event) {
+      if (event.data?.type !== 'windtrail:notification-click') return;
+      const openId = new URLSearchParams(new URL(event.data.url, window.location.origin).search).get('open');
+      if (!openId) return;
+      resumeDraftItinerary(openId);
+      navigate('/trip');
+    }
+    navigator.serviceWorker?.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+  }, [resumeDraftItinerary, navigate]);
+
   // 사용자가 일정을 연 경우에만 로드. 새로고침/재방문 시 메인 대시보드를 유지한다.
   useEffect(() => {
     if (!itineraryId) {

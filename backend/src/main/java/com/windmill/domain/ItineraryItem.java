@@ -96,4 +96,12 @@ public class ItineraryItem {
     @Builder.Default
     @Column(nullable = false)
     private int displayOrder = 0;
+
+    /** 슬롯 할일 알림("이제 OO로 이동할 시간이에요")을 이미 보냈는지 - 당일치기 한정이라 날짜별
+     *  리셋이 필요 없어 boolean 하나로 충분. ColumnDefault: 이미 행이 있는 테이블에 NOT NULL 컬럼을
+     *  추가할 때 기존 행을 false로 채우기 위함(strollerFriendly·isAlternate와 동일 이유). */
+    @Builder.Default
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean slotNotified = false;
 }

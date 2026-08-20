@@ -22,10 +22,33 @@ self.addEventListener('push', (event) => {
   } catch {
     payload = { title: '바람따라', body: event.data.text() };
   }
+  // FCM 웹푸시는 {notification:{...}, data:{...}} 형태로 실려온다 - notification/data 블록과
+  // 최상위 필드(직접 테스트용 payload) 둘 다 방어적으로 처리한다.
+  const notification = payload.notification || payload;
+  const data = payload.data || payload;
   event.waitUntil(
-    self.registration.showNotification(payload.title || '바람따라', {
-      body: payload.body || '',
+    self.registration.showNotification(notification.title || '바람따라', {
+      body: notification.body || '',
       icon: '/favicon.svg',
+      data: { url: data.url || '/', itineraryId: data.itineraryId || null },
+    }),
+  );
+});
+
+// 알림 탭 - 이미 열린 탭이 있으면 그쪽에 딥링크(url)를 postMessage로 알려 포커스만 하고,
+// 없으면 새 탭을 그 URL로 연다(NotificationSchedulerService가 실어 보낸 "/?open={itineraryId}").
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'windtrail:notification-click', url });
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
     }),
   );
 });

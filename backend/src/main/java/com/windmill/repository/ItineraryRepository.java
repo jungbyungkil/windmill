@@ -48,4 +48,18 @@ public interface ItineraryRepository extends JpaRepository<Itinerary, Long> {
             """)
     List<Itinerary> findActiveBySessionUuidAndStartDate(
             @Param("sessionUuid") String sessionUuid, @Param("startDate") LocalDate startDate);
+
+    /**
+     * 알림 대상 일정 - 오늘(KST)이 여행일이고, 아직 "여행 마무리"(TripRecord)를 하지 않은 모든 세션의
+     * 당일치기. 세션 필터가 없다 - NotificationSchedulerService는 특정 사용자가 아니라 전체를 스캔하는
+     * 백그라운드 잡이기 때문. findOngoingDayTripsBySession과 동일한 NOT EXISTS 패턴 재사용.
+     */
+    @Query("""
+            SELECT i FROM Itinerary i
+            WHERE i.startDate = :today
+              AND NOT EXISTS (
+                SELECT t FROM TripRecord t WHERE t.itinerary = i
+              )
+            """)
+    List<Itinerary> findActiveTodayForNotification(@Param("today") LocalDate today);
 }

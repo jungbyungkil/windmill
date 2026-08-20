@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.util.Base64;
+import java.util.Map;
 
 /**
  * FCM Admin SDK로 서버 → 클라이언트 웹 푸시 발송(brief-web-push-notification.md).
@@ -63,6 +64,15 @@ public class PushSenderService {
 
     /** @return 발송 성공 여부. 미설정/실패해도 예외를 던지지 않는다(호출부 흐름을 막지 않기 위함) */
     public boolean send(String fcmToken, String title, String body) {
+        return send(fcmToken, title, body, Map.of());
+    }
+
+    /**
+     * data는 웹 푸시 클릭 시 딥링크(itineraryId/url)를 sw.js의 notificationclick 핸들러에 전달하기
+     * 위함(NotificationSchedulerService 참고).
+     * @return 발송 성공 여부. 미설정/실패해도 예외를 던지지 않는다(호출부 흐름을 막지 않기 위함)
+     */
+    public boolean send(String fcmToken, String title, String body, Map<String, String> data) {
         FirebaseMessaging fm = messaging();
         if (fm == null || fcmToken == null || fcmToken.isBlank()) {
             return false;
@@ -71,6 +81,7 @@ public class PushSenderService {
             Message message = Message.builder()
                     .setToken(fcmToken)
                     .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+                    .putAllData(data)
                     .build();
             fm.send(message);
             return true;
