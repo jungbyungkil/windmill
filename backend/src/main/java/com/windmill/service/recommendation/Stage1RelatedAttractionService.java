@@ -132,8 +132,10 @@ public class Stage1RelatedAttractionService {
      * 반려동물 동반 시 TarRlteTarService1(연관관광지) 대신 전용 KorPetTourService2를 후보 소스로 쓴다.
      * 이 API 응답은 KorService2와 동일 스키마(contentid/title/firstimage)라 resolveContentIds의
      * 별도 이름매칭 조인이 필요 없다 - contentId가 이미 채워진 채로 반환된다.
+     * public: RecommendationPipeline이 태그 검색 경로(fetchByThemes)에서도 반려동물 후보를 함께
+     * 병합하기 위해 직접 호출한다(2026-08-20 - withPet이 태그 있을 때 완전히 무시되던 버그 수정).
      */
-    private Mono<List<RelatedCandidate>> fetchPetFriendly(RegionCode region, String seedPlaceName) {
+    public Mono<List<RelatedCandidate>> fetchPetFriendly(RegionCode region, String seedPlaceName) {
         Mono<List<JsonNode>> itemsMono = (seedPlaceName == null || seedPlaceName.isBlank())
                 ? petFriendlyAttractionClient.areaBasedList(region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
                 : petFriendlyAttractionClient.searchKeyword(seedPlaceName, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1);

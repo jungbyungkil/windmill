@@ -81,7 +81,6 @@ public class SmartPlanService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + itinerary.getSignguFullCode()));
         LocalDate date = itinerary.getStartDate() != null ? itinerary.getStartDate() : KoreaClock.today();
         CompanionType companion = itinerary.getCompanionType();
-        boolean familyPace = isFamilyPace(companion);
 
         return triggerScheduler.ensureFresh(region)
                 .onErrorReturn(RegionCondition.builder().crowdRateByPlaceName(java.util.Map.of()).build())
@@ -94,9 +93,8 @@ public class SmartPlanService {
                             ? RecommendationRequest.AvoidanceHint.HEAT
                             : rain ? RecommendationRequest.AvoidanceHint.WEATHER : null;
 
-                    List<String> attractionTags = familyPace
-                            ? List.of("#실내", "#자연", "#아이동반")
-                            : List.of("#실내", "#자연", "#역사");
+                    List<String> attractionTags = AttractionThemeSelector.select(
+                            companion, itinerary.getAdultAgeGroup(), itinerary.getChildAges());
                     RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags, true);
                     RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"), true);
 
@@ -230,7 +228,6 @@ public class SmartPlanService {
 
         List<LocalDate> targetDays = resolveDays(itinerary, forDate);
         CompanionType companion = itinerary.getCompanionType();
-        boolean familyPace = isFamilyPace(companion);
 
         return triggerScheduler.ensureFresh(region)
                 .onErrorReturn(RegionCondition.builder().crowdRateByPlaceName(java.util.Map.of()).build())
@@ -247,9 +244,8 @@ public class SmartPlanService {
                         avoid = RecommendationRequest.AvoidanceHint.WEATHER;
                     }
 
-                    List<String> attractionTags = familyPace
-                            ? List.of("#실내", "#자연", "#아이동반")
-                            : List.of("#실내", "#자연", "#역사");
+                    List<String> attractionTags = AttractionThemeSelector.select(
+                            companion, itinerary.getAdultAgeGroup(), itinerary.getChildAges());
                     RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags);
                     RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"));
 
@@ -589,33 +585,50 @@ public class SmartPlanService {
         }
     }
 
-    private List<RecommendationCandidate> sortComfortable(List<RecommendationCandidate> raw) {
+    /** 개인화 순서 보존 윈도우 - takeNearest가 이 안에서만 최단거리를 고른다(ProximityRanking과 같은 취지) */
+    static final int PERSONALIZATION_WINDOW = 6;
+
+    /**
+     * 혼잡도 "값"으로 완전히 재정렬하면 RecommendationPipeline이 이미 계산한 개인화 순서(동반유형/
+     * 유모차·무장애/연령대)가 사라진다(2026-08-20 사용자 제보 - 대가족 여행에 근대역사관 대신
+     * 남농기념관이 뽑힌 원인 중 하나). ProximityRanking/ReservationRequiredRanking과 동일한 설계로
+     * 바꿔 혼잡 트리거 걸린 후보만 뒤 버킷으로 밀고, 같은 버킷 안에서는 들어온 순서(=개인화 순서)를
+     * 안정정렬로 그대로 유지한다. 버킷 방식이라 후보를 제거하지 않아, 기존에 있던 "comfortable이
+     * 부족하면 raw로 폴백" 로직은 더 이상 필요 없다.
+     */
+    List<RecommendationCandidate> sortComfortable(List<RecommendationCandidate> raw) {
         if (raw == null || raw.isEmpty()) {
             return new ArrayList<>();
         }
-        List<RecommendationCandidate> comfortable = raw.stream()
-                .filter(c -> !CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered())
-                .collect(Collectors.toCollection(ArrayList::new));
-        List<RecommendationCandidate> pool = comfortable.size() >= Math.min(3, raw.size())
-                ? comfortable
-                : new ArrayList<>(raw);
+        List<RecommendationCandidate> pool = new ArrayList<>(raw);
         pool.sort(Comparator
-                .comparing((RecommendationCandidate c) -> c.getCrowdRate() == null ? Double.POSITIVE_INFINITY : c.getCrowdRate())
+                .comparingInt((RecommendationCandidate c) -> crowdBucket(c))
                 .thenComparing(c -> c.getThumbnailUrl() == null || c.getThumbnailUrl().isBlank() ? 1 : 0));
         int cap = Math.min(pool.size(), 24);
         return new ArrayList<>(pool.subList(0, cap));
     }
 
-    private RecommendationCandidate takeNearest(List<RecommendationCandidate> pool, RecommendationCandidate origin) {
+    private static int crowdBucket(RecommendationCandidate c) {
+        return CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered() ? 1 : 0;
+    }
+
+    /**
+     * pool 앞쪽 윈도우(개인화 순서가 가장 강하게 반영된 구간)에서만 최단거리를 고른다 - 전체 풀을
+     * 스캔해 순수 거리로만 고르면 개인화 순서가 무의미해지므로(위 sortComfortable 주석 참고),
+     * "개인화가 먼저 후보를 추리고 그 안에서 동선 효율을 본다"는 순서로 바꾼다. 윈도우 안 후보가
+     * 이미 다른 슬롯에 다 쓰였으면(호출부에서 remove) 전체 풀로 넓혀 슬롯은 무조건 채운다.
+     */
+    RecommendationCandidate takeNearest(List<RecommendationCandidate> pool, RecommendationCandidate origin) {
         if (pool == null || pool.isEmpty()) {
             return null;
         }
         if (origin == null || origin.getMapX() == null || origin.getMapY() == null) {
             return pool.remove(0);
         }
+        int windowSize = Math.min(PERSONALIZATION_WINDOW, pool.size());
         int bestIdx = 0;
         double bestKm = Double.POSITIVE_INFINITY;
-        for (int i = 0; i < pool.size(); i++) {
+        for (int i = 0; i < windowSize; i++) {
             RecommendationCandidate c = pool.get(i);
             Double km = GeoUtils.distanceKmSafe(origin.getMapX(), origin.getMapY(), c.getMapX(), c.getMapY());
             double d = km == null ? 50.0 : km;

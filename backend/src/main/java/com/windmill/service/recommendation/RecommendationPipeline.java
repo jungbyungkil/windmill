@@ -16,7 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,7 +74,15 @@ public class RecommendationPipeline {
                         stage1Result = stage1.fetchIndoor(region);
                     } else if (!themes.isEmpty()) {
                         // UI 해시태그는 TourAPI(KorService2) 테마 조회로 최소 후보를 확보
-                        stage1Result = stage1.fetchByThemes(region, request.getTags(), seed);
+                        Mono<List<RelatedCandidate>> themed = stage1.fetchByThemes(region, request.getTags(), seed);
+                        // withPet은 예전엔 태그가 있으면 통째로 무시됐다(2026-08-20 사용자 제보 -
+                        // "당일치기 시작하기"는 항상 태그를 넘겨서 반려동물 체크박스가 결과에 전혀
+                        // 영향을 못 줬음) - 반려동물 인증 후보(KorPetTourService2)를 테마 후보와
+                        // 병합해서, "구조화 데이터 우선"(AgeGroupRanking과 동일 원칙) 순으로 앞세운다.
+                        stage1Result = request.isWithPet()
+                                ? Mono.zip(stage1.fetchPetFriendly(region, seed), themed)
+                                        .map(petTuple -> mergePetFirst(petTuple.getT1(), petTuple.getT2()))
+                                : themed;
                     } else {
                         stage1Result = stage1.fetch(region, seed, request.isWithPet())
                                 .flatMap(list -> stage1.resolveContentIds(list, region));
@@ -207,6 +217,22 @@ public class RecommendationPipeline {
         return tourAttractionService.getDetail(request.getOriginContentId(), request.getOriginContentTypeId())
                 .defaultIfEmpty(NO_ORIGIN)
                 .onErrorReturn(NO_ORIGIN);
+    }
+
+    /** 반려동물 인증 후보(pet)를 테마 후보(themed)보다 우선 배치하며 contentId 기준으로 중복 제거한다 */
+    static List<RelatedCandidate> mergePetFirst(List<RelatedCandidate> pet, List<RelatedCandidate> themed) {
+        Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
+        for (RelatedCandidate c : pet) {
+            if (c.getContentId() != null) {
+                byId.put(c.getContentId(), c);
+            }
+        }
+        for (RelatedCandidate c : themed) {
+            if (c.getContentId() != null) {
+                byId.putIfAbsent(c.getContentId(), c);
+            }
+        }
+        return new ArrayList<>(byId.values());
     }
 
     /** origin의 mapX/mapY가 없으면(또는 조회 실패) distanceKm은 null로 남는다 - 프론트에서 뱃지를 숨긴다 */

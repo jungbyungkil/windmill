@@ -153,9 +153,32 @@ public class AnchorPlanService {
         return PlaceTagSanitizer.looksLikeFood(c.getContentTypeId(), c.getPlaceName(), c.getCategory());
     }
 
-    /** 앵커와의 거리(distanceKm, Stage1에서 origin 기준으로 이미 계산됨) 가까운 순 정렬 */
+    private static final double NEAR_KM = 1.5;
+    private static final double MID_KM = 4.0;
+
+    /**
+     * 거리(distanceKm, Stage1에서 앵커 기준으로 이미 계산됨) "값"으로 완전히 재정렬하면
+     * RecommendationPipeline이 이미 계산한 개인화 순서(동반유형/유모차·무장애/연령대 - 이 경로는
+     * seedPlaceName 기반이라 categoryMcls/categoryScls가 채워져 있어 실제로 동작 중)가 사라진다
+     * (SmartPlanService.sortComfortable과 동일한 문제). ProximityRanking과 같은 근/중/원 버킷 +
+     * 안정정렬로 바꿔, 같은 거리 구간 안에서는 파이프라인이 정한 순서를 그대로 유지한다.
+     */
     private void sortByDistance(List<RecommendationCandidate> pool) {
-        pool.sort(Comparator.comparing(c -> c.getDistanceKm() == null ? Double.MAX_VALUE : c.getDistanceKm()));
+        pool.sort(Comparator.comparingInt(AnchorPlanService::distanceBucket));
+    }
+
+    static int distanceBucket(RecommendationCandidate c) {
+        Double km = c.getDistanceKm();
+        if (km == null) {
+            return 2;
+        }
+        if (km <= NEAR_KM) {
+            return 0;
+        }
+        if (km <= MID_KM) {
+            return 1;
+        }
+        return 3;
     }
 
     /** 연관 관광지 풀이 비어 있을 때만(부분 보강은 안 함 - 가까운 연관 후보가 있으면 그게 항상 우선) 지역 카테고리로 채운다 */

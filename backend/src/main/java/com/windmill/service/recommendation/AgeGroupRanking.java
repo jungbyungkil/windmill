@@ -16,6 +16,10 @@ import java.util.stream.Collectors;
  * 반영하지만, 동반 자녀 나이는 실제 detailIntro2 체험가능연령(expAgeRange) 필드가 존재해서(라이브 확인,
  * BusinessHoursEvaluator 참고) 그 하한과 자녀 나이를 직접 비교한다 - 다만 이 필드도 대부분 공란이라
  * 여전히 하드 필터가 아닌 순위 부스트로만 쓴다(값이 있고 실제로 자녀 나이보다 높을 때만 뒤로 밀림).
+ *
+ * ⚠ ADULT_KEYWORDS 매칭은 CompanionCategoryRanking과 같은 한계가 있다(태그 검색 경로에서
+ * categoryMcls/Scls가 비어 무동작) - 그 클래스 주석 참고. AttractionThemeSelector가 같은
+ * ADULT_KEYWORDS 취지를 "테마 선택" 단계에서 실질적으로 대신 반영한다.
  */
 final class AgeGroupRanking {
 
