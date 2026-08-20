@@ -1101,12 +1101,12 @@
 
 .weather-banner {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   background: var(--sand-card);
   border: 1px solid var(--sand-border);
-  border-radius: 14px;
-  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
   box-shadow: var(--shadow);
 }
 
@@ -1119,19 +1119,70 @@
   background: color-mix(in srgb, var(--level-danger) 8%, var(--sand-card));
 }
 
-.weather-icon {
-  font-size: 28px;
-}
-
-.weather-info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  font-size: 13px;
+.weather-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--muted);
 }
 
-.weather-condition, .weather-temp {
+.weather-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.weather-icon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.weather-headline {
+  display: flex;
+  flex-direction: column;
+}
+
+.weather-condition {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.weather-temp {
+  font-family: var(--display);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.weather-stats {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.weather-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--sand);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  text-align: center;
+}
+
+.weather-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.weather-stat-value {
+  font-family: var(--display);
+  font-size: 15px;
   font-weight: 700;
   color: var(--ink);
 }
@@ -1151,32 +1202,30 @@
 
 .mid-weather-head {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .mid-weather-badge {
   flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--muted);
-  border: 1px solid var(--sand-border);
-  border-radius: 8px;
-  padding: 3px 8px;
-  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sky);
+  background: color-mix(in srgb, var(--sky) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 
 .mid-weather-head strong {
-  display: block;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ink);
 }
 
-.mid-weather-head p {
-  margin: 3px 0 0;
+.mid-weather-desc {
+  margin: -4px 0 0;
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .mid-weather-list {
@@ -1794,8 +1843,8 @@
 
 .reco-query-input {
   border: 1px solid var(--sand-border);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 999px;
+  padding: 12px 18px;
   font-size: 14px;
   background: #fff;
   color: var(--ink);
@@ -2244,6 +2293,69 @@
   font-size: 13px;
   align-items: center;
   padding: 12px 14px;
+}
+
+/* ---------- Alert feed (알림 화면 - 발송된 알림 이력 리스트) ---------- */
+
+.alert-feed {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
+}
+
+.alert-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alert-feed-card {
+  --alert-tone: var(--status-normal);
+  display: flex;
+  gap: 12px;
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-left: 4px solid var(--alert-tone);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.alert-feed-card.tone-warning { --alert-tone: var(--status-warning); }
+.alert-feed-card.tone-danger { --alert-tone: var(--status-danger); }
+
+.alert-feed-icon {
+  font-size: 20px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.alert-feed-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alert-feed-headline {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.alert-feed-detail {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.alert-feed-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--alert-tone);
 }
 
 .situation-pulse {
@@ -4078,7 +4190,7 @@
 
 .day-route-map {
   margin: 0 0 14px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--sand-border);
   background: color-mix(in srgb, var(--sea) 3%, white);
   overflow: hidden;
@@ -4112,8 +4224,8 @@
 
 .day-route-map-canvas {
   width: 100%;
-  height: 260px;
-  border-radius: 12px;
+  height: 280px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--sand-border);
 }
 

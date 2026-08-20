@@ -3,6 +3,7 @@ package com.windmill.controller;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.AlertEventResponse;
 import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.AnchorPlanRequest;
 import com.windmill.dto.ConfirmDayRequest;
@@ -17,6 +18,7 @@ import com.windmill.dto.SmartPlanResponse;
 import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.ItineraryService;
+import com.windmill.service.notification.AlertFeedService;
 import com.windmill.service.recommendation.AnchorPlanService;
 import com.windmill.service.recommendation.InitialPlanService;
 import com.windmill.service.recommendation.RecommendationPipeline;
@@ -47,6 +49,7 @@ public class ItineraryController {
     private final SmartPlanService smartPlanService;
     private final AnchorPlanService anchorPlanService;
     private final TripRecordService tripRecordService;
+    private final AlertFeedService alertFeedService;
 
     @PostMapping
     public Mono<ResponseEntity<ItineraryResponse>> create(
@@ -144,6 +147,19 @@ public class ItineraryController {
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> triggerDetectionService.detectForItinerary(itinerary, originLon, originLat))
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 알림 피드 - 실제로 발송(시도)된 알림 이력을 최신순으로. NotificationSchedulerService가
+     * dispatch()를 결정한 시점에만 기록되므로 사용자가 실제로 받은 알림과 항상 일치한다.
+     */
+    @GetMapping("/{id}/alert-feed")
+    public Mono<ResponseEntity<List<AlertEventResponse>>> alertFeed(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "30") int limit) {
+        return Mono.fromCallable(() -> alertFeedService.list(id, limit))
+                .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
     }
 

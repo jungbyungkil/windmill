@@ -5,6 +5,7 @@ import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.PushSubscription;
 import com.windmill.dto.TriggerLevel;
 import com.windmill.dto.TriggerResult;
+import com.windmill.repository.AlertEventRepository;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.PushSubscriptionRepository;
 import com.windmill.service.push.PushSenderService;
@@ -41,6 +42,7 @@ class NotificationSchedulerServiceTest {
 
     private ItineraryRepository itineraryRepository;
     private PushSubscriptionRepository pushSubscriptionRepository;
+    private AlertEventRepository alertEventRepository;
     private TriggerDetectionService triggerDetectionService;
     private PushSenderService pushSenderService;
     private NotificationSchedulerService scheduler;
@@ -49,10 +51,11 @@ class NotificationSchedulerServiceTest {
     void setUp() {
         itineraryRepository = mock(ItineraryRepository.class);
         pushSubscriptionRepository = mock(PushSubscriptionRepository.class);
+        alertEventRepository = mock(AlertEventRepository.class);
         triggerDetectionService = mock(TriggerDetectionService.class);
         pushSenderService = mock(PushSenderService.class);
         scheduler = new NotificationSchedulerService(
-                itineraryRepository, pushSubscriptionRepository, triggerDetectionService,
+                itineraryRepository, pushSubscriptionRepository, alertEventRepository, triggerDetectionService,
                 new NotificationComposer(), pushSenderService);
         when(pushSenderService.send(anyString(), anyString(), anyString(), anyMap())).thenReturn(true);
     }

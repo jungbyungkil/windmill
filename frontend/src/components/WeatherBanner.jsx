@@ -39,13 +39,30 @@ export default function WeatherBanner({ items }) {
 
   return (
     <div className={`weather-banner ${weather.rainy ? 'rainy' : ''} ${weather.temp >= 33 ? 'heat' : ''}`}>
-      <span className="weather-icon">{weather.temp >= 33 ? '🌡️' : weather.icon}</span>
-      <div className="weather-info">
-        <span className="weather-condition">{weather.temp >= 33 ? '폭염 주의' : weather.condition}</span>
-        {weather.temp !== null && <span className="weather-temp">{weather.temp}°C</span>}
-        {weather.pop !== null && <span className="weather-pop">강수확률 {weather.pop}%</span>}
-        {weather.humidity !== null && <span className="weather-humidity">습도 {weather.humidity}%</span>}
+      <div className="weather-eyebrow">오늘 날씨</div>
+      <div className="weather-main">
+        <span className="weather-icon">{weather.temp >= 33 ? '🌡️' : weather.icon}</span>
+        <div className="weather-headline">
+          <span className="weather-condition">{weather.temp >= 33 ? '폭염 주의' : weather.condition}</span>
+          {weather.temp !== null && <span className="weather-temp">{weather.temp}°</span>}
+        </div>
       </div>
+      {(weather.pop !== null || weather.humidity !== null) && (
+        <div className="weather-stats">
+          {weather.pop !== null && (
+            <div className="weather-stat">
+              <span className="weather-stat-label">강수확률</span>
+              <span className="weather-stat-value">{weather.pop}%</span>
+            </div>
+          )}
+          {weather.humidity !== null && (
+            <div className="weather-stat">
+              <span className="weather-stat-label">습도</span>
+              <span className="weather-stat-value">{weather.humidity}%</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

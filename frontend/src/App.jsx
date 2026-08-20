@@ -22,6 +22,7 @@ import SharedItineraryScreen from './components/SharedItineraryScreen';
 import ClosingGateModal from './components/ClosingGateModal';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
+import AlertFeedScreen from './components/AlertFeedScreen';
 import MyTripsScreen from './components/MyTripsScreen';
 import TripRecordDetailScreen from './components/TripRecordDetailScreen';
 import SettingsScreen from './components/SettingsScreen';
@@ -206,6 +207,11 @@ export default function App() {
   function handleOpenMyTrips() {
     setMenuOpen(false);
     navigate('/my-trips');
+  }
+
+  function handleOpenAlerts() {
+    setMenuOpen(false);
+    navigate('/alerts');
   }
 
   function handleOpenGuide() {
@@ -1046,6 +1052,7 @@ export default function App() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigateMyTrips={handleOpenMyTrips}
+        onNavigateAlerts={handleOpenAlerts}
         onNavigateGuide={handleOpenGuide}
       />
       <ExitConfirmModal
@@ -1286,6 +1293,17 @@ export default function App() {
                 onClose={() => setTripRecordOpen(false)}
               />
             </div>
+          )
+        }
+      />
+      <Route
+        path="/alerts"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <>
+              <BackHeader title="알림" onMenuClick={() => setMenuOpen(true)} />
+              <AlertFeedScreen itineraryId={itineraryId} />
+            </>
           )
         }
       />

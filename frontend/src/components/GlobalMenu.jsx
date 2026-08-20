@@ -8,6 +8,7 @@ export default function GlobalMenu({
   open,
   onClose,
   onNavigateMyTrips,
+  onNavigateAlerts,
   onNavigateGuide,
 }) {
   useModalHistory(open, onClose);
@@ -30,6 +31,11 @@ export default function GlobalMenu({
           <li>
             <button type="button" className="global-menu-item" onClick={onNavigateMyTrips}>
               🗂️ 내 여행 관리
+            </button>
+          </li>
+          <li>
+            <button type="button" className="global-menu-item" onClick={onNavigateAlerts}>
+              🔔 알림
             </button>
           </li>
           <li>

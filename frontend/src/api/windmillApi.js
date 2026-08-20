@@ -105,6 +105,11 @@ export function confirmDay(itineraryId, date, confirmed) {
   return request(`/itineraries/${itineraryId}/days/${date}`, { method: 'PATCH', body: { confirmed } });
 }
 
+/** 알림 피드 - 실제로 발송(시도)된 알림 이력을 최신순으로 */
+export function getAlertFeed(itineraryId, { limit } = {}) {
+  return request(`/itineraries/${itineraryId}/alert-feed${qs({ limit })}`);
+}
+
 /** 응답 형태: { candidates: RecommendationCandidate[], reason: "RAIN_ALTERNATIVE" | null } */
 export function getAlternatives(itineraryId, { avoid, seedPlaceName } = {}) {
   return request(`/itineraries/${itineraryId}/alternatives${qs({ avoid, seedPlaceName })}`);

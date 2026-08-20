@@ -24,12 +24,10 @@ export default function MidWeatherBanner({ forecast }) {
   return (
     <section className="mid-weather-banner" aria-label="중기예보">
       <div className="mid-weather-head">
-        <span className="mid-weather-badge">중기 · 참고</span>
-        <div>
-          <strong>{forecast.summary || '3~10일 날씨 전망'}</strong>
-          <p>단기(오늘~모레)보다 거친 예보예요. 여행 며칠 앞을 미리 가늠할 때 참고하세요.</p>
-        </div>
+        <strong>{forecast.summary || '3~10일 날씨 전망'}</strong>
+        <span className="mid-weather-badge">참고</span>
       </div>
+      <p className="mid-weather-desc">단기(오늘~모레)보다 거친 예보예요. 여행 며칠 앞을 미리 가늠할 때 참고하세요.</p>
       <div className="mid-weather-list" role="list">
         {forecast.days.map((day) => {
           const wf = day.pmWeather || day.amWeather || '-';

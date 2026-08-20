@@ -1,5 +1,6 @@
 package com.windmill.service.trip;
 
+import com.windmill.domain.AlertEvent;
 import com.windmill.domain.CompanionType;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
@@ -7,6 +8,8 @@ import com.windmill.domain.TripRecord;
 import com.windmill.domain.VisitFeedback;
 import com.windmill.domain.VisitRating;
 import com.windmill.dto.RegionCode;
+import com.windmill.dto.TriggerLevel;
+import com.windmill.repository.AlertEventRepository;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
@@ -36,6 +39,7 @@ public class DevSeedService {
     private final ItineraryRepository itineraryRepository;
     private final TripRecordRepository tripRecordRepository;
     private final RegionCodeService regionCodeService;
+    private final AlertEventRepository alertEventRepository;
 
     private record ItemSpec(String timeSlot, String placeName, String contentId,
                              String category, VisitRating feedback, boolean isAlternate) {
@@ -213,5 +217,37 @@ public class DevSeedService {
     }
 
     public record ResetResult(int removedMultiDay, boolean seeded, int dayTripCount) {
+    }
+
+    /**
+     * 알림 피드 화면 검증용 - TOURAPI_KEY 없이도 로컬에서 눈으로 확인할 수 있게 샘플 알림 이력을 심는다.
+     * NotificationSchedulerService의 정상 흐름을 거치지 않는 dev 전용 지름길.
+     */
+    @Transactional
+    public int seedAlertEvents(Long itineraryId) {
+        if (!itineraryRepository.existsById(itineraryId)) {
+            throw new IllegalArgumentException("존재하지 않는 itineraryId: " + itineraryId);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        List<AlertEvent> samples = List.of(
+                AlertEvent.builder().itineraryId(itineraryId).kind("STATUS").level(TriggerLevel.DANGER)
+                        .icon("🌧️").headline("🔴 지금 코스를 바꿔야 해요")
+                        .detail("14시경 강수확률 70%. 실내 일정으로 순서를 바꾸는 걸 권해요.")
+                        .createdAt(now.minusMinutes(5)).build(),
+                AlertEvent.builder().itineraryId(itineraryId).kind("STATUS").level(TriggerLevel.WARNING)
+                        .icon("👥").headline("🟡 혼잡도가 올라가고 있어요")
+                        .detail("여미지식물원 혼잡도 72%. 방문 시간을 앞당기면 여유로워요.")
+                        .createdAt(now.minusMinutes(32)).build(),
+                AlertEvent.builder().itineraryId(itineraryId).kind("STATUS").level(TriggerLevel.WARNING)
+                        .icon("🚫").headline("🟡 정기휴무인 곳이 있어요")
+                        .detail("오늘 방문 예정인 한 곳이 정기휴무예요. 대체 장소를 골라보세요.")
+                        .createdAt(now.minusMinutes(58)).build(),
+                AlertEvent.builder().itineraryId(itineraryId).kind("PERIODIC").level(TriggerLevel.NORMAL)
+                        .icon("🟢").headline("🟢 바람따라가 지켜보고 있어요")
+                        .detail("지금까지 계획대로 순항 중이에요.")
+                        .createdAt(now.minusHours(1)).build()
+        );
+        alertEventRepository.saveAll(samples);
+        return samples.size();
     }
 }

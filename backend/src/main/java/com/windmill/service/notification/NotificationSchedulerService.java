@@ -1,10 +1,12 @@
 package com.windmill.service.notification;
 
+import com.windmill.domain.AlertEvent;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.PushSubscription;
 import com.windmill.dto.TriggerLevel;
 import com.windmill.dto.TriggerResult;
+import com.windmill.repository.AlertEventRepository;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.PushSubscriptionRepository;
 import com.windmill.service.push.PushSenderService;
@@ -50,6 +52,7 @@ public class NotificationSchedulerService {
 
     private final ItineraryRepository itineraryRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
+    private final AlertEventRepository alertEventRepository;
     private final TriggerDetectionService triggerDetectionService;
     private final NotificationComposer composer;
     private final PushSenderService pushSenderService;
@@ -104,7 +107,10 @@ public class NotificationSchedulerService {
         }
 
         String nudgeId = "STATUS:" + oldLevel + "->" + newLevel + "@" + minuteKey(now);
-        dispatch(itinerary, subs, composer.statusTitle(newLevel), composer.statusBody(result), nudgeId, now);
+        String title = composer.statusTitle(newLevel);
+        String body = composer.statusBody(result);
+        recordAlertEvent(itinerary, "STATUS", result, title, body);
+        dispatch(itinerary, subs, title, body, nudgeId, now);
     }
 
     private void handlePeriodicAndSlots(Itinerary itinerary, List<PushSubscription> subs,
@@ -127,20 +133,25 @@ public class NotificationSchedulerService {
         String nudgeId;
         String title;
         String body;
+        String kind;
         if (periodicDue && !justReached.isEmpty()) {
             nudgeId = "PERIODIC+SLOT:" + idsOf(justReached) + "@" + minuteKey(now);
             title = composer.mergedTitle();
             body = composer.mergedBody(result, justReached);
+            kind = "PERIODIC+SLOT";
         } else if (periodicDue) {
             nudgeId = "PERIODIC@" + minuteKey(now);
             title = composer.periodicTitle();
             body = composer.periodicBody(result);
+            kind = "PERIODIC";
         } else {
             nudgeId = "SLOT:" + idsOf(justReached) + "@" + minuteKey(now);
             title = composer.slotTitle(justReached);
             body = composer.slotBody(justReached);
+            kind = "SLOT";
         }
 
+        recordAlertEvent(itinerary, kind, result, title, body);
         dispatch(itinerary, subs, title, body, nudgeId, now);
 
         if (periodicDue) {
@@ -218,6 +229,18 @@ public class NotificationSchedulerService {
             sub.setLastSentKey(todayKey);
             pushSubscriptionRepository.save(sub);
         }
+    }
+
+    /** 구독자별 dispatch 루프 밖에서 일정당 한 번만 - 실제로 발송을 시도한 알림만 이력에 남긴다 */
+    private void recordAlertEvent(Itinerary itinerary, String kind, TriggerResult result, String title, String body) {
+        alertEventRepository.save(AlertEvent.builder()
+                .itineraryId(itinerary.getId())
+                .kind(kind)
+                .level(result.getLevel())
+                .icon(AlertIconResolver.resolve(result))
+                .headline(title)
+                .detail(body)
+                .build());
     }
 
     private static LocalTime parseTime(String scheduledTime) {
