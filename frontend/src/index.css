@@ -8,6 +8,7 @@
   --sand: #f2f7f9;
   --sand-card: #ffffff;
   --sand-border: #dce8ee;
+  --panel-muted: var(--sand);
   --ink: #0f1f26;
   /* 모바일에서도 본문·보조 글자가 읽히도록 대비를 조금 높임 */
   --muted: #3d5260;

@@ -20,7 +20,7 @@ function RatingBadge({ value }) {
   const r = RATINGS.find((x) => x.value === value);
   if (!r) return <span className="trip-record-rating-badge unrated">미평가</span>;
   return (
-    <span className={`trip-record-rating-badge ${value === 'BAD' ? 'bad' : ''}`}>
+    <span className={`trip-record-rating-badge ${value === 'GOOD' ? 'good' : ''} ${value === 'BAD' ? 'bad' : ''}`}>
       {r.icon} {r.label}
     </span>
   );
@@ -202,7 +202,7 @@ export default function TripRecordDetailScreen({ sessionId, onViewItinerary }) {
       {editableItems.length > 0 && (
         <>
           <p className="modal-desc feedback-section-label">장소별 기록</p>
-          <div className="feedback-list">
+          <div className="feedback-list trip-record-feedback-card">
             {editableItems.map((item) => (
               <div key={item.itemId} className="trip-record-detail-item">
                 <div className="feedback-row">

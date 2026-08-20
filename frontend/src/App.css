@@ -5125,7 +5125,14 @@
   padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 14px;
+}
+
+.settings-section {
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
 }
 
 .settings-section-title {
@@ -5164,12 +5171,43 @@
 }
 
 .settings-push-btn {
-  padding: 10px 18px;
+  width: 100%;
+  padding: 11px 0;
   font-size: 14px;
 }
 
 .settings-push-status {
   margin-top: 8px;
+}
+
+.settings-menu-list {
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.settings-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 16px;
+  border: none;
+  border-bottom: 1px solid var(--sand-border);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.settings-menu-item:last-child {
+  border-bottom: none;
+}
+
+.settings-menu-item-chevron {
+  color: var(--muted);
 }
 
 /* ---------- 여행 기록 ---------- */
@@ -5289,9 +5327,14 @@
   padding: 5px 12px;
 }
 
+.trip-record-rating-badge.good {
+  color: var(--level-normal);
+  background: color-mix(in srgb, var(--level-normal) 14%, white);
+}
+
 .trip-record-rating-badge.bad {
-  color: #c45c4a;
-  background: color-mix(in srgb, #c45c4a 12%, white);
+  color: var(--level-danger);
+  background: color-mix(in srgb, var(--level-danger) 12%, white);
 }
 
 .trip-record-rating-badge.unrated {
@@ -5306,6 +5349,14 @@
   line-height: 1.6;
   color: var(--ink);
   white-space: pre-wrap;
+}
+
+.trip-record-feedback-card {
+  gap: 0;
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-radius: var(--radius-lg);
+  padding: 4px 16px;
 }
 
 .trip-record-detail-item {
@@ -5348,98 +5399,6 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 20px;
-}
-
-/* ---------- 이용 히스토리 ---------- */
-
-.history-screen {
-  max-width: 720px;
-  margin: 0 auto;
-  width: 100%;
-  padding: 4px 16px max(48px, calc(28px + env(safe-area-inset-bottom, 0px)));
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.history-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.history-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.history-clear-btn {
-  flex-shrink: 0;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--sand-border);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--level-danger);
-  cursor: pointer;
-}
-
-.history-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.history-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--sand-border);
-  background: var(--sand-card);
-}
-
-.history-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.history-thumb-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--sand);
-  font-size: 16px;
-}
-
-.history-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.history-name {
-  font-size: 14px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.history-meta {
-  font-size: 11px;
-  color: var(--muted);
 }
 
 /* ---------- 이용 가이드 ---------- */

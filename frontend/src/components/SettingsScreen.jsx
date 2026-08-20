@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useTextScale from '../hooks/useTextScale';
 import { isIOS, isStandalone, isPushSupported, requestPushToken } from '../utils/webPush';
 import { registerPush } from '../api/windmillApi';
@@ -18,6 +19,7 @@ const PUSH_STATUS_LABEL = {
 
 /** 전체 메뉴 > 설정 - 글씨 크기(어르신 접근성), 알림(웹 푸시) */
 export default function SettingsScreen({ sessionId }) {
+  const navigate = useNavigate();
   const [textScale, setTextScale] = useTextScale();
   const [pushStatus, setPushStatus] = useState('idle');
 
@@ -82,6 +84,17 @@ export default function SettingsScreen({ sessionId }) {
           </>
         )}
       </section>
+
+      <nav className="settings-menu-list" aria-label="바로가기">
+        <button type="button" className="settings-menu-item" onClick={() => navigate('/my-trips')}>
+          🗂️ 내 여행 관리
+          <span className="settings-menu-item-chevron">›</span>
+        </button>
+        <button type="button" className="settings-menu-item" onClick={() => navigate('/guide')}>
+          ❓ 이용 가이드
+          <span className="settings-menu-item-chevron">›</span>
+        </button>
+      </nav>
     </div>
   );
 }
