@@ -5486,3 +5486,84 @@
   text-align: center;
 }
 
+.guide-subsection {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-border);
+  background: color-mix(in srgb, var(--sea) 4%, var(--sand-card));
+}
+
+.guide-subsection-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.guide-subsection-body {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.guide-subsection-body:last-child {
+  margin-bottom: 0;
+}
+
+.guide-status-table {
+  width: 100%;
+  margin: 0 0 10px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.guide-status-table th,
+.guide-status-table td {
+  padding: 8px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--sand-border);
+}
+
+.guide-status-table th {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.guide-status-table td {
+  color: var(--ink);
+}
+
+.guide-status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.guide-status-dot.level-normal {
+  background: var(--level-normal);
+}
+
+.guide-status-dot.level-warning {
+  background: var(--level-warning);
+}
+
+.guide-status-dot.level-danger {
+  background: var(--level-danger);
+}
+
+.guide-callout {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--sea) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--sea) 20%, var(--sand-border));
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sea-deep);
+}
+

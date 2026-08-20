@@ -21,6 +21,20 @@ const PAGE1_BRANCH = [
   },
 ];
 
+// "고정 일정(앵커) 등록" 문구는 CreateTripScreen의 실제 UI 문구를 그대로 재사용(일관성 유지)
+const ANCHOR_STEPS = [
+  { icon: '📌', title: '앵커 등록', body: 'DDP 공연처럼 시각이 이미 정해진 장소가 있다면 이름으로 찾아 등록해요. 시작 시각만 정하면 돼요.' },
+  { icon: '⏱️', title: '앞뒤 시간 자동 채움', body: '등록한 시각을 기준으로 앞뒤 빈 시간(식사·가벼운 관광)을 자동으로 채워, 바로 시작할 수 있게 준비해요.' },
+  { icon: '📍', title: '근처 추천 코스 확인', body: '앵커 장소를 기준으로 이동 가능한 반경 안에서 어울리는 코스를 자동으로 구성해 보여줘요.' },
+];
+
+// 색상/상태명/의미는 PinwheelHero의 LEVEL_META(NORMAL/WARNING/DANGER)와 1:1로 일치시킴 - 문구가 실제 트리거 로직과 어긋나지 않도록 유지
+const PINWHEEL_LEVELS = [
+  { level: 'normal', emoji: '🟢', name: '순풍', meaning: '계획대로 진행 가능, 이상 없음' },
+  { level: 'warning', emoji: '🟡', name: '주의', meaning: '경미한 이슈 발생, 참고 필요' },
+  { level: 'danger', emoji: '🔴', name: '변경 필요', meaning: '기존 계획 진행 불가, 대응 필요' },
+];
+
 const PAGE2_STEPS = [
   {
     icon: '🧭',
@@ -113,6 +127,14 @@ export default function GuideScreen() {
           </div>
         </div>
 
+        <div className="guide-subsection">
+          <h3 className="guide-subsection-title">📌 이미 정해진 일정이 있다면 (앵커 등록)</h3>
+          <p className="guide-subsection-body">
+            이미 정해진 일정이 있어요? 앵커로 등록해두면 앞뒤 빈 시간을 자동으로 채워드려요.
+          </p>
+          <StepList steps={ANCHOR_STEPS} startNumber={1} />
+        </div>
+
         <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/')}>
           🌬️ 여기서부터 따라 해보기
         </button>
@@ -124,6 +146,40 @@ export default function GuideScreen() {
           여행 진행
         </h2>
         <StepList steps={PAGE2_STEPS} startNumber={5} />
+
+        <div className="guide-subsection">
+          <h3 className="guide-subsection-title">🌀 바람개비 색상, 무슨 뜻일까요?</h3>
+          <p className="guide-subsection-body">
+            바람개비는 여행 중에도 날씨·혼잡도·동선을 주기적으로 확인해서, 상황이 바뀌면 색으로 바로 알려드려요.
+          </p>
+          <table className="guide-status-table">
+            <thead>
+              <tr>
+                <th scope="col">색상</th>
+                <th scope="col">상태명</th>
+                <th scope="col">의미</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PINWHEEL_LEVELS.map((s) => (
+                <tr key={s.level}>
+                  <td>
+                    <span className={`guide-status-dot level-${s.level}`} aria-hidden="true" />
+                    {s.emoji}
+                  </td>
+                  <td>{s.name}</td>
+                  <td>{s.meaning}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="guide-subsection-body">
+            바람개비를 탭하면 색이 바뀐 사유를 확인하고, 이어서 대응 방안(대안 코스)까지 바로 볼 수 있어요.
+          </p>
+          <div className="guide-callout">
+            🔍 이 판단은 AI의 임의 추측이 아니에요. 기상청·한국관광공사 공공데이터로 실시간 검증한 결과예요.
+          </div>
+        </div>
 
         <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/')}>
           🧭 내 일정에서 이어서 따라 해보기
