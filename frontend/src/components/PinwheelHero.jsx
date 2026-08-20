@@ -99,41 +99,48 @@ export default function PinwheelHero({
         rainMode ? 'rain-alert' : '',
       ].filter(Boolean).join(' ')}
     >
-      <div
-        className="pinwheel-graphic"
-        role={interactive ? 'button' : undefined}
-        tabIndex={interactive ? 0 : undefined}
-        onClick={handleActivate}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleActivate()}
-        aria-label={interactive ? '바람개비 상태 - 탭해서 새 코스 추천받기' : '바람따라 로고'}
-      >
-        <svg viewBox="0 0 200 200" className="pinwheel-svg" aria-hidden="true">
-          <g className="pinwheel-blades">
-            {[0, 90, 180, 270].map((deg) => (
-              <path
-                key={deg}
-                className="pinwheel-blade"
-                transform={`rotate(${deg} 100 100)`}
-                d="M100,100 C100,60 120,30 155,25 C160,55 145,85 100,100 Z"
-              />
-            ))}
-          </g>
-          <circle className="pinwheel-hub" cx="100" cy="100" r="10" />
-        </svg>
-        {causes.length > 0 && (
-          <div className="pinwheel-causes">
-            {causes.map(([key, c]) => (
-              <span key={key} className="cause-chip" title={c.label}>{c.icon}</span>
-            ))}
+      <div className="pinwheel-card-top">
+        <div
+          className="pinwheel-graphic"
+          role={interactive ? 'button' : undefined}
+          tabIndex={interactive ? 0 : undefined}
+          onClick={handleActivate}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleActivate()}
+          aria-label={interactive ? '바람개비 상태 - 탭해서 새 코스 추천받기' : '바람따라 로고'}
+        >
+          <svg viewBox="0 0 200 200" className="pinwheel-svg" aria-hidden="true">
+            <g className="pinwheel-blades">
+              {[0, 90, 180, 270].map((deg) => (
+                <path
+                  key={deg}
+                  className="pinwheel-blade"
+                  transform={`rotate(${deg} 100 100)`}
+                  d="M100,100 C100,60 120,30 155,25 C160,55 145,85 100,100 Z"
+                />
+              ))}
+            </g>
+            <circle className="pinwheel-hub" cx="100" cy="100" r="10" />
+          </svg>
+          {causes.length > 0 && (
+            <div className="pinwheel-causes">
+              {causes.map(([key, c]) => (
+                <span key={key} className="cause-chip" title={c.label}>{c.icon}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {trigger && (
+          <div className="pinwheel-headline">
+            <div className="pinwheel-eyebrow">실시간 변수</div>
+            <div className="pinwheel-caption">{caption()}</div>
           </div>
         )}
       </div>
 
       {trigger && (
         <div className="pinwheel-status">
-          <div className="pinwheel-eyebrow">실시간 변수</div>
-          <div className="pinwheel-caption">{caption()}</div>
-          <div className="pinwheel-sub">{sub()}</div>
+          <p className="pinwheel-sub">{sub()}</p>
 
           {causes.length > 0 && (
             <div className="pinwheel-cause-labels">

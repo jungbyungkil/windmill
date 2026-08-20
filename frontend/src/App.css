@@ -817,10 +817,17 @@
 .pinwheel-hero {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
   gap: 4px;
   --level-color: var(--level-normal);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--breeze) 26%, white) 0%, var(--sand) 100%);
+  border-radius: var(--radius-lg);
+  padding: 20px 18px;
+}
+
+.pinwheel-card-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .pinwheel-hero.level-warning {
@@ -854,8 +861,9 @@
 
 .pinwheel-graphic {
   position: relative;
-  width: 140px;
-  height: 140px;
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -983,9 +991,13 @@
   font-size: 14px;
 }
 
+.pinwheel-headline {
+  text-align: left;
+}
+
 .pinwheel-status {
-  margin-top: 10px;
-  max-width: 340px;
+  margin-top: 12px;
+  text-align: left;
 }
 
 .pinwheel-eyebrow {
@@ -997,19 +1009,21 @@
   background: color-mix(in srgb, var(--sea) 12%, transparent);
   border-radius: 999px;
   padding: 3px 8px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .pinwheel-caption {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
+  line-height: 1.3;
   color: var(--level-color);
 }
 
 .pinwheel-sub {
   font-size: 13px;
   color: var(--muted);
-  margin-top: 2px;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .pinwheel-cause-labels {
@@ -1057,7 +1071,7 @@
   margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
 }
 
