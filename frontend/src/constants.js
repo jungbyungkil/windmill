@@ -18,9 +18,21 @@ export const TAG_OPTIONS = TAG_GROUPS.flatMap((group) => group.tags);
 export const COMPANION_TYPE_OPTIONS = [
   { value: 'SOLO', label: '1인 여행' },
   { value: 'COUPLE', label: '2인 여행' },
+  { value: 'TRIO', label: '3인 여행' },
   { value: 'FAMILY_4', label: '4인 가족 여행' },
   { value: 'EXTENDED_FAMILY', label: '대가족 여행' },
 ];
+
+// 동반유형별 고정 총 인원수 - EXTENDED_FAMILY(대가족)는 없음(사용자 직접 입력, 5~9명)
+export const FIXED_PARTY_SIZE_BY_COMPANION_TYPE = {
+  SOLO: 1,
+  COUPLE: 2,
+  TRIO: 3,
+  FAMILY_4: 4,
+};
+
+export const EXTENDED_FAMILY_MIN_SIZE = 5;
+export const EXTENDED_FAMILY_MAX_SIZE = 9;
 
 // 첫 화면 성인 연령대 단일선택(필수) - 동반 자녀는 개별 만 나이로 별도 입력(CHILD_AGE_OPTIONS)
 export const AGE_GROUP_OPTIONS = [

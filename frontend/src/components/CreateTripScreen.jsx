@@ -5,7 +5,14 @@ import TripStoryFeed from './TripStoryFeed';
 import RecommendationCard from './RecommendationCard';
 import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
 import * as api from '../api/windmillApi';
-import { COMPANION_TYPE_OPTIONS, AGE_GROUP_OPTIONS, CHILD_AGE_OPTIONS } from '../constants';
+import {
+  COMPANION_TYPE_OPTIONS,
+  AGE_GROUP_OPTIONS,
+  CHILD_AGE_OPTIONS,
+  FIXED_PARTY_SIZE_BY_COMPANION_TYPE,
+  EXTENDED_FAMILY_MIN_SIZE,
+  EXTENDED_FAMILY_MAX_SIZE,
+} from '../constants';
 
 const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
@@ -48,6 +55,7 @@ export default function CreateTripScreen({
   const [dateTouched, setDateTouched] = useState(false);
   const [companionType, setCompanionType] = useState('SOLO');
   const [partySize, setPartySize] = useState(1);
+  const [partySizeTouched, setPartySizeTouched] = useState(false);
   const [adultAgeGroup, setAdultAgeGroup] = useState('THIRTIES');
   const [childAges, setChildAges] = useState([]);
   const [withPet, setWithPet] = useState(false);
@@ -138,7 +146,34 @@ export default function CreateTripScreen({
   const today = todayIso();
   const dateBeforeToday = Boolean(tripDate && tripDate < today);
   const dateInvalid = !tripDate || dateBeforeToday;
-  const canSubmit = Boolean(signguFullCode && tripDate && !dateBeforeToday);
+
+  // 대가족 여행만 총 인원수를 직접 입력(5~9명), 나머지는 동반유형에 고정값을 세팅하고 입력을 잠근다
+  const isExtendedFamily = companionType === 'EXTENDED_FAMILY';
+  const partySizeError = isExtendedFamily
+    && (partySize < EXTENDED_FAMILY_MIN_SIZE || partySize > EXTENDED_FAMILY_MAX_SIZE)
+    ? `대가족 여행은 ${EXTENDED_FAMILY_MIN_SIZE}명 이상 ${EXTENDED_FAMILY_MAX_SIZE}명 이하만 가능해요`
+    : null;
+  // 성인 최소 1명 보장을 위해 자녀 수는 총 인원수-1을 넘을 수 없음(내부 계산값으로만 사용, 화면 미표기)
+  const maxChildren = Math.max(0, (partySize || 0) - 1);
+  const canAddChild = childAges.length < maxChildren;
+
+  // 동반유형/총 인원수가 줄어들어 기존 자녀 목록이 상한을 넘으면 초과분을 잘라낸다
+  useEffect(() => {
+    setChildAges((prev) => (prev.length > maxChildren ? prev.slice(0, maxChildren) : prev));
+  }, [maxChildren]);
+
+  const canSubmit = Boolean(signguFullCode && tripDate && !dateBeforeToday && !partySizeError);
+
+  function handleCompanionTypeChange(value) {
+    setCompanionType(value);
+    const fixedSize = FIXED_PARTY_SIZE_BY_COMPANION_TYPE[value];
+    if (fixedSize != null) {
+      setPartySize(fixedSize);
+    } else if (partySize < EXTENDED_FAMILY_MIN_SIZE || partySize > EXTENDED_FAMILY_MAX_SIZE) {
+      setPartySize(EXTENDED_FAMILY_MIN_SIZE);
+    }
+    setPartySizeTouched(false);
+  }
 
   function handleDateChange(value) {
     setDateTouched(true);
@@ -153,6 +188,7 @@ export default function CreateTripScreen({
   function handleSubmit(e) {
     e.preventDefault();
     setDateTouched(true);
+    setPartySizeTouched(true);
     if (!canSubmit) return;
     // 당일치기 강제: startDate === endDate
     onCreate({
@@ -218,7 +254,7 @@ export default function CreateTripScreen({
   }
 
   function handleAddChild() {
-    setChildAges((prev) => [...prev, 10]);
+    setChildAges((prev) => (prev.length >= maxChildren ? prev : [...prev, 10]));
   }
 
   function handleChangeChildAge(index, age) {
@@ -319,7 +355,7 @@ export default function CreateTripScreen({
                 key={opt.value}
                 type="button"
                 className={`tag ${companionType === opt.value ? 'selected' : ''}`}
-                onClick={() => setCompanionType(opt.value)}
+                onClick={() => handleCompanionTypeChange(opt.value)}
               >
                 {opt.label}
               </button>
@@ -329,16 +365,24 @@ export default function CreateTripScreen({
             총 인원수
             <input
               type="number"
-              min={1}
-              max={20}
+              min={isExtendedFamily ? EXTENDED_FAMILY_MIN_SIZE : partySize}
+              max={isExtendedFamily ? EXTENDED_FAMILY_MAX_SIZE : partySize}
               value={partySize}
+              readOnly={!isExtendedFamily}
+              disabled={!isExtendedFamily}
+              aria-invalid={partySizeTouched && Boolean(partySizeError)}
               onChange={(e) => {
+                if (!isExtendedFamily) return;
                 const n = parseInt(e.target.value, 10);
-                setPartySize(Number.isNaN(n) || n < 1 ? 1 : n);
+                setPartySize(Number.isNaN(n) ? '' : n);
               }}
+              onBlur={() => setPartySizeTouched(true)}
             />
             <span className="trip-form-hint-inline">명 - 슬롯별/전체 예상 비용 계산에 쓰여요</span>
           </label>
+          {isExtendedFamily && partySizeTouched && partySizeError && (
+            <div className="error-msg">❌ {partySizeError}</div>
+          )}
           <label className="trip-form-checkbox">
             <input type="checkbox" checked={withPet} onChange={(e) => setWithPet(e.target.checked)} />
             🐾 반려동물과 함께해요
@@ -379,7 +423,13 @@ export default function CreateTripScreen({
           <div className="trip-form-child-ages">
             <div className="trip-form-child-ages-head">
               <span className="trip-form-child-ages-label">동반 자녀 나이 (선택)</span>
-              <button type="button" className="btn-child-add" onClick={handleAddChild}>
+              <button
+                type="button"
+                className="btn-child-add"
+                onClick={handleAddChild}
+                disabled={!canAddChild}
+                title={!canAddChild ? '성인 최소 1명을 위해 더 이상 자녀를 추가할 수 없어요' : undefined}
+              >
                 + 자녀 추가
               </button>
             </div>
