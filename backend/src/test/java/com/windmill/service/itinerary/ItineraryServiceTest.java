@@ -47,7 +47,12 @@ class ItineraryServiceTest {
         tripRecordRepository = mock(TripRecordRepository.class);
         regionCodeService = mock(RegionCodeService.class);
         routeRecalculationService = mock(RouteRecalculationService.class);
-        service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService, routeRecalculationService);
+        com.windmill.service.tourapi.TourAttractionService tourAttractionService =
+                mock(com.windmill.service.tourapi.TourAttractionService.class);
+        com.windmill.service.recommendation.RecommendationPipeline recommendationPipeline =
+                mock(com.windmill.service.recommendation.RecommendationPipeline.class);
+        service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
+                routeRecalculationService, tourAttractionService, recommendationPipeline);
 
         when(regionCodeService.find("51210")).thenReturn(Optional.of(RegionCode.builder()
                 .sidoName("강원특별자치도").signguName("속초시").signguFullCode("51210")

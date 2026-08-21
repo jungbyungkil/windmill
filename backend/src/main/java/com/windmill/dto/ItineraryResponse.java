@@ -39,6 +39,8 @@ public class ItineraryResponse {
     private String routeHint;
     /** 동선 최적화 직후 총 이동거리 km(선택, Haversine) */
     private Double optimizedDistanceKm;
+    /** 삭제 직후 자동 대체된 장소명(선택) - 프론트가 "OO로 자동 채워드렸어요" 안내에 사용 */
+    private String autoReplacedPlaceName;
 
     public static ItineraryResponse from(Itinerary itinerary, ItineraryStatus status) {
         ItineraryResponse response = from(itinerary);

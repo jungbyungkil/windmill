@@ -29,6 +29,7 @@ import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
 import { checkClosingGate } from './utils/closingTime';
+import { checkTimeConflict } from './utils/timeConflict';
 import { recordView } from './utils/viewHistory';
 import './App.css';
 
@@ -472,15 +473,33 @@ export default function App() {
     }
   }
 
+  /** 409(TimeSlotConflictException)면 "시간 겹침" 모달로 안내하고, 호출자가 실패를 알 수 있게 다시 던진다 */
+  function reportIfTimeConflict(e, itemId) {
+    if (e?.status === 409 && e?.data?.conflictingPlaceName) {
+      const placeName = itinerary?.items?.find((i) => i.itemId === itemId)?.placeName;
+      setClosingGate({ placeName, message: e.data.message, kind: 'CONFLICT' });
+    }
+  }
+
   async function handleUpdateTime(itemId, scheduledTime) {
-    const result = await api.updateItem(itineraryId, itemId, { scheduledTime });
-    setItinerary(result);
+    try {
+      const result = await api.updateItem(itineraryId, itemId, { scheduledTime });
+      setItinerary(result);
+    } catch (e) {
+      reportIfTimeConflict(e, itemId);
+      throw e;
+    }
   }
 
   async function handleUpdateItem(itemId, patch) {
-    const result = await api.updateItem(itineraryId, itemId, patch);
-    setItinerary(result);
-    return result;
+    try {
+      const result = await api.updateItem(itineraryId, itemId, patch);
+      setItinerary(result);
+      return result;
+    } catch (e) {
+      reportIfTimeConflict(e, itemId);
+      throw e;
+    }
   }
 
   async function handleTogglePin(itemId, isPinned) {
@@ -490,6 +509,10 @@ export default function App() {
 
   async function handleDeleteItem(itemId) {
     const result = await api.deleteItem(itineraryId, itemId);
+    if (result.autoReplacedPlaceName) {
+      setAutoReplaceNotice(`"${result.autoReplacedPlaceName}"로 자동 채워드렸어요.`);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+    }
     setItinerary(result);
   }
 
@@ -526,36 +549,59 @@ export default function App() {
     const dayItems = (itinerary?.items || []).filter(
       (i) => (i.visitDate || itinerary.startDate) === (visitDate || itinerary?.startDate),
     );
+    // 시간 겹침(다른 일정과의 충돌)을 마감시간 게이트보다 먼저·독립적으로 검사한다 - 안 그러면
+    // "17시에 이미 다른 일정이 있어서" 못 넣는 경우에도 "이 장소 자체가 마감 임박"으로 잘못 안내됨.
+    const explicitTime = candidate.scheduledTime || candidate.suggestedTime;
+    if (explicitTime) {
+      const conflict = checkTimeConflict(explicitTime, dayItems);
+      if (conflict.blocked) {
+        setClosingGate({ placeName: candidate.placeName, message: conflict.message, kind: 'CONFLICT' });
+        throw new Error(conflict.message);
+      }
+    }
     const gate = checkClosingGate(candidate, { dayItems, visitDate: visitDate || itinerary?.startDate });
     if (gate.blocked) {
-      setClosingGate({ placeName: candidate.placeName, message: gate.message });
+      setClosingGate({ placeName: candidate.placeName, message: gate.message, kind: 'CLOSING' });
       throw new Error(gate.message);
     }
-    const result = await api.addItem(itineraryId, {
-      contentId: candidate.contentId,
-      contentTypeId: candidate.contentTypeId,
-      placeName: candidate.placeName,
-      thumbnailUrl: candidate.thumbnailUrl,
-      scheduledTime: candidate.scheduledTime || candidate.suggestedTime,
-      tags: candidate.matchedTags,
-      crowdRate: candidate.crowdRate,
-      visitDate,
-      addr1: candidate.addr1,
-      tel: candidate.tel,
-      useFeeText: candidate.useFeeText,
-      isFree: candidate.isFree,
-      estimatedCostPerPerson: candidate.estimatedCostPerPerson,
-      restDateText: candidate.restDateText,
-      closeTime: candidate.closeTime,
-      useTimeText: candidate.useTimeText,
-      homepageUrl: candidate.homepageUrl,
-      strollerFriendly: candidate.strollerFriendly,
-      accessibleFriendly: candidate.accessibleFriendly,
-      category: candidate.category,
-      mapX: candidate.mapX,
-      mapY: candidate.mapY,
-      isAlternate,
-    });
+    let result;
+    try {
+      result = await api.addItem(itineraryId, {
+        contentId: candidate.contentId,
+        contentTypeId: candidate.contentTypeId,
+        placeName: candidate.placeName,
+        thumbnailUrl: candidate.thumbnailUrl,
+        scheduledTime: candidate.scheduledTime || candidate.suggestedTime,
+        tags: candidate.matchedTags,
+        crowdRate: candidate.crowdRate,
+        visitDate,
+        addr1: candidate.addr1,
+        tel: candidate.tel,
+        useFeeText: candidate.useFeeText,
+        isFree: candidate.isFree,
+        estimatedCostPerPerson: candidate.estimatedCostPerPerson,
+        restDateText: candidate.restDateText,
+        closeTime: candidate.closeTime,
+        useTimeText: candidate.useTimeText,
+        homepageUrl: candidate.homepageUrl,
+        strollerFriendly: candidate.strollerFriendly,
+        accessibleFriendly: candidate.accessibleFriendly,
+        category: candidate.category,
+        mapX: candidate.mapX,
+        mapY: candidate.mapY,
+        isAlternate,
+        backupContentId: candidate.backupContentId,
+        backupContentTypeId: candidate.backupContentTypeId,
+        backupPlaceName: candidate.backupPlaceName,
+      });
+    } catch (e) {
+      // 클라이언트 사전검사를 통과했어도 서버가 그 사이 다른 항목 추가/수정으로 실제 겹침을
+      // 판정한 경우(경쟁 상태) - 구조화된 409면 CONFLICT 문구로 안내.
+      if (e?.status === 409 && e?.data?.conflictingPlaceName) {
+        setClosingGate({ placeName: candidate.placeName, message: e.data.message, kind: 'CONFLICT' });
+      }
+      throw e;
+    }
     setItinerary(result);
     return result;
   }
@@ -843,6 +889,7 @@ export default function App() {
 
   async function handleConfirmAutoPlan(selected) {
     let skipped = 0;
+    let added = 0;
     const visitDate = activeDate || itinerary.startDate;
     for (const candidate of selected) {
       try {
@@ -851,15 +898,26 @@ export default function App() {
           visitDate,
           false,
         );
+        added += 1;
       } catch {
         skipped += 1;
       }
     }
+    let result = itinerary;
     try {
-      const result = await api.getItinerary(itineraryId);
+      result = await api.getItinerary(itineraryId);
       setItinerary(result);
     } catch {
       /* keep */
+    }
+    // 스마트플랜 확정 때(confirmSmartPlanCore)와 동일하게 커밋 직후 실제 이동시간 기준으로 동선을 다시 잡는다
+    if (added >= 2 && (result?.items || []).length >= 2) {
+      try {
+        result = await api.optimizeRoute(itineraryId, visitDate);
+        setItinerary(result);
+      } catch {
+        /* keep unoptimized order */
+      }
     }
     if (skipped > 0) {
       setAutoReplaceNotice(`마감 시간 때문에 ${skipped}곳은 자동으로 건너뛰었어요.`);
@@ -1282,6 +1340,7 @@ export default function App() {
                 open={Boolean(closingGate)}
                 placeName={closingGate?.placeName}
                 message={closingGate?.message}
+                kind={closingGate?.kind}
                 onClose={() => setClosingGate(null)}
               />
 

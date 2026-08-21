@@ -110,6 +110,11 @@ export default function SmartPlanScreen({
               {stop.category && stop.category !== '점심' && stop.category !== '저녁' && (
                 <span className="leg-chip">{stop.category}</span>
               )}
+              {stop.backupPlaceName && (
+                <span className="leg-chip" title={`삭제하면 "${stop.backupPlaceName}"로 자동 교체돼요`}>
+                  🔁 예비 후보 있음
+                </span>
+              )}
             </div>
           </div>
         </article>

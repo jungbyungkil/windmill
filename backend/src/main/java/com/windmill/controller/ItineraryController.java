@@ -120,7 +120,11 @@ public class ItineraryController {
     public Mono<ResponseEntity<ItineraryResponse>> deleteItem(@PathVariable Long id, @PathVariable Long itemId) {
         return Mono.fromCallable(() -> itineraryService.deleteItem(id, itemId))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(this::toResponse)
+                .map(result -> {
+                    ItineraryResponse body = toResponse(result.itinerary());
+                    body.setAutoReplacedPlaceName(result.autoReplacedPlaceName());
+                    return body;
+                })
                 .map(ResponseEntity::ok);
     }
 

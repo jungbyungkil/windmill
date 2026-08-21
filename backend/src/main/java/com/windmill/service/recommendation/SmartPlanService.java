@@ -58,6 +58,8 @@ public class SmartPlanService {
     private static final int DEFAULT_TRAVEL_MINUTES = 20;
     private static final int MINUTES_PER_KM = 12;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    /** 슬롯 확장(오전2/오후2/저녁후) 판단용 근접 기준 - ProximityRanking.NEAR_KM/AnchorPlanService와 동일값 */
+    private static final double SLOT_EXPANSION_NEAR_KM = 1.5;
 
     private final RecommendationPipeline recommendationPipeline;
     private final TriggerScheduler triggerScheduler;
@@ -431,8 +433,11 @@ public class SmartPlanService {
     }
 
     /**
-     * 현실적인 당일치기: 오전 1 · 점심 · 오후 1~2 · 저녁 · (선택) 저녁 후.
-     * 가족은 오후 1곳, 저녁 후는 생략해 여유를 둔다.
+     * 현실적인 당일치기: 오전 1~2 · 점심 · 오후 1~2 · 저녁 · (선택) 저녁 후 — 최대 7슬롯.
+     * 각 구간의 "1번째"는 기존과 동일하게 시간창·예산만으로 무조건 시도한다(회귀 없음). "2번째"
+     * (오전2/오후2/저녁후)는 방금 배치한 곳에서 가까운 후보가 남아 있을 때만 밀도+거리 기준으로
+     * 추가한다 — 슬롯 개수를 늘리려고 먼 곳을 억지로 넣지 않는다는 요구사항(isNearby).
+     * 가족은 오후 1곳(2번째 없음), 저녁 후는 생략해 여유를 둔다.
      */
     List<RecommendationCandidate> buildDayRhythm(List<RecommendationCandidate> attrPool,
                                                    List<RecommendationCandidate> foodPool,
@@ -448,19 +453,33 @@ public class SmartPlanService {
         int afternoonLimit = familyPace ? 1 : 2;
         int attractionBudget = placeCap > 0
                 ? placeCap
-                : (familyPace ? 3 : 4); // 오전1+오후1~2+(저녁후0~1)
+                : (familyPace ? 3 : 5); // 오전1~2+오후1~2+(저녁후0~1)
         int attractionsUsed = 0;
         RecommendationCandidate prev = null;
 
-        // 1) 오전 관광 1곳 (11:30 이전 시작 가능할 때)
+        // 1) 오전 관광 1~2곳 (11:30 이전 시작 가능할 때, 2번째는 밀도+거리 통과 시에만)
         if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget) {
             RecommendationCandidate morning = takeNearest(attrPool, prev);
             if (morning != null) {
-                placeStop(morning, cursor, "오전 일정", false);
+                placeStop(morning, cursor, "오전 1", false);
+                attachBackup(morning, attrPool);
                 day.add(morning);
                 attractionsUsed++;
                 prev = morning;
                 cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekNearest(attrPool, prev)));
+
+                if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget
+                        && isNearby(prev, peekNearest(attrPool, prev))) {
+                    RecommendationCandidate morning2 = takeNearest(attrPool, prev);
+                    if (morning2 != null) {
+                        placeStop(morning2, cursor, "오전 2", false);
+                        attachBackup(morning2, attrPool);
+                        day.add(morning2);
+                        attractionsUsed++;
+                        prev = morning2;
+                        cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekNearest(attrPool, prev)));
+                    }
+                }
             }
         }
 
@@ -471,6 +490,7 @@ public class SmartPlanService {
                 RecommendationCandidate lunch = takeNearest(foodPool, prev);
                 if (lunch != null) {
                     placeStop(lunch, lunchTime, "🍽️ 점심", true);
+                    attachBackup(lunch, foodPool);
                     day.add(lunch);
                     prev = lunch;
                     cursor = lunchTime.plusMinutes(MEAL_STAY + DEFAULT_TRAVEL_MINUTES);
@@ -478,9 +498,13 @@ public class SmartPlanService {
             }
         }
 
-        // 3) 오후 관광 1~2곳 (17:30 전)
+        // 3) 오후 관광 1~2곳 (17:30 전) - 1번째는 기존과 동일하게 무조건 시도, 2번째만 밀도+거리 게이팅
         int afternoonLeft = afternoonLimit;
+        boolean firstAfternoon = true;
         while (afternoonLeft > 0 && attractionsUsed < attractionBudget && cursor.isBefore(LocalTime.of(17, 30))) {
+            if (!firstAfternoon && !isNearby(prev, peekNearest(attrPool, prev))) {
+                break;
+            }
             RecommendationCandidate afternoon = takeNearest(attrPool, prev);
             if (afternoon == null) {
                 break;
@@ -489,10 +513,12 @@ public class SmartPlanService {
                 attrPool.add(0, afternoon);
                 break;
             }
-            placeStop(afternoon, cursor, "오후 일정", false);
+            placeStop(afternoon, cursor, firstAfternoon ? "오후 1" : "오후 2", false);
+            attachBackup(afternoon, attrPool);
             day.add(afternoon);
             attractionsUsed++;
             afternoonLeft--;
+            firstAfternoon = false;
             prev = afternoon;
             cursor = cursor.plusMinutes(attractionStay + DEFAULT_TRAVEL_MINUTES);
         }
@@ -504,6 +530,7 @@ public class SmartPlanService {
                 RecommendationCandidate dinner = takeNearest(foodPool, prev);
                 if (dinner != null) {
                     placeStop(dinner, dinnerTime, "🍽️ 저녁", true);
+                    attachBackup(dinner, foodPool);
                     day.add(dinner);
                     prev = dinner;
                     cursor = dinnerTime.plusMinutes(MEAL_STAY + DEFAULT_TRAVEL_MINUTES);
@@ -511,12 +538,14 @@ public class SmartPlanService {
             }
         }
 
-        // 5) 저녁 후 선택 1곳 — 가족은 생략(여유), 솔로/커플만
-        if (!familyPace && attractionsUsed < attractionBudget && !cursor.isAfter(LocalTime.of(19, 45))) {
+        // 5) 저녁 후 선택 1곳 — 가족은 생략(여유), 솔로/커플만 + 밀도+거리 통과 시에만
+        if (!familyPace && attractionsUsed < attractionBudget && !cursor.isAfter(LocalTime.of(19, 45))
+                && isNearby(prev, peekNearest(attrPool, prev))) {
             RecommendationCandidate evening = takeNearest(attrPool, prev);
             if (evening != null && !cursor.isAfter(LATEST_START)) {
                 placeStop(evening, cursor.isBefore(LocalTime.of(19, 30)) ? LocalTime.of(19, 30) : cursor,
                         "저녁 후 일정", false);
+                attachBackup(evening, attrPool);
                 day.add(evening);
             } else if (evening != null) {
                 attrPool.add(0, evening);
@@ -529,6 +558,29 @@ public class SmartPlanService {
                     return t != null && !t.isAfter(LATEST_START);
                 })
                 .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    /**
+     * 방금 배치한 스탑 바로 다음으로 가까운 후보를 풀에서 "제거하지 않고" 예비 후보로 참조만 남긴다.
+     * 다른 슬롯이 이 후보를 더 잘 쓸 수도 있어(예: 오후의 예비가 저녁후의 대표가 될 수도) 지금 당장
+     * 소모하지 않는다 - 사용자가 대표를 삭제했을 때만(ItineraryService.deleteItem) 실제로 쓰인다.
+     */
+    private void attachBackup(RecommendationCandidate placed, List<RecommendationCandidate> pool) {
+        RecommendationCandidate backup = peekNearest(pool, placed);
+        if (backup != null) {
+            placed.setBackupContentId(backup.getContentId());
+            placed.setBackupContentTypeId(backup.getContentTypeId());
+            placed.setBackupPlaceName(backup.getPlaceName());
+        }
+    }
+
+    /** 슬롯 확장(2번째 오전/오후, 저녁후) 판단 기준 - anchor와 candidate가 근접 반경 안일 때만 확장 */
+    private boolean isNearby(RecommendationCandidate anchor, RecommendationCandidate candidate) {
+        if (anchor == null || candidate == null) {
+            return false;
+        }
+        Double km = GeoUtils.distanceKmSafe(anchor.getMapX(), anchor.getMapY(), candidate.getMapX(), candidate.getMapY());
+        return km != null && km <= SLOT_EXPANSION_NEAR_KM;
     }
 
     private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal) {

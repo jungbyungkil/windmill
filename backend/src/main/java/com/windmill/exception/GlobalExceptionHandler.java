@@ -1,6 +1,7 @@
 package com.windmill.exception;
 
 import com.windmill.dto.DuplicateItineraryResponse;
+import com.windmill.dto.TimeSlotConflictResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,15 @@ public class GlobalExceptionHandler {
             DuplicateActiveItineraryException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(DuplicateItineraryResponse.from(e.getExisting()));
+    }
+
+    /**
+     * 시간대 겹침(TimeConflictGate) - 마감시간 게이트(IllegalArgumentException)와 원인이 다르므로
+     * 별도 타입으로 구분해, 프론트가 "마감 임박"이 아닌 "시간 겹침" 문구를 정확히 골라 보여줄 수 있게 한다.
+     */
+    @ExceptionHandler(TimeSlotConflictException.class)
+    public ResponseEntity<TimeSlotConflictResponse> handleTimeSlotConflict(TimeSlotConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(TimeSlotConflictResponse.from(e));
     }
 
     /**

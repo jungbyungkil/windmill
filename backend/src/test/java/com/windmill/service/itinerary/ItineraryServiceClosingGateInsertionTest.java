@@ -40,7 +40,12 @@ class ItineraryServiceClosingGateInsertionTest {
         TripRecordRepository tripRecordRepository = mock(TripRecordRepository.class);
         RegionCodeService regionCodeService = mock(RegionCodeService.class);
         RouteRecalculationService routeRecalculationService = mock(RouteRecalculationService.class);
-        service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService, routeRecalculationService);
+        com.windmill.service.tourapi.TourAttractionService tourAttractionService =
+                mock(com.windmill.service.tourapi.TourAttractionService.class);
+        com.windmill.service.recommendation.RecommendationPipeline recommendationPipeline =
+                mock(com.windmill.service.recommendation.RecommendationPipeline.class);
+        service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
+                routeRecalculationService, tourAttractionService, recommendationPipeline);
         when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 

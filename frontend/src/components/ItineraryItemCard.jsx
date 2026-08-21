@@ -341,7 +341,12 @@ export default function ItineraryItemCard({
           🗺️
         </button>
         <button className="icon-btn" title="AI 도슨트 듣기" onClick={() => onOpenDocent(item)} disabled={editing}>🎧</button>
-        <button className="icon-btn danger" title="삭제" onClick={() => onDelete(item.itemId)} disabled={editing}>🗑️</button>
+        <button
+          className="icon-btn danger"
+          title={item.backupPlaceName ? `삭제 (자동으로 "${item.backupPlaceName}"로 교체돼요)` : '삭제'}
+          onClick={() => onDelete(item.itemId)}
+          disabled={editing}
+        >🗑️</button>
       </div>
     </div>
   );

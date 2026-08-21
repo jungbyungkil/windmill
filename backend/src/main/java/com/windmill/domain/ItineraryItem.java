@@ -61,6 +61,12 @@ public class ItineraryItem {
     private String useTimeText;
     private String homepageUrl;
 
+    /** 예비 후보 스냅샷(대표 다음으로 가까웠던 후보) - 이 항목을 삭제하면 자동 대체 시도에 쓰인다.
+     *  없으면(구버전 데이터·예비 후보 자체가 없던 슬롯) 전부 null - 삭제 시 재조회 폴백으로 넘어감. */
+    private String backupContentId;
+    private Integer backupContentTypeId;
+    private String backupPlaceName;
+
     /** 담는 시점의 RecommendationCandidate 스냅샷 - 유모차/무장애 배지 표시용 */
     private Boolean strollerFriendly;
     @Builder.Default

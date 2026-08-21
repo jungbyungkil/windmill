@@ -37,4 +37,8 @@ public class AddItineraryItemRequest {
     private Boolean isAlternate;
     private String mapX;
     private String mapY;
+    /** 예비 후보(RecommendationCandidate.backupContentId 등) 스냅샷 - 삭제 시 자동 대체에 사용 */
+    private String backupContentId;
+    private Integer backupContentTypeId;
+    private String backupPlaceName;
 }

@@ -7,21 +7,29 @@ import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryListItemResponse;
 import com.windmill.dto.ItineraryStatus;
+import com.windmill.dto.RecommendationCandidate;
+import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SharedItineraryResponse;
+import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.exception.DuplicateActiveItineraryException;
+import com.windmill.exception.TimeSlotConflictException;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
+import com.windmill.service.recommendation.RecommendationPipeline;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.GeoUtils;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.PlaceTagSanitizer;
+import com.windmill.util.TimeConflictGate;
 import com.windmill.util.VisitOrderOptimizer;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +47,7 @@ import java.util.stream.Collectors;
  * 일정 CRUD - 회원가입 없이 클라이언트가 매 요청 헤더(X-Session-Id)로 보내는 익명 UUID로만 스코핑한다.
  * JPA는 블로킹이므로 컨트롤러에서 별도 스레드(boundedElastic)로 감싸 호출한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ItineraryService {
@@ -50,6 +59,8 @@ public class ItineraryService {
     private final TripRecordRepository tripRecordRepository;
     private final RegionCodeService regionCodeService;
     private final RouteRecalculationService routeRecalculationService;
+    private final TourAttractionService tourAttractionService;
+    private final RecommendationPipeline recommendationPipeline;
 
     @Transactional
     public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
@@ -266,6 +277,10 @@ public class ItineraryService {
                 }
             }
         } else {
+            // 시간 겹침(다른 일정과의 충돌)을 마감시간 게이트보다 먼저·독립적으로 검사한다.
+            // 마감시간 게이트만 보면 "17시에 이미 다른 일정이 있어서" 못 넣는 경우에도
+            // 엉뚱하게 "이 장소 자체가 마감 임박" 메시지가 뜨는 문제가 있었다.
+            assertNoTimeConflict(itinerary, visitDate, scheduledTime, null);
             assertClosingGate(itinerary, request, visitDate, scheduledTime);
         }
 
@@ -294,6 +309,9 @@ public class ItineraryService {
                 .isAlternate(Boolean.TRUE.equals(request.getIsAlternate()))
                 .mapX(request.getMapX())
                 .mapY(request.getMapY())
+                .backupContentId(request.getBackupContentId())
+                .backupContentTypeId(request.getBackupContentTypeId())
+                .backupPlaceName(request.getBackupPlaceName())
                 .build();
 
         if (insertBeforeDayIndex != null) {
@@ -303,6 +321,27 @@ public class ItineraryService {
         }
         itinerary.getItems().add(item);
         return itineraryRepository.save(itinerary);
+    }
+
+    /**
+     * 같은 날 이미 예정된 다른 일정과 시간대가 겹치는지 검사(마감시간 게이트와 독립적인 원인).
+     * excludeItemId는 기존 항목의 시간을 수정할 때 자기 자신을 겹침 대상에서 빼기 위함(신규 추가 시엔 null).
+     */
+    private void assertNoTimeConflict(Itinerary itinerary, LocalDate visitDate, String scheduledTime,
+                                       Long excludeItemId) {
+        LocalTime start = ClosingTimeGate.parseHhMm(scheduledTime);
+        if (start == null) {
+            return;
+        }
+        List<TimeConflictGate.Occupant> occupants = dayItemsSorted(itinerary, visitDate).stream()
+                .map(i -> new TimeConflictGate.Occupant(
+                        i.getId(), i.getPlaceName(), ClosingTimeGate.parseHhMm(i.getScheduledTime())))
+                .toList();
+        TimeConflictGate.CheckResult result = TimeConflictGate.check(start, occupants, excludeItemId);
+        if (result.blocked()) {
+            throw new TimeSlotConflictException(result.message(), result.conflictingItemId(),
+                    result.conflictingPlaceName(), result.conflictingTime());
+        }
     }
 
     /**
@@ -452,6 +491,10 @@ public class ItineraryService {
             item.setDisplayOrder(request.getDisplayOrder());
         }
         if (request.getScheduledTime() != null) {
+            LocalDate targetVisitDate = (request.getVisitDate() != null && !request.getVisitDate().isBlank())
+                    ? LocalDate.parse(request.getVisitDate())
+                    : item.getVisitDate();
+            assertNoTimeConflict(itinerary, targetVisitDate, request.getScheduledTime(), item.getId());
             item.setScheduledTime(request.getScheduledTime());
         }
         if (request.getVisitDate() != null && !request.getVisitDate().isBlank()) {
@@ -491,11 +534,179 @@ public class ItineraryService {
         return itineraryRepository.save(itinerary);
     }
 
+    /**
+     * 삭제 - 예비 후보(backupContentId, 슬롯 생성 시점에 담아둔 대표 다음으로 가까웠던 후보)가 있으면
+     * 그 자리에 자동으로 대체를 시도한다. 예비 후보의 유효성은 삭제 시점에 다시 확인한다(생성 이후
+     * 마감/휴무가 바뀌었을 수 있어 스냅샷을 그대로 믿지 않음) - 무효하면 파이프라인 재조회로 폴백,
+     * 그마저 없으면 빈 자리로 둔다(대체 실패를 조용히 허용 - 무리하게 아무거나 채우지 않음).
+     */
     @Transactional
-    public Itinerary deleteItem(Long itineraryId, Long itemId) {
+    public DeleteItemResult deleteItem(Long itineraryId, Long itemId) {
         Itinerary itinerary = get(itineraryId);
+        ItineraryItem removed = itinerary.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElse(null);
+        if (removed == null) {
+            return new DeleteItemResult(itineraryRepository.save(itinerary), null);
+        }
+        String backupContentId = removed.getBackupContentId();
+        Integer backupContentTypeId = removed.getBackupContentTypeId();
+        String scheduledTime = removed.getScheduledTime();
+        LocalDate visitDate = removed.getVisitDate();
+        int displayOrder = removed.getDisplayOrder();
         itinerary.getItems().removeIf(i -> i.getId().equals(itemId));
-        return itineraryRepository.save(itinerary);
+
+        ItineraryItem replacement = null;
+        if (backupContentId != null && backupContentTypeId != null) {
+            replacement = tryBackupReplacement(itinerary, backupContentId, backupContentTypeId,
+                    scheduledTime, visitDate, displayOrder);
+        }
+        if (replacement == null) {
+            replacement = tryFallbackReplacement(itinerary, scheduledTime, visitDate, displayOrder);
+        }
+        if (replacement != null) {
+            replacement.setItinerary(itinerary);
+            itinerary.getItems().add(replacement);
+        }
+        Itinerary saved = itineraryRepository.save(itinerary);
+        return new DeleteItemResult(saved, replacement == null ? null : replacement.getPlaceName());
+    }
+
+    public record DeleteItemResult(Itinerary itinerary, String autoReplacedPlaceName) {
+    }
+
+    /** 예비 후보 스냅샷을 지금 다시 조회해 유효성(마감·시간겹침)을 확인한 뒤에만 대체 아이템을 만든다 */
+    private ItineraryItem tryBackupReplacement(Itinerary itinerary, String contentId, int contentTypeId,
+                                                String scheduledTime, LocalDate visitDate, int displayOrder) {
+        TourAttractionDetail detail;
+        try {
+            detail = tourAttractionService.getDetail(contentId, contentTypeId).block();
+        } catch (Exception e) {
+            log.warn("[deleteItem] 예비 후보 상세조회 실패 contentId={} - 폴백으로 넘어감", contentId, e);
+            return null;
+        }
+        if (detail == null) {
+            return null;
+        }
+        String useTimeText = BusinessHoursEvaluator.extractUseTimeText(detail.getIntroFields());
+        LocalTime close = BusinessHoursEvaluator.extractCloseTime(detail.getIntroFields());
+        if (!isSlotStillValid(itinerary, visitDate, scheduledTime, close, null)) {
+            return null;
+        }
+        String useFeeText = BusinessHoursEvaluator.extractUseFeeText(detail.getIntroFields());
+        String placeName = detail.getTitle() != null && !detail.getTitle().isBlank()
+                ? detail.getTitle() : null;
+        if (placeName == null) {
+            return null;
+        }
+        return ItineraryItem.builder()
+                .contentId(contentId)
+                .contentTypeId(contentTypeId)
+                .placeName(placeName)
+                .mapX(detail.getMapX())
+                .mapY(detail.getMapY())
+                .scheduledTime(scheduledTime)
+                .visitDate(visitDate)
+                .addr1(detail.getAddr1())
+                .tel(BusinessHoursEvaluator.extractPhone(detail.getTel(), detail.getIntroFields()))
+                .useFeeText(useFeeText)
+                .isFree(BusinessHoursEvaluator.isFree(useFeeText))
+                .estimatedCostPerPerson(BusinessHoursEvaluator.extractCostAmount(useFeeText))
+                .restDateText(BusinessHoursEvaluator.extractRestDateText(detail.getIntroFields()))
+                .closeTime(BusinessHoursEvaluator.formatHhMm(close))
+                .useTimeText(useTimeText)
+                .homepageUrl(detail.getHomepage())
+                .displayOrder(displayOrder)
+                .isAlternate(true)
+                .build();
+    }
+
+    /** 예비 후보가 없거나 무효화됐을 때 - 같은 지역 파이프라인을 한 번 더 돌려 최상위 후보 하나를 대신 담는다 */
+    private ItineraryItem tryFallbackReplacement(Itinerary itinerary, String scheduledTime, LocalDate visitDate,
+                                                  int displayOrder) {
+        List<ItineraryItem> dayItems = dayItemsSorted(itinerary, visitDate);
+        ItineraryItem origin = dayItems.isEmpty() ? null : dayItems.get(dayItems.size() - 1);
+        List<String> excludeContentIds = itinerary.getItems().stream()
+                .map(ItineraryItem::getContentId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toList());
+        RecommendationRequest request = RecommendationRequest.builder()
+                .regionCode(itinerary.getSignguFullCode())
+                .withPet(itinerary.isWithPet())
+                .strollerFriendly(itinerary.isStrollerFriendly())
+                .accessibleFriendly(itinerary.isAccessibleFriendly())
+                .companionType(itinerary.getCompanionType())
+                .adultAgeGroup(itinerary.getAdultAgeGroup())
+                .childAges(itinerary.getChildAges())
+                .excludeContentIds(excludeContentIds)
+                .originContentId(origin == null ? null : origin.getContentId())
+                .originContentTypeId(origin == null ? null : origin.getContentTypeId())
+                .skipLlm(true)
+                .build();
+
+        List<RecommendationCandidate> candidates;
+        try {
+            candidates = recommendationPipeline.recommend(request).block();
+        } catch (Exception e) {
+            log.warn("[deleteItem] 대체 후보 재조회 실패 itineraryId={}", itinerary.getId(), e);
+            return null;
+        }
+        if (candidates == null) {
+            return null;
+        }
+        for (RecommendationCandidate c : candidates) {
+            LocalTime close = ClosingTimeGate.parseHhMm(c.getCloseTime());
+            if (close == null) {
+                close = BusinessHoursEvaluator.extractCloseTimeFromText(c.getUseTimeText());
+            }
+            if (!isSlotStillValid(itinerary, visitDate, scheduledTime, close, null)) {
+                continue;
+            }
+            return ItineraryItem.builder()
+                    .contentId(c.getContentId())
+                    .contentTypeId(c.getContentTypeId())
+                    .placeName(c.getPlaceName())
+                    .thumbnailUrl(c.getThumbnailUrl())
+                    .mapX(c.getMapX())
+                    .mapY(c.getMapY())
+                    .scheduledTime(scheduledTime)
+                    .visitDate(visitDate)
+                    .addr1(c.getAddr1())
+                    .tel(c.getTel())
+                    .useFeeText(c.getUseFeeText())
+                    .isFree(c.getIsFree())
+                    .estimatedCostPerPerson(c.getEstimatedCostPerPerson())
+                    .restDateText(c.getRestDateText())
+                    .closeTime(c.getCloseTime())
+                    .useTimeText(c.getUseTimeText())
+                    .homepageUrl(c.getHomepageUrl())
+                    .category(c.getCategory())
+                    .strollerFriendly(c.getStrollerFriendly())
+                    .accessibleFriendly(c.isAccessibleFriendly())
+                    .crowdRate(c.getCrowdRate())
+                    .displayOrder(displayOrder)
+                    .isAlternate(true)
+                    .build();
+        }
+        return null;
+    }
+
+    /** 마감시간·시간겹침 둘 다 지금 시점 기준으로 통과해야 대체를 실행한다 */
+    private boolean isSlotStillValid(Itinerary itinerary, LocalDate visitDate, String scheduledTime,
+                                      LocalTime close, Long excludeItemId) {
+        LocalTime arrival = ClosingTimeGate.parseHhMm(scheduledTime);
+        if (arrival == null) {
+            return true;
+        }
+        if (close != null && ClosingTimeGate.check(close, arrival).blocked()) {
+            return false;
+        }
+        List<TimeConflictGate.Occupant> occupants = dayItemsSorted(itinerary, visitDate).stream()
+                .map(i -> new TimeConflictGate.Occupant(
+                        i.getId(), i.getPlaceName(), ClosingTimeGate.parseHhMm(i.getScheduledTime())))
+                .toList();
+        return !TimeConflictGate.check(arrival, occupants, excludeItemId).blocked();
     }
 
     /** 일자별 페이지 확정/해제 - 프론트가 "다음 날로 이동"을 허용할지 판단하는 기준 */

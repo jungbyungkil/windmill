@@ -43,4 +43,10 @@ public class RecommendationCandidate {
     private Boolean businessOpen;   // Stage2 결과 - RelatedCandidate에서 그대로 넘어옴, 모르면 null
     private BusinessStatus businessStatus; // Stage2 결과 - 휴무/영업종료 구분(businessOpen=false일 때 이유)
     private List<Badge> badges;     // 날씨/혼잡/영업 실시간 상태 배지 - RecommendationPipeline에서 조립
+
+    // 슬롯당 예비 후보(대표 바로 다음으로 가까운 후보) - 풀에서 제거하지 않고 참조만 남긴다.
+    // 사용자가 대표를 삭제하면 이 예비 후보로 자동 대체를 시도한다(ItineraryService.deleteItem).
+    private String backupContentId;
+    private Integer backupContentTypeId;
+    private String backupPlaceName;
 }
