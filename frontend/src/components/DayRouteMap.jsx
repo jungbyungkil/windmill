@@ -295,7 +295,7 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
 }
 
 /**
- * 오늘 동선 카카오맵 — 접이식. 순서 마커 + 도로 폴리라인(서버 프록시) + 상태 색.
+ * 오늘 동선 카카오맵 — "지도" 탭 전용 화면 콘텐츠. 순서 마커 + 도로 폴리라인(서버 프록시) + 상태 색.
  * TourAPI 좌표가 없어도 주소/장소명으로 카카오 지오코딩해 표시한다.
  */
 export default function DayRouteMap({
@@ -305,7 +305,6 @@ export default function DayRouteMap({
   hoursEndedAffectedItemIds = [],
   crowdAffectedItemIds = [],
 }) {
-  const [open, setOpen] = useState(true);
   const [jsKey, setJsKey] = useState(BUILD_TIME_JS_KEY);
   const [keyChecked, setKeyChecked] = useState(Boolean(BUILD_TIME_JS_KEY));
   const mode = 'CAR';
@@ -343,47 +342,22 @@ export default function DayRouteMap({
     }).filter(Boolean);
   }, [items, weather, closedDay, hoursEnded, crowd]);
 
-  const knownCoordCount = useMemo(
-    () => draftStops.filter((s) => s.lat != null && s.lng != null).length,
-    [draftStops],
-  );
-
   return (
-    <section className="day-route-map" aria-label="오늘 동선 지도">
-      <button
-        type="button"
-        className="day-route-map-toggle"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        <span>지도로 보기</span>
-        <span className="day-route-map-toggle-meta">
-          {draftStops.length > 0
-            ? knownCoordCount < draftStops.length
-              ? `${knownCoordCount}+주소 ${draftStops.length}곳`
-              : `${draftStops.length}곳`
-            : '위치 없음'}
-          {' · '}
-          {open ? '접기' : '펼치기'}
-        </span>
-      </button>
-
-      {open && (
-        <div className="day-route-map-body">
-          {!jsKey && keyChecked && (
-            <p className="day-route-map-hint">
-              카카오 JS 키를 찾지 못했어요. Render 환경변수 `VITE_KAKAO_JS_KEY` 또는 `KAKAO_JS_KEY`를
-              확인하고, 카카오 개발자 콘솔 Web 도메인에 배포 주소를 등록해 주세요.
-            </p>
-          )}
-          {jsKey && draftStops.length === 0 && (
-            <p className="day-route-map-hint">좌표·주소가 있는 장소가 아직 없어요.</p>
-          )}
-          {jsKey && draftStops.length > 0 && (
-            <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} mode={mode} />
-          )}
-        </div>
-      )}
+    <section className="day-route-map standalone" aria-label="오늘 동선 지도">
+      <div className="day-route-map-body">
+        {!jsKey && keyChecked && (
+          <p className="day-route-map-hint">
+            카카오 JS 키를 찾지 못했어요. Render 환경변수 `VITE_KAKAO_JS_KEY` 또는 `KAKAO_JS_KEY`를
+            확인하고, 카카오 개발자 콘솔 Web 도메인에 배포 주소를 등록해 주세요.
+          </p>
+        )}
+        {jsKey && draftStops.length === 0 && (
+          <p className="day-route-map-hint">좌표·주소가 있는 장소가 아직 없어요.</p>
+        )}
+        {jsKey && draftStops.length > 0 && (
+          <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} mode={mode} />
+        )}
+      </div>
     </section>
   );
 }

@@ -14,7 +14,9 @@ import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
 import ItineraryList from './components/ItineraryList';
+import DayRouteMap from './components/DayRouteMap';
 import RecommendationSearch from './components/RecommendationSearch';
+import BottomTabBar from './components/BottomTabBar';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
@@ -29,6 +31,7 @@ import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
 import { recordView } from './utils/viewHistory';
+import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from './utils/statusLevel';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -206,11 +209,6 @@ export default function App() {
   function handleOpenMyTrips() {
     setMenuOpen(false);
     navigate('/my-trips');
-  }
-
-  function handleOpenAlerts() {
-    setMenuOpen(false);
-    navigate('/alerts');
   }
 
   function handleOpenGuide() {
@@ -1108,7 +1106,6 @@ export default function App() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigateMyTrips={handleOpenMyTrips}
-        onNavigateAlerts={handleOpenAlerts}
         onNavigateGuide={handleOpenGuide}
       />
       <ExitConfirmModal
@@ -1288,15 +1285,6 @@ export default function App() {
                   gpsOptimizing={optimizeLoading}
                 />
 
-                <RecommendationSearch
-                  onSearch={handleSearch}
-                  onAdd={handleAddRecommendation}
-                  results={recoResults}
-                  loading={recoLoading}
-                  addingId={addingContentId}
-                  pinnedPlaceName={pinnedOrigin?.placeName}
-                />
-
                 <FestivalBanner
                   festivals={trigger?.festivalSuggestions}
                   onAdd={handleAddFestival}
@@ -1309,6 +1297,8 @@ export default function App() {
               <footer className="app-footer">
                 <p>바람따라 · 바람이 알려주는 실시간 여행</p>
               </footer>
+
+              <BottomTabBar active="home" />
 
               <AlternativesPanel
                 open={altOpen}
@@ -1354,12 +1344,85 @@ export default function App() {
         }
       />
       <Route
+        path="/trip/map"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <>
+              <BackHeader title="지도 · 스팟" showBack={false} onMenuClick={() => setMenuOpen(true)} />
+              <div className="map-tab-screen">
+                <DayRouteMap
+                  items={visibleItems}
+                  weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
+                  closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
+                  hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
+                  crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
+                />
+                {visibleItems.length > 0 && (() => {
+                  const weather = new Set((trigger?.weatherAffectedItemIds || []).map(Number));
+                  const closedDay = new Set((trigger?.closedDayAffectedItemIds || []).map(Number));
+                  const hoursEnded = new Set((trigger?.hoursEndedAffectedItemIds || []).map(Number));
+                  const crowd = new Set((trigger?.crowdAffectedItemIds || []).map(Number));
+                  return (
+                  <ul className="map-tab-place-list">
+                    {visibleItems.map((item) => {
+                      const id = Number(item.itemId);
+                      const indoor = isIndoorPlace(item);
+                      const level = itemStatusLevel(item, {
+                        weatherAlerted: weather.has(id) && !indoor,
+                        businessAlerted: closedDay.has(id) || hoursEnded.has(id),
+                        crowdAlerted: crowd.has(id),
+                      }).toLowerCase();
+                      return (
+                        <li key={item.itemId} className="map-tab-place-row">
+                          <span className={`map-tab-place-dot level-${level}`} />
+                          <div className="map-tab-place-body">
+                            <div className="map-tab-place-name">{item.placeName}</div>
+                            {item.addr1 && <div className="map-tab-place-addr">{item.addr1}</div>}
+                          </div>
+                          <span className={`map-tab-place-status level-${level}`}>
+                            {STATUS_LABEL[level.toUpperCase()]}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  );
+                })()}
+              </div>
+              <BottomTabBar active="map" />
+            </>
+          )
+        }
+      />
+      <Route
+        path="/trip/search"
+        element={
+          !itinerary ? <Navigate to="/" replace /> : (
+            <>
+              <BackHeader showBack={false} onMenuClick={() => setMenuOpen(true)} />
+              <div className="search-tab-screen">
+                <RecommendationSearch
+                  onSearch={handleSearch}
+                  onAdd={handleAddRecommendation}
+                  results={recoResults}
+                  loading={recoLoading}
+                  addingId={addingContentId}
+                  pinnedPlaceName={pinnedOrigin?.placeName}
+                />
+              </div>
+              <BottomTabBar active="search" />
+            </>
+          )
+        }
+      />
+      <Route
         path="/alerts"
         element={
           !itinerary ? <Navigate to="/" replace /> : (
             <>
-              <BackHeader title="알림" onMenuClick={() => setMenuOpen(true)} />
+              <BackHeader title="알림" showBack={false} onMenuClick={() => setMenuOpen(true)} />
               <AlertFeedScreen itineraryId={itineraryId} />
+              <BottomTabBar active="alerts" />
             </>
           )
         }
@@ -1386,8 +1449,9 @@ export default function App() {
         path="/settings"
         element={
           <>
-            <BackHeader title="설정" onMenuClick={() => setMenuOpen(true)} />
+            <BackHeader title="프로필 · 설정" showBack={false} onMenuClick={() => setMenuOpen(true)} />
             <SettingsScreen sessionId={sessionId} />
+            <BottomTabBar active="profile" />
           </>
         }
       />
