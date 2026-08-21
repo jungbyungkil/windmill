@@ -152,27 +152,15 @@ export default function GuideScreen() {
           <p className="guide-subsection-body">
             바람개비는 여행 중에도 날씨·혼잡도·동선을 주기적으로 확인해서, 상황이 바뀌면 색으로 바로 알려드려요.
           </p>
-          <table className="guide-status-table">
-            <thead>
-              <tr>
-                <th scope="col">색상</th>
-                <th scope="col">상태명</th>
-                <th scope="col">의미</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PINWHEEL_LEVELS.map((s) => (
-                <tr key={s.level}>
-                  <td>
-                    <span className={`guide-status-dot level-${s.level}`} aria-hidden="true" />
-                    {s.emoji}
-                  </td>
-                  <td>{s.name}</td>
-                  <td>{s.meaning}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="guide-status-legend">
+            {PINWHEEL_LEVELS.map((s) => (
+              <div className="guide-status-row" key={s.level}>
+                <span className={`guide-status-dot level-${s.level}`} aria-hidden="true" />
+                <span className="guide-status-name">{s.name}</span>
+                <span className="guide-status-meaning">{s.meaning}</span>
+              </div>
+            ))}
+          </div>
           <p className="guide-subsection-body">
             바람개비를 탭하면 색이 바뀐 사유를 확인하고, 이어서 대응 방안(대안 코스)까지 바로 볼 수 있어요.
           </p>

@@ -5597,37 +5597,38 @@
   margin-bottom: 0;
 }
 
-.guide-status-table {
-  width: 100%;
+.guide-status-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin: 0 0 10px;
-  border-collapse: collapse;
-  font-size: 13px;
 }
 
-.guide-status-table th,
-.guide-status-table td {
-  padding: 8px 6px;
-  text-align: left;
-  border-bottom: 1px solid var(--sand-border);
+.guide-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.guide-status-table th {
-  font-size: 11px;
+.guide-status-name {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--ink);
 }
 
-.guide-status-table td {
-  color: var(--ink);
+.guide-status-meaning {
+  font-size: 11.5px;
+  color: var(--muted);
 }
 
 .guide-status-dot {
   display: inline-block;
   width: 10px;
   height: 10px;
-  margin-right: 6px;
   border-radius: 50%;
-  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .guide-status-dot.level-normal {
