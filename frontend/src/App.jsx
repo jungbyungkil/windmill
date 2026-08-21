@@ -28,8 +28,6 @@ import TripRecordDetailScreen from './components/TripRecordDetailScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
-import { checkClosingGate } from './utils/closingTime';
-import { checkTimeConflict } from './utils/timeConflict';
 import { recordView } from './utils/viewHistory';
 import './App.css';
 
@@ -558,25 +556,14 @@ export default function App() {
     }
   }
 
+  /**
+   * "일정에 추가" 버튼은 무조건 담는다 - 마감시간·시간겹침 사전검사로 막지 않는다. 사용자가 이미
+   * "넣겠다"고 판단하고 누른 액션이라 조건 없이 그대로 반영해야 한다는 요청(2026-08-22)에 따라,
+   * 예전에 여기 있던 checkTimeConflict/checkClosingGate 클라이언트 사전검사를 제거함 - 서버
+   * (ItineraryService.addItem)도 같은 이유로 더 이상 마감·겹침을 사유로 추가를 거절하지 않는다
+   * (가능하면 마감 안 넘기는 자리에 끼워 넣어주는 동작은 유지, 거절만 없앰).
+   */
   async function addCandidateToItinerary(candidate, visitDate = activeDate, isAlternate = false) {
-    const dayItems = (itinerary?.items || []).filter(
-      (i) => (i.visitDate || itinerary.startDate) === (visitDate || itinerary?.startDate),
-    );
-    // 시간 겹침(다른 일정과의 충돌)을 마감시간 게이트보다 먼저·독립적으로 검사한다 - 안 그러면
-    // "17시에 이미 다른 일정이 있어서" 못 넣는 경우에도 "이 장소 자체가 마감 임박"으로 잘못 안내됨.
-    const explicitTime = candidate.scheduledTime || candidate.suggestedTime;
-    if (explicitTime) {
-      const conflict = checkTimeConflict(explicitTime, dayItems);
-      if (conflict.blocked) {
-        setClosingGate({ placeName: candidate.placeName, message: conflict.message, kind: 'CONFLICT' });
-        throw new Error(conflict.message);
-      }
-    }
-    const gate = checkClosingGate(candidate, { dayItems, visitDate: visitDate || itinerary?.startDate });
-    if (gate.blocked) {
-      setClosingGate({ placeName: candidate.placeName, message: gate.message, kind: 'CLOSING' });
-      throw new Error(gate.message);
-    }
     let result;
     try {
       result = await api.addItem(itineraryId, {
@@ -608,11 +595,9 @@ export default function App() {
         backupPlaceName: candidate.backupPlaceName,
       });
     } catch (e) {
-      // 클라이언트 사전검사를 통과했어도 서버가 그 사이 다른 항목 추가/수정으로 실제 겹침을
-      // 판정한 경우(경쟁 상태) - 구조화된 409면 CONFLICT 문구로 안내.
-      if (e?.status === 409 && e?.data?.conflictingPlaceName) {
-        setClosingGate({ placeName: candidate.placeName, message: e.data.message, kind: 'CONFLICT' });
-      }
+      // 마감·겹침으로는 더 이상 거절되지 않으니, 여기 남는 실패는 네트워크 오류 등 진짜 예외뿐이다.
+      setAutoReplaceNotice(`"${candidate.placeName || '이 장소'}"를 담지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
       throw e;
     }
     setItinerary(result);

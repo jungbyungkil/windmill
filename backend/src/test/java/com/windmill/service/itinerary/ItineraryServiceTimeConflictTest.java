@@ -17,7 +17,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -83,29 +82,32 @@ class ItineraryServiceTimeConflictTest {
         return request;
     }
 
+    /**
+     * 2026-08-22 - "일정에 추가" 버튼은 마감·겹침을 이유로 더 이상 거절하지 않는다(사용자 요청:
+     * 이미 넣기로 판단하고 누른 액션이니 조건 없이 그대로 반영). updateItem(기존 항목 시간 수정)의
+     * 겹침 검사는 그대로 유지됨 - 아래 updateItem_* 테스트 참고.
+     */
     @Test
-    void addItem_explicitTimeOverlapsExistingItem_throwsTimeSlotConflictWithConflictingItemInfo() {
+    void addItem_explicitTimeOverlapsExistingItem_addsAnywayWithoutBlocking() {
         itineraryWith(existing(1, 0, "경복궁", "17:00"));
 
-        TimeSlotConflictException ex = assertThrows(TimeSlotConflictException.class,
-                () -> service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "21:00")));
+        Itinerary result = service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "21:00"));
 
-        assertEquals(1L, ex.getConflictingItemId());
-        assertEquals("경복궁", ex.getConflictingPlaceName());
-        assertTrue(ex.getMessage().contains("경복궁"));
-        assertTrue(ex.getMessage().contains("17"));
+        assertEquals(2, result.getItems().size());
+        ItineraryItem added = result.getItems().stream()
+                .filter(i -> "창덕궁".equals(i.getPlaceName())).findFirst().orElseThrow();
+        assertEquals("17:20", added.getScheduledTime());
     }
 
     @Test
-    void addItem_conflictTakesPriorityOverClosingTimeGate() {
-        // 새 장소 자체는 17:30에 마감(입력 17:20 도착도 마감 임박 버퍼 안에 걸림)이라 마감게이트로도
-        // 막힐 수 있는 상황이지만, 실제로는 시간 겹침이 먼저 걸려 TimeSlotConflictException이어야 한다.
+    void addItem_bothConflictAndClosingTimeIssues_stillAddsAnyway() {
+        // 새 장소 자체는 17:30에 마감(입력 17:20 도착도 마감 임박 버퍼 안에 걸림)이면서 기존 경복궁
+        // 17:00과도 겹치는 상황이지만, 두 사유 모두 더 이상 추가 자체를 막지 않는다.
         itineraryWith(existing(1, 0, "경복궁", "17:00"));
 
-        TimeSlotConflictException ex = assertThrows(TimeSlotConflictException.class,
-                () -> service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "17:30")));
+        Itinerary result = service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "17:30"));
 
-        assertEquals("경복궁", ex.getConflictingPlaceName());
+        assertEquals(2, result.getItems().size());
     }
 
     @Test

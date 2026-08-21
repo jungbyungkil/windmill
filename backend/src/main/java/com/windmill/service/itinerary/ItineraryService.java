@@ -239,6 +239,12 @@ public class ItineraryService {
         return itineraryRepository.findOngoingDayTripsBySession(sessionUuid, KoreaClock.today());
     }
 
+    /**
+     * 일정에 담기 - 마감시간·시간겹침을 이유로 추가 자체를 막지 않는다(2026-08-22 사용자 요청:
+     * "이미 넣기로 판단하고 누른 버튼이니 조건 없이 그대로 넣어달라"). scheduledTime이 없는
+     * 경우엔 여전히 가능하면 마감을 안 넘기는 자리를 찾아 끼워 넣어 주지만(findFeasibleInsertion),
+     * 그런 자리가 없어도 더 이상 거절하지 않고 그냥 하루 끝에 이어붙인다.
+     */
     @Transactional
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);
@@ -261,23 +267,17 @@ public class ItineraryService {
                 if (!endCheck.allowed()) {
                     // 하루 맨 끝에는 마감 때문에 못 붙는다 - 마감을 안 넘기는 자리 중 가장 늦은(=기존
                     // 앞쪽 일정을 최대한 안 건드리는) 위치를 찾아 그 자리에 끼워 넣는다. 못 찾으면
-                    // 기존처럼 차단.
+                    // (예전엔 여기서 차단했지만) 그냥 하루 끝에 이어붙인다 - scheduledTime 미배정 상태로
+                    // 남아 기존 "시간 미지정 항목"과 동일하게 처리됨.
                     dayItems = dayItemsSorted(itinerary, visitDate);
                     InsertionPlan plan = dayItems.isEmpty() ? null
                             : findFeasibleInsertion(dayItems, visitDate, request.getMapX(), request.getMapY(), close);
-                    if (plan == null) {
-                        throw new IllegalArgumentException(endCheck.message());
+                    if (plan != null) {
+                        insertBeforeDayIndex = plan.index();
+                        scheduledTime = plan.arrival().format(TIME_FMT);
                     }
-                    insertBeforeDayIndex = plan.index();
-                    scheduledTime = plan.arrival().format(TIME_FMT);
                 }
             }
-        } else {
-            // 시간 겹침(다른 일정과의 충돌)을 마감시간 게이트보다 먼저·독립적으로 검사한다.
-            // 마감시간 게이트만 보면 "17시에 이미 다른 일정이 있어서" 못 넣는 경우에도
-            // 엉뚱하게 "이 장소 자체가 마감 임박" 메시지가 뜨는 문제가 있었다.
-            assertNoTimeConflict(itinerary, visitDate, scheduledTime, null);
-            assertClosingGate(itinerary, request, visitDate, scheduledTime);
         }
 
         ItineraryItem item = ItineraryItem.builder()
@@ -337,29 +337,6 @@ public class ItineraryService {
         if (result.blocked()) {
             throw new TimeSlotConflictException(result.message(), result.conflictingItemId(),
                     result.conflictingPlaceName(), result.conflictingTime());
-        }
-    }
-
-    /**
-     * close 시간이 있으면 도착 예상(또는 지정 scheduledTime)이 마감 임박 이내인지 검사.
-     * 이동시간은 TarRlte에 없어 Haversine 추정(또는 기본 20분)을 사용한다.
-     */
-    private void assertClosingGate(Itinerary itinerary, AddItineraryItemRequest request, LocalDate visitDate,
-                                    String scheduledTime) {
-        LocalTime close = ClosingTimeGate.parseHhMm(request.getCloseTime());
-        if (close == null) {
-            close = BusinessHoursEvaluator.extractCloseTimeFromText(request.getUseTimeText());
-        }
-        if (close == null) {
-            return;
-        }
-        LocalTime arrival = ClosingTimeGate.parseHhMm(scheduledTime);
-        if (arrival == null) {
-            arrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
-        }
-        ClosingTimeGate.CheckResult check = ClosingTimeGate.check(close, arrival);
-        if (check.blocked()) {
-            throw new IllegalArgumentException(check.message());
         }
     }
 

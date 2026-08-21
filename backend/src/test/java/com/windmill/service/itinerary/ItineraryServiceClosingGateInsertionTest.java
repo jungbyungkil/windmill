@@ -15,8 +15,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -106,16 +104,26 @@ class ItineraryServiceClosingGateInsertionTest {
         assertEquals("15:30", byOrder.get(3).getScheduledTime());
     }
 
+    /**
+     * 2026-08-22 - 마감을 안 넘기는 자리를 어디서도 못 찾아도(예전엔 여기서 차단) 더 이상 추가
+     * 자체를 막지 않는다(사용자 요청: 조건 없이 그대로 넣어달라) - scheduledTime 미배정 상태로
+     * 그냥 하루 끝에 이어붙인다.
+     */
     @Test
-    void noFeasibleSlotAnywhere_stillBlocksWithMessage() {
+    void noFeasibleSlotAnywhere_addsAnywayWithoutForcingScheduledTime() {
         itineraryWith(
                 existing(1, 0, "새봄떡국국수", "11:00"),
                 existing(2, 1, "농업박물관", "12:20"),
                 existing(3, 2, "국도발전전시관", "18:20"));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.addItem(ITINERARY_ID, candidate("초조기마감장소", "10:00")));
-        assertTrue(ex.getMessage().contains("10시"));
+        Itinerary result = service.addItem(ITINERARY_ID, candidate("초조기마감장소", "10:00"));
+
+        List<ItineraryItem> byOrder = result.getItems().stream()
+                .sorted((a, b) -> Integer.compare(a.getDisplayOrder(), b.getDisplayOrder()))
+                .toList();
+        assertEquals(4, byOrder.size());
+        assertEquals("초조기마감장소", byOrder.get(3).getPlaceName());
+        assertNull(byOrder.get(3).getScheduledTime());
     }
 
     @Test
@@ -137,11 +145,13 @@ class ItineraryServiceClosingGateInsertionTest {
     }
 
     @Test
-    void emptyFutureDay_earlyClosingPlace_stillBlockedByOriginalPath() {
+    void emptyFutureDay_earlyClosingPlace_addsAnywayWithoutForcingScheduledTime() {
         itineraryWith();
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.addItem(ITINERARY_ID, candidate("이른마감장소", "09:30")));
-        assertTrue(ex.getMessage().contains("9시"));
+        Itinerary result = service.addItem(ITINERARY_ID, candidate("이른마감장소", "09:30"));
+
+        assertEquals(1, result.getItems().size());
+        assertEquals("이른마감장소", result.getItems().get(0).getPlaceName());
+        assertNull(result.getItems().get(0).getScheduledTime());
     }
 }
