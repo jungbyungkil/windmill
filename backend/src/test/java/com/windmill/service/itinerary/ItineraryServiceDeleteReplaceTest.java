@@ -2,11 +2,9 @@ package com.windmill.service.itinerary;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
-import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
-import com.windmill.service.recommendation.RecommendationPipeline;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -27,7 +24,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * 삭제 시 자동 대체(요구사항: 슬롯당 예비 후보 2개 중 대표를 지우면 예비로 즉시 채움) 검증.
- * 2026-08-21 - "슬롯 확장 + 삭제 시 자동 대체" 요구사항 세션.
+ * 2026-08-21 - "슬롯 확장 + 삭제 시 자동 대체" 요구사항 세션. 최초 구현엔 예비 후보가 없거나
+ * 무효할 때 파이프라인 재조회 폴백이 있었으나, 삭제 자체가 느려지거나 실패하는 회귀를 일으켜
+ * 제거함(사용자 제보 - "삭제 버튼이 안 먹는다") - 이제 예비 후보가 없으면 그냥 빈 자리로 둔다.
  */
 class ItineraryServiceDeleteReplaceTest {
 
@@ -36,7 +35,6 @@ class ItineraryServiceDeleteReplaceTest {
 
     private ItineraryRepository itineraryRepository;
     private TourAttractionService tourAttractionService;
-    private RecommendationPipeline recommendationPipeline;
     private ItineraryService service;
 
     @BeforeEach
@@ -46,9 +44,8 @@ class ItineraryServiceDeleteReplaceTest {
         RegionCodeService regionCodeService = mock(RegionCodeService.class);
         RouteRecalculationService routeRecalculationService = mock(RouteRecalculationService.class);
         tourAttractionService = mock(TourAttractionService.class);
-        recommendationPipeline = mock(RecommendationPipeline.class);
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService, recommendationPipeline);
+                routeRecalculationService, tourAttractionService);
         when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -104,52 +101,30 @@ class ItineraryServiceDeleteReplaceTest {
         assertTrue(replaced.isAlternate());
     }
 
+    /** 예비 후보가 그 사이 마감시간이 당겨져 지금은 무효 - 재조회 폴백 없이 그냥 빈 자리로 남는다 */
     @Test
-    void deleteWithBackupNowClosed_fallsBackToPipelineRefetch() {
+    void deleteWithBackupNowClosed_leavesSlotEmpty() {
         itineraryWith(itemWithBackup(1, 0, "경복궁", "17:30", "backup-1"));
-        // 예비 후보가 그 사이 마감시간이 당겨져 17:30 도착 기준으로는 이제 막힘
         TourAttractionDetail detail = TourAttractionDetail.builder()
                 .contentId("backup-1")
                 .title("창덕궁")
                 .introFields(Map.of("usetime", "09:00~18:00")) // 마감 18:00, 버퍼 60분 -> 17:00 이후 불가
                 .build();
         when(tourAttractionService.getDetail("backup-1", 12)).thenReturn(Mono.just(detail));
-        RecommendationCandidate fallback = RecommendationCandidate.builder()
-                .contentId("fallback-1")
-                .contentTypeId(12)
-                .placeName("경희궁")
-                .build();
-        when(recommendationPipeline.recommend(any())).thenReturn(Mono.just(List.of(fallback)));
 
         ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L);
 
-        assertEquals("경희궁", result.autoReplacedPlaceName());
-        assertEquals("fallback-1", result.itinerary().getItems().get(0).getContentId());
-        assertTrue(result.itinerary().getItems().get(0).isAlternate());
+        assertNull(result.autoReplacedPlaceName());
+        assertTrue(result.itinerary().getItems().isEmpty());
     }
 
+    /** 예비 후보 자체가 없으면(이 기능 배포 전에 담긴 항목 등) 파이프라인을 다시 돌리지 않고 그냥 삭제한다 */
     @Test
-    void deleteWithoutBackup_fallsBackToPipelineRefetch() {
+    void deleteWithoutBackup_justDeletes_noPipelineCall() {
         ItineraryItem noBackup = ItineraryItem.builder()
                 .id(1L).displayOrder(0).placeName("경복궁").scheduledTime("10:00").visitDate(TOMORROW)
                 .build();
         itineraryWith(noBackup);
-        RecommendationCandidate fallback = RecommendationCandidate.builder()
-                .contentId("fallback-1").contentTypeId(12).placeName("경희궁").build();
-        when(recommendationPipeline.recommend(any())).thenReturn(Mono.just(List.of(fallback)));
-
-        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L);
-
-        assertEquals("경희궁", result.autoReplacedPlaceName());
-    }
-
-    @Test
-    void deleteWithNoBackupAndNoFallbackCandidates_leavesSlotEmpty() {
-        ItineraryItem noBackup = ItineraryItem.builder()
-                .id(1L).displayOrder(0).placeName("경복궁").scheduledTime("10:00").visitDate(TOMORROW)
-                .build();
-        itineraryWith(noBackup);
-        when(recommendationPipeline.recommend(any())).thenReturn(Mono.just(List.of()));
 
         ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L);
 

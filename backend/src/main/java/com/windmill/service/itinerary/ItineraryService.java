@@ -7,8 +7,6 @@ import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryListItemResponse;
 import com.windmill.dto.ItineraryStatus;
-import com.windmill.dto.RecommendationCandidate;
-import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SharedItineraryResponse;
 import com.windmill.dto.TourAttractionDetail;
@@ -17,7 +15,6 @@ import com.windmill.exception.DuplicateActiveItineraryException;
 import com.windmill.exception.TimeSlotConflictException;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
-import com.windmill.service.recommendation.RecommendationPipeline;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.util.ClosingTimeGate;
@@ -60,7 +57,6 @@ public class ItineraryService {
     private final RegionCodeService regionCodeService;
     private final RouteRecalculationService routeRecalculationService;
     private final TourAttractionService tourAttractionService;
-    private final RecommendationPipeline recommendationPipeline;
 
     @Transactional
     public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
@@ -537,8 +533,15 @@ public class ItineraryService {
     /**
      * 삭제 - 예비 후보(backupContentId, 슬롯 생성 시점에 담아둔 대표 다음으로 가까웠던 후보)가 있으면
      * 그 자리에 자동으로 대체를 시도한다. 예비 후보의 유효성은 삭제 시점에 다시 확인한다(생성 이후
-     * 마감/휴무가 바뀌었을 수 있어 스냅샷을 그대로 믿지 않음) - 무효하면 파이프라인 재조회로 폴백,
-     * 그마저 없으면 빈 자리로 둔다(대체 실패를 조용히 허용 - 무리하게 아무거나 채우지 않음).
+     * 마감/휴무가 바뀌었을 수 있어 스냅샷을 그대로 믿지 않음) - 무효하면(또는 예비 후보 자체가 없으면)
+     * 빈 자리로 둔다.
+     * ⚠ 2026-08-21: 최초 구현엔 예비 후보가 없거나 무효할 때 파이프라인(Stage1~4, 외부 API 여러 건)을
+     * 다시 돌리는 재조회 폴백이 있었으나, 삭제는 지금까지 즉시 끝나던 가벼운 동작이었는데 이 폴백이
+     * @Transactional 트랜잭션 안에서 수 초짜리 외부 API 체인을 동기 블로킹으로 돌리면서, 예비 후보가
+     * 없는 대다수 항목(이 기능 배포 전에 이미 담겨 있던 모든 항목 포함)의 삭제가 느려지거나 타임아웃/
+     * 오류로 아예 실패하는 회귀가 발생함(사용자 제보: "삭제 버튼이 안 먹는다"). 프론트도 이 실패를
+     * 못 잡아 버튼이 그냥 반응 없는 것처럼 보였음. 재조회 폴백은 제거하고, 예비 후보(단건 캐시 조회,
+     * 가벼움)가 있을 때만 대체를 시도하도록 축소했다.
      */
     @Transactional
     public DeleteItemResult deleteItem(Long itineraryId, Long itemId) {
@@ -561,9 +564,6 @@ public class ItineraryService {
         if (backupContentId != null && backupContentTypeId != null) {
             replacement = tryBackupReplacement(itinerary, backupContentId, backupContentTypeId,
                     scheduledTime, visitDate, displayOrder);
-        }
-        if (replacement == null) {
-            replacement = tryFallbackReplacement(itinerary, scheduledTime, visitDate, displayOrder);
         }
         if (replacement != null) {
             replacement.setItinerary(itinerary);
@@ -620,76 +620,6 @@ public class ItineraryService {
                 .displayOrder(displayOrder)
                 .isAlternate(true)
                 .build();
-    }
-
-    /** 예비 후보가 없거나 무효화됐을 때 - 같은 지역 파이프라인을 한 번 더 돌려 최상위 후보 하나를 대신 담는다 */
-    private ItineraryItem tryFallbackReplacement(Itinerary itinerary, String scheduledTime, LocalDate visitDate,
-                                                  int displayOrder) {
-        List<ItineraryItem> dayItems = dayItemsSorted(itinerary, visitDate);
-        ItineraryItem origin = dayItems.isEmpty() ? null : dayItems.get(dayItems.size() - 1);
-        List<String> excludeContentIds = itinerary.getItems().stream()
-                .map(ItineraryItem::getContentId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(Collectors.toList());
-        RecommendationRequest request = RecommendationRequest.builder()
-                .regionCode(itinerary.getSignguFullCode())
-                .withPet(itinerary.isWithPet())
-                .strollerFriendly(itinerary.isStrollerFriendly())
-                .accessibleFriendly(itinerary.isAccessibleFriendly())
-                .companionType(itinerary.getCompanionType())
-                .adultAgeGroup(itinerary.getAdultAgeGroup())
-                .childAges(itinerary.getChildAges())
-                .excludeContentIds(excludeContentIds)
-                .originContentId(origin == null ? null : origin.getContentId())
-                .originContentTypeId(origin == null ? null : origin.getContentTypeId())
-                .skipLlm(true)
-                .build();
-
-        List<RecommendationCandidate> candidates;
-        try {
-            candidates = recommendationPipeline.recommend(request).block();
-        } catch (Exception e) {
-            log.warn("[deleteItem] 대체 후보 재조회 실패 itineraryId={}", itinerary.getId(), e);
-            return null;
-        }
-        if (candidates == null) {
-            return null;
-        }
-        for (RecommendationCandidate c : candidates) {
-            LocalTime close = ClosingTimeGate.parseHhMm(c.getCloseTime());
-            if (close == null) {
-                close = BusinessHoursEvaluator.extractCloseTimeFromText(c.getUseTimeText());
-            }
-            if (!isSlotStillValid(itinerary, visitDate, scheduledTime, close, null)) {
-                continue;
-            }
-            return ItineraryItem.builder()
-                    .contentId(c.getContentId())
-                    .contentTypeId(c.getContentTypeId())
-                    .placeName(c.getPlaceName())
-                    .thumbnailUrl(c.getThumbnailUrl())
-                    .mapX(c.getMapX())
-                    .mapY(c.getMapY())
-                    .scheduledTime(scheduledTime)
-                    .visitDate(visitDate)
-                    .addr1(c.getAddr1())
-                    .tel(c.getTel())
-                    .useFeeText(c.getUseFeeText())
-                    .isFree(c.getIsFree())
-                    .estimatedCostPerPerson(c.getEstimatedCostPerPerson())
-                    .restDateText(c.getRestDateText())
-                    .closeTime(c.getCloseTime())
-                    .useTimeText(c.getUseTimeText())
-                    .homepageUrl(c.getHomepageUrl())
-                    .category(c.getCategory())
-                    .strollerFriendly(c.getStrollerFriendly())
-                    .accessibleFriendly(c.isAccessibleFriendly())
-                    .crowdRate(c.getCrowdRate())
-                    .displayOrder(displayOrder)
-                    .isAlternate(true)
-                    .build();
-        }
-        return null;
     }
 
     /** 마감시간·시간겹침 둘 다 지금 시점 기준으로 통과해야 대체를 실행한다 */

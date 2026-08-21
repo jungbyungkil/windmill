@@ -44,10 +44,8 @@ class ItineraryServiceTimeConflictTest {
         RouteRecalculationService routeRecalculationService = mock(RouteRecalculationService.class);
         com.windmill.service.tourapi.TourAttractionService tourAttractionService =
                 mock(com.windmill.service.tourapi.TourAttractionService.class);
-        com.windmill.service.recommendation.RecommendationPipeline recommendationPipeline =
-                mock(com.windmill.service.recommendation.RecommendationPipeline.class);
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService, recommendationPipeline);
+                routeRecalculationService, tourAttractionService);
         when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 

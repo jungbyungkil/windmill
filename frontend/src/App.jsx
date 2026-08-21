@@ -473,12 +473,20 @@ export default function App() {
     }
   }
 
-  /** 409(TimeSlotConflictException)면 "시간 겹침" 모달로 안내하고, 호출자가 실패를 알 수 있게 다시 던진다 */
+  /**
+   * 시간 수정 실패를 사용자에게 반드시 보여준다 - 409(TimeSlotConflictException)면 "시간 겹침"
+   * 모달로, 그 외(마감 게이트·네트워크 오류 등 무엇이든)는 최소한 토스트로라도 안내한다.
+   * 예전엔 이 catch가 409 겹침이 아닌 실패는 조용히 넘겨서(App.jsx 상위 호출부도 uncaught),
+   * 시간을 골라도 아무 반응이 없는 것처럼 보이는 문제가 있었다(2026-08-21 사용자 제보).
+   */
   function reportIfTimeConflict(e, itemId) {
+    const placeName = itinerary?.items?.find((i) => i.itemId === itemId)?.placeName;
     if (e?.status === 409 && e?.data?.conflictingPlaceName) {
-      const placeName = itinerary?.items?.find((i) => i.itemId === itemId)?.placeName;
       setClosingGate({ placeName, message: e.data.message, kind: 'CONFLICT' });
+      return;
     }
+    setAutoReplaceNotice(`${placeName ? `"${placeName}" ` : ''}시간을 바꾸지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
+    setTimeout(() => setAutoReplaceNotice(null), 5000);
   }
 
   async function handleUpdateTime(itemId, scheduledTime) {
@@ -508,12 +516,17 @@ export default function App() {
   }
 
   async function handleDeleteItem(itemId) {
-    const result = await api.deleteItem(itineraryId, itemId);
-    if (result.autoReplacedPlaceName) {
-      setAutoReplaceNotice(`"${result.autoReplacedPlaceName}"로 자동 채워드렸어요.`);
+    try {
+      const result = await api.deleteItem(itineraryId, itemId);
+      if (result.autoReplacedPlaceName) {
+        setAutoReplaceNotice(`"${result.autoReplacedPlaceName}"로 자동 채워드렸어요.`);
+        setTimeout(() => setAutoReplaceNotice(null), 5000);
+      }
+      setItinerary(result);
+    } catch (e) {
+      setAutoReplaceNotice(`삭제하지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
       setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
-    setItinerary(result);
   }
 
   async function handleSearch({ query, tags, maxBudgetPerPerson }) {
