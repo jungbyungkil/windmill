@@ -35,8 +35,8 @@ import java.util.stream.Collectors;
 
 /**
  * 바람따라 핵심 플로우: TourAPI 기반 후보를
- * 1) 혼잡도 낮은 순으로 고르고
- * 2) 날씨(비/폭염)면 실내 코스로 전환하며
+ * 1) 인기(집중률) 높은 명소를 우선하고, 붐비는 곳은 비교적 한산한 오전에 두며
+ * 2) 날씨(비/폭염)면 실내 코스로 전환하고
  * 3) 현실적인 당일치기 리듬(오전→점심→오후→저녁)으로 배치한다.
  * 가족 여행은 관광을 줄이고 식사 슬롯을 반드시 넣는다.
  */
@@ -71,12 +71,10 @@ public class SmartPlanService {
     }
 
     /**
-     * "당일치기 시작하기" 전용 표준 4단계 일정 - 아침 일정 → 점심 식사 → 오후 일정 → 저녁 식사를
-     * 무조건 채운다(사용자 요구사항: 후보 풀이 빡빡하거나 마감이 애매해도 슬롯을 비우지 않음).
-     * 기존 {@link #build}의 유연한 시간창 판정(현재 시각 기준 시작·후보 소진 시 슬롯 생략)은 여행 중
-     * "다시 짜기"에는 맞지만, 최초 생성 직후엔 "지금 몇 시든 하루 전체 틀"을 원한다는 게 이번 요구라
-     * 09:00/12:00/14:30/18:00 고정 슬롯의 별도 경로로 분리했다. 개인화(연령대/자녀나이/반려동물/유모차/
-     * 무장애)는 기존 {@link #buildRequest}를 그대로 재사용해 동일하게 반영된다.
+     * "당일치기 시작하기" 전용 표준 7슬롯 일정.
+     * 지금 시각과 무관하게 하루 전체를 채운다: 그외 일정 4 + 식당 2 + 카페 1.
+     * (요청의 식당2·카페1·그외3에 슬롯 7개 채우기를 맞추면 그외는 4곳이 된다.)
+     * 여행 중 "다시 짜기"는 {@link #build}의 시간창 판정을 그대로 쓴다.
      */
     public Mono<SmartPlanResponse> buildStandardDayPlan(Itinerary itinerary) {
         RegionCode region = regionCodeService.find(itinerary.getSignguFullCode())
@@ -99,68 +97,32 @@ public class SmartPlanService {
                             companion, itinerary.getAdultAgeGroup(), itinerary.getChildAges());
                     RecommendationRequest attractionReq = buildRequest(itinerary, avoid, attractionTags, true);
                     RecommendationRequest foodReq = buildRequest(itinerary, avoid, List.of("#맛집"), true);
+                    RecommendationRequest cafeReq = buildRequest(itinerary, avoid, List.of("#카페"), true);
 
                     return Mono.zip(
                                     recommendationPipeline.recommend(attractionReq).onErrorReturn(List.of()),
-                                    recommendationPipeline.recommend(foodReq).onErrorReturn(List.of()))
-                            .map(tuple -> assembleStandardDay(tuple.getT1(), tuple.getT2(), date, companion, rain, heat));
+                                    recommendationPipeline.recommend(foodReq).onErrorReturn(List.of()),
+                                    recommendationPipeline.recommend(cafeReq).onErrorReturn(List.of()))
+                            .map(tuple -> assembleStandardDay(
+                                    tuple.getT1(), tuple.getT2(), tuple.getT3(),
+                                    date, companion, rain, heat));
                 });
     }
 
     private SmartPlanResponse assembleStandardDay(List<RecommendationCandidate> attractionsRaw,
                                                     List<RecommendationCandidate> foodRaw,
+                                                    List<RecommendationCandidate> cafeRaw,
                                                     LocalDate date, CompanionType companion,
                                                     boolean rain, boolean heat) {
-        List<RecommendationCandidate> attrPool = new ArrayList<>(sortComfortable(attractionsRaw));
-        List<RecommendationCandidate> foodPool = new ArrayList<>(sortComfortable(foodRaw));
-        // 맛집 풀이 비면(지역 데이터 부족) 관광 풀에서 음식 후보를 분리해 최소한 식사 슬롯을 채운다
-        if (foodPool.isEmpty()) {
-            List<RecommendationCandidate> splitFood = new ArrayList<>();
-            List<RecommendationCandidate> splitAttr = new ArrayList<>();
-            for (RecommendationCandidate c : attrPool) {
-                (isFoodCandidate(c) ? splitFood : splitAttr).add(c);
-            }
-            if (!splitFood.isEmpty()) {
-                foodPool = splitFood;
-                attrPool = splitAttr;
-            }
-        }
+        List<RecommendationCandidate> attrPool = new ArrayList<>(attractionsRaw);
+        List<RecommendationCandidate> foodPool = new ArrayList<>(foodRaw);
+        List<RecommendationCandidate> cafePool = new ArrayList<>(cafeRaw);
+        splitPools(attrPool, foodPool, cafePool);
+        attrPool = new ArrayList<>(sortPopular(attrPool));
+        foodPool = new ArrayList<>(sortPopular(foodPool));
+        cafePool = new ArrayList<>(sortPopular(cafePool));
 
-        List<RecommendationCandidate> day = new ArrayList<>();
-        RecommendationCandidate prev = null;
-        // 관광 풀과 맛집 풀을 별도 API 호출로 채우기 때문에 같은 장소가 두 풀 모두에 겹쳐 들어올 수 있다
-        // (예: 특정 장소가 두 테마 조회 모두에 매칭). 슬롯마다 고르기 직전에 이미 오늘 담긴 contentId를
-        // 상대편 풀에서도 제거해 같은 장소가 두 번 배치되는 걸 막는다.
-        Set<String> usedContentIds = new java.util.HashSet<>();
-
-        RecommendationCandidate morning = placeForced(attrPool, prev, LocalTime.of(9, 0), "아침 일정", false);
-        if (morning != null) {
-            day.add(morning);
-            prev = morning;
-            addUsed(usedContentIds, morning);
-            removeUsed(foodPool, usedContentIds);
-        }
-
-        RecommendationCandidate lunch = placeForced(foodPool, prev, LocalTime.of(12, 0), "점심 식사", true);
-        if (lunch != null) {
-            day.add(lunch);
-            prev = lunch;
-            addUsed(usedContentIds, lunch);
-            removeUsed(attrPool, usedContentIds);
-        }
-
-        RecommendationCandidate afternoon = placeForced(attrPool, prev, LocalTime.of(14, 30), "오후 일정", false);
-        if (afternoon != null) {
-            day.add(afternoon);
-            prev = afternoon;
-            addUsed(usedContentIds, afternoon);
-            removeUsed(foodPool, usedContentIds);
-        }
-
-        RecommendationCandidate dinner = placeForced(foodPool, prev, LocalTime.of(18, 0), "저녁 식사", true);
-        if (dinner != null) {
-            day.add(dinner);
-        }
+        List<RecommendationCandidate> day = assembleStandardSevenSlots(attrPool, foodPool, cafePool);
 
         fillDistances(day);
         double dayKm = RouteOptimizer.totalDistanceKm(day);
@@ -174,7 +136,7 @@ public class SmartPlanService {
                 .anyMatch(c -> CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered());
         String summary = buildSummary(rain, heat, crowdFiltered, dayKm, day, 1, null, isFamilyPace(companion));
 
-        log.info("[SmartPlan] 표준 4단계 일정 생성 - date={}, stops={}, family={}", date, day.size(), isFamilyPace(companion));
+        log.info("[SmartPlan] 표준 7슬롯 일정 생성 - date={}, stops={}, family={}", date, day.size(), isFamilyPace(companion));
 
         return SmartPlanResponse.builder()
                 .strategySummary(summary)
@@ -182,7 +144,7 @@ public class SmartPlanService {
                 .heatAdjusted(heat)
                 .crowdFiltered(crowdFiltered)
                 .estimatedTotalDistanceKm(Math.round(dayKm * 10.0) / 10.0)
-                .candidateCount(attractionsRaw.size() + foodRaw.size())
+                .candidateCount(attractionsRaw.size() + foodRaw.size() + cafeRaw.size())
                 .visitDate(date.toString())
                 .dayCount(1)
                 .days(List.of(SmartPlanResponse.DayPlan.builder()
@@ -196,6 +158,119 @@ public class SmartPlanService {
                 .build();
     }
 
+    /**
+     * 시각과 무관하게 7칸을 채운다.
+     * 오전1 → 오전2 → 점심(식당) → 오후 → 카페 → 저녁 전 → 저녁(식당).
+     */
+    List<RecommendationCandidate> assembleStandardSevenSlots(List<RecommendationCandidate> attrPool,
+                                                               List<RecommendationCandidate> foodPool,
+                                                               List<RecommendationCandidate> cafePool) {
+        attrPool = new ArrayList<>(sortPopular(attrPool));
+        foodPool = new ArrayList<>(sortPopular(foodPool));
+        cafePool = new ArrayList<>(sortPopular(cafePool));
+        List<RecommendationCandidate> day = new ArrayList<>();
+        RecommendationCandidate prev = null;
+        Set<String> usedContentIds = new java.util.HashSet<>();
+
+        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(9, 0), "오전 일정", SlotKind.ATTRACTION);
+        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(10, 30), "오전 일정 2", SlotKind.ATTRACTION);
+        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(12, 0), "점심 식사", SlotKind.MEAL);
+        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(14, 0), "오후 일정", SlotKind.ATTRACTION);
+        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(15, 30), "카페", SlotKind.CAFE);
+        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(17, 0), "저녁 전 일정", SlotKind.ATTRACTION);
+        addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(18, 30), "저녁 식사", SlotKind.MEAL);
+        return day;
+    }
+
+    private RecommendationCandidate addForcedSlot(List<RecommendationCandidate> day,
+                                                    List<RecommendationCandidate> attrPool,
+                                                    List<RecommendationCandidate> foodPool,
+                                                    List<RecommendationCandidate> cafePool,
+                                                    RecommendationCandidate prev,
+                                                    Set<String> usedContentIds,
+                                                    LocalTime time, String label, SlotKind kind) {
+        List<RecommendationCandidate> preferred = switch (kind) {
+            case MEAL -> foodPool;
+            case CAFE -> cafePool;
+            case ATTRACTION -> attrPool;
+        };
+        boolean morningPopular = kind == SlotKind.ATTRACTION && time.isBefore(LocalTime.of(12, 0));
+        RecommendationCandidate placed = placeForced(preferred, prev, time, label, kind, morningPopular);
+        if (placed == null) {
+            List<RecommendationCandidate> fallback = kind == SlotKind.CAFE ? foodPool
+                    : kind == SlotKind.MEAL ? cafePool
+                    : foodPool;
+            placed = placeForced(fallback, prev, time, label, kind, morningPopular);
+        }
+        if (placed == null && kind != SlotKind.ATTRACTION) {
+            placed = placeForced(attrPool, prev, time, label, kind, morningPopular);
+        }
+        if (placed == null) {
+            return prev;
+        }
+        day.add(placed);
+        addUsed(usedContentIds, placed);
+        removeUsed(attrPool, usedContentIds);
+        removeUsed(foodPool, usedContentIds);
+        removeUsed(cafePool, usedContentIds);
+        return placed;
+    }
+
+    private void splitPools(List<RecommendationCandidate> attrPool,
+                            List<RecommendationCandidate> foodPool,
+                            List<RecommendationCandidate> cafePool) {
+        if (foodPool.isEmpty()) {
+            List<RecommendationCandidate> splitFood = new ArrayList<>();
+            List<RecommendationCandidate> splitAttr = new ArrayList<>();
+            for (RecommendationCandidate c : attrPool) {
+                (isFoodCandidate(c) ? splitFood : splitAttr).add(c);
+            }
+            if (!splitFood.isEmpty()) {
+                foodPool.addAll(splitFood);
+                attrPool.clear();
+                attrPool.addAll(splitAttr);
+            }
+        }
+        if (cafePool.isEmpty()) {
+            List<RecommendationCandidate> fromFood = new ArrayList<>();
+            foodPool.removeIf(c -> {
+                if (isCafeCandidate(c)) {
+                    fromFood.add(c);
+                    return true;
+                }
+                return false;
+            });
+            List<RecommendationCandidate> fromAttr = new ArrayList<>();
+            attrPool.removeIf(c -> {
+                if (isCafeCandidate(c)) {
+                    fromAttr.add(c);
+                    return true;
+                }
+                return false;
+            });
+            cafePool.addAll(fromFood);
+            cafePool.addAll(fromAttr);
+        }
+        Set<String> foodIds = foodPool.stream()
+                .map(RecommendationCandidate::getContentId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Set<String> cafeIds = cafePool.stream()
+                .map(RecommendationCandidate::getContentId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        attrPool.removeIf(c -> (c.getContentId() != null && (foodIds.contains(c.getContentId()) || cafeIds.contains(c.getContentId())))
+                || isFoodCandidate(c) || isCafeCandidate(c));
+        foodPool.removeIf(c -> c.getContentId() != null && cafeIds.contains(c.getContentId()));
+    }
+
     private static void addUsed(Set<String> usedContentIds, RecommendationCandidate candidate) {
         if (candidate.getContentId() != null) {
             usedContentIds.add(candidate.getContentId());
@@ -207,18 +282,25 @@ public class SmartPlanService {
     }
 
     /**
-     * pool에서 가장 가까운 후보 하나를 골라 targetTime에 강제 배치한다(무조건 채우기 - 마감 게이트에
+     * pool에서 후보 하나를 골라 targetTime에 강제 배치한다(무조건 채우기 - 마감 게이트에
      * 걸려도 안전 시각으로 당기거나, 그마저 불가능하면 요청 시각 그대로 강행한다). pool이 비어 있으면 null.
+     * 오전 관광은 인기(집중률) 높은 곳을, 그 외는 직전 스탑에서 가까운 곳을 고른다.
      */
     private RecommendationCandidate placeForced(List<RecommendationCandidate> pool, RecommendationCandidate origin,
-                                                  LocalTime targetTime, String slotLabel, boolean meal) {
-        RecommendationCandidate candidate = takeNearest(pool, origin);
+                                                  LocalTime targetTime, String slotLabel, SlotKind kind,
+                                                  boolean preferPopular) {
+        RecommendationCandidate candidate = preferPopular
+                ? takeMostPopularInWindow(pool)
+                : takeNearest(pool, origin);
         if (candidate == null) {
             return null;
         }
-        placeStop(candidate, targetTime, slotLabel, meal, true);
+        placeStop(candidate, targetTime, slotLabel, kind, true);
+        attachBackup(candidate, pool);
         return candidate;
     }
+
+    private enum SlotKind { ATTRACTION, MEAL, CAFE }
 
     /**
      * @param forDate null이면 여행 기간 전체(최대 7일), 지정 시 해당 일자만
@@ -347,8 +429,8 @@ public class SmartPlanService {
                                        CompanionType companion,
                                        int placeCap,
                                        boolean rain, boolean heat) {
-        List<RecommendationCandidate> attractions = sortComfortable(attractionsRaw);
-        List<RecommendationCandidate> foods = sortComfortable(foodRaw);
+        List<RecommendationCandidate> attractions = sortPopular(attractionsRaw);
+        List<RecommendationCandidate> foods = sortPopular(foodRaw);
         // 맛집 풀이 비면 관광 풀에서 음식 후보를 분리
         if (foods.isEmpty()) {
             List<RecommendationCandidate> splitFood = new ArrayList<>();
@@ -459,18 +541,18 @@ public class SmartPlanService {
 
         // 1) 오전 관광 1~2곳 (11:30 이전 시작 가능할 때, 2번째는 밀도+거리 통과 시에만)
         if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget) {
-            RecommendationCandidate morning = takeNearest(attrPool, prev);
+            RecommendationCandidate morning = takeMostPopularInWindow(attrPool);
             if (morning != null) {
                 placeStop(morning, cursor, "오전 1", false);
                 attachBackup(morning, attrPool);
                 day.add(morning);
                 attractionsUsed++;
                 prev = morning;
-                cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekNearest(attrPool, prev)));
+                cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekMostPopular(attrPool)));
 
                 if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget
-                        && isNearby(prev, peekNearest(attrPool, prev))) {
-                    RecommendationCandidate morning2 = takeNearest(attrPool, prev);
+                        && isNearby(prev, peekMostPopular(attrPool))) {
+                    RecommendationCandidate morning2 = takeMostPopularInWindow(attrPool);
                     if (morning2 != null) {
                         placeStop(morning2, cursor, "오전 2", false);
                         attachBackup(morning2, attrPool);
@@ -584,15 +666,14 @@ public class SmartPlanService {
     }
 
     private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal) {
-        placeStop(stop, time, slotLabel, meal, false);
+        placeStop(stop, time, slotLabel, meal ? SlotKind.MEAL : SlotKind.ATTRACTION, false);
     }
 
     /**
      * @param forced true면 마감 게이트를 넘겨도 슬롯을 비우지 않는다 - 안전 시각으로 당겨보고,
      *               그마저 불가능하면(안전 시각이 하루 시작보다 이르는 등) 요청 시각 그대로 강행한다.
-     *               "당일치기 시작하기"의 표준 4단계 일정처럼 슬롯을 무조건 채워야 하는 경로에서만 사용.
      */
-    private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, boolean meal, boolean forced) {
+    private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, SlotKind kind, boolean forced) {
         LocalTime close = ClosingTimeGate.parseHhMm(stop.getCloseTime());
         if (close == null) {
             close = BusinessHoursEvaluator.extractCloseTimeFromText(stop.getUseTimeText());
@@ -607,19 +688,23 @@ public class SmartPlanService {
             } else if (forced) {
                 visit = time;
             } else {
-                // 마감에 맞춰 넣을 수 없으면 suggestedTime을 비워 이후 필터에서 탈락
                 stop.setSuggestedTime(null);
                 return;
             }
         }
         stop.setSuggestedTime(visit.format(TIME_FORMAT));
-        if (meal) {
+        if (kind == SlotKind.MEAL) {
             stop.setCategory(slotLabel.contains("점심") ? "점심" : "저녁");
             stop.setMatchedTags(List.of("#맛집"));
             stop.setOneLiner(slotLabel + " · 여유롭게 식사해요");
+        } else if (kind == SlotKind.CAFE) {
+            stop.setCategory("카페");
+            stop.setMatchedTags(List.of("#카페"));
+            stop.setOneLiner(slotLabel + " · 잠깐 쉬어가요");
         } else {
             if (stop.getCategory() == null || stop.getCategory().isBlank()
-                    || "점심".equals(stop.getCategory()) || "저녁".equals(stop.getCategory())) {
+                    || "점심".equals(stop.getCategory()) || "저녁".equals(stop.getCategory())
+                    || "카페".equals(stop.getCategory())) {
                 stop.setCategory(slotLabel);
             }
             stop.setMatchedTags(PlaceTagSanitizer.sanitize(
@@ -628,10 +713,13 @@ public class SmartPlanService {
                     stop.getPlaceName(),
                     stop.getCategory(),
                     null));
-            if (stop.getOneLiner() == null || stop.getOneLiner().isBlank()) {
+            if (slotLabel.contains("오전")
+                    && CrowdCongestionEvaluator.fromPeakRelativeRate(stop.getCrowdRate()).isTriggered()) {
+                stop.setOneLiner("인기 명소 · 오전에 가면 비교적 한산해요");
+            } else if (stop.getOneLiner() == null || stop.getOneLiner().isBlank()) {
                 stop.setOneLiner(slotLabel + " · " + defaultLine(stop));
             } else if (!stop.getOneLiner().contains("오전") && !stop.getOneLiner().contains("오후")
-                    && !stop.getOneLiner().contains("저녁")) {
+                    && !stop.getOneLiner().contains("저녁") && !stop.getOneLiner().contains("카페")) {
                 stop.setOneLiner(slotLabel + " · " + stop.getOneLiner());
             }
         }
@@ -660,8 +748,55 @@ public class SmartPlanService {
         return new ArrayList<>(pool.subList(0, cap));
     }
 
+    /**
+     * 인기(집중률) 높은 순. 혼잡하다고 뒤로 밀지 않는다 — 스마트 동선은 인기 명소를 살리고
+     * 오전에 배치한다. 집중률 없는 후보는 뒤로, 같은 값이면 들어온 순서를 유지한다.
+     */
+    List<RecommendationCandidate> sortPopular(List<RecommendationCandidate> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<RecommendationCandidate> pool = new ArrayList<>(raw);
+        pool.sort(Comparator
+                .comparing(RecommendationCandidate::getCrowdRate, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(c -> c.getThumbnailUrl() == null || c.getThumbnailUrl().isBlank() ? 1 : 0));
+        int cap = Math.min(pool.size(), 24);
+        return new ArrayList<>(pool.subList(0, cap));
+    }
+
     private static int crowdBucket(RecommendationCandidate c) {
         return CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered() ? 1 : 0;
+    }
+
+    /**
+     * 오전 슬롯용 - 개인화 윈도우 안에서 집중률(인기)이 가장 높은 곳을 고른다.
+     * 붐비는 인기 명소를 빼지 않고, 상대적으로 한산한 오전에 넣기 위함.
+     */
+    RecommendationCandidate takeMostPopularInWindow(List<RecommendationCandidate> pool) {
+        RecommendationCandidate chosen = peekMostPopular(pool);
+        if (chosen == null) {
+            return null;
+        }
+        pool.remove(chosen);
+        return chosen;
+    }
+
+    RecommendationCandidate peekMostPopular(List<RecommendationCandidate> pool) {
+        if (pool == null || pool.isEmpty()) {
+            return null;
+        }
+        int windowSize = Math.min(PERSONALIZATION_WINDOW, pool.size());
+        int bestIdx = 0;
+        double bestRate = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < windowSize; i++) {
+            Double rate = pool.get(i).getCrowdRate();
+            double v = rate == null ? Double.NEGATIVE_INFINITY : rate;
+            if (v > bestRate) {
+                bestRate = v;
+                bestIdx = i;
+            }
+        }
+        return pool.get(bestIdx);
     }
 
     /**
@@ -753,6 +888,13 @@ public class SmartPlanService {
         return PlaceTagSanitizer.looksLikeFood(c.getContentTypeId(), c.getPlaceName(), c.getCategory());
     }
 
+    private boolean isCafeCandidate(RecommendationCandidate c) {
+        if (c == null) {
+            return false;
+        }
+        return PlaceTagSanitizer.looksLikeCafe(c.getContentTypeId(), c.getPlaceName(), c.getCategory(), c.getMatchedTags());
+    }
+
     private boolean isMealStop(RecommendationCandidate c) {
         String cat = c.getCategory() == null ? "" : c.getCategory();
         return "점심".equals(cat) || "저녁".equals(cat)
@@ -813,7 +955,8 @@ public class SmartPlanService {
                                 LocalTime todayStart, boolean familyPace) {
         List<String> parts = new ArrayList<>();
         long meals = stops.stream().filter(this::isMealStop).count();
-        long sights = stops.size() - meals;
+        long cafes = stops.stream().filter(s -> "카페".equals(s.getCategory())).count();
+        long sights = stops.size() - meals - cafes;
         if (dayCount > 1) {
             parts.add(dayCount + "일 일정");
         }
@@ -823,13 +966,13 @@ public class SmartPlanService {
         if (familyPace) {
             parts.add("가족 여유 코스");
         }
-        parts.add("관광 " + sights + "곳 · 식사 " + meals + "끼");
-        parts.add("오전→점심→오후→저녁 리듬");
+        parts.add("관광 " + sights + "곳 · 식사 " + meals + "끼" + (cafes > 0 ? " · 카페 " + cafes : ""));
+        parts.add("오전→점심→오후→카페→저녁 리듬");
         if (totalKm > 0) {
             parts.add(String.format("약 %.1fkm", totalKm));
         }
         if (crowdFiltered) {
-            parts.add("붐비는 곳 제외");
+            parts.add("인기 명소는 오전에");
         }
         if (heat) {
             parts.add("폭염 → 실내 코스");
@@ -845,6 +988,9 @@ public class SmartPlanService {
 
     private String defaultLine(RecommendationCandidate c) {
         if (c.getCrowdRate() != null) {
+            if (CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered()) {
+                return "인기 명소";
+            }
             return String.format("여유율 %.0f%%", 100 - c.getCrowdRate());
         }
         return "동선에 맞춰 이어져요";

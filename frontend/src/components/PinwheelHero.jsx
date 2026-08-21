@@ -52,6 +52,7 @@ export default function PinwheelHero({
     : [];
   const heatMode = Boolean(trigger?.heatTrigger);
   const rainMode = Boolean(trigger?.weatherTrigger);
+  const crowdMode = Boolean(trigger?.crowdTrigger);
   const tangleMode = Boolean(trigger?.routeTangleTrigger);
   const travelTimeMode = Boolean(trigger?.travelTimeTrigger);
   const weatherAlert = heatMode || rainMode;
@@ -70,6 +71,7 @@ export default function PinwheelHero({
     if (travelTimeMode) return `${levelEmoji} 이동시간 부족 · 다음 장소 마감이 임박했어요`;
     if (heatMode) return `${levelEmoji} 폭염 소식 · 실내로 바꾸세요`;
     if (rainMode) return `${levelEmoji} 비 소식 · 실내로 바꾸세요`;
+    if (crowdMode) return `${levelEmoji} 혼잡 · 한산한 곳으로 바꾸세요`;
     if (tangleMode) return `${levelEmoji} 동선이 꼬였어요 · 자동 재배치`;
     return meta.caption;
   }
@@ -81,6 +83,7 @@ export default function PinwheelHero({
     }
     if (heatMode) return '야외 일정이 있어요. 실내 활동으로 전환을 권해요.';
     if (rainMode) return '야외 일정이 있어요. 비에 맞는 실내 코스를 추천할게요.';
+    if (crowdMode) return '붐비는 장소가 있어요. 한산한 일정으로 바꿀 수 있어요.';
     if (tangleMode) {
       return trigger?.routeTangle?.message
         || '방문 순서를 다시 잡아 이동 거리를 줄일 수 있어요.';
@@ -97,6 +100,7 @@ export default function PinwheelHero({
         weatherAlert ? 'weather-alert' : '',
         heatMode ? 'heat-alert' : '',
         rainMode ? 'rain-alert' : '',
+        crowdMode ? 'crowd-alert' : '',
       ].filter(Boolean).join(' ')}
     >
       <div className="pinwheel-card-top">
@@ -173,7 +177,16 @@ export default function PinwheelHero({
                   onClick={() => onRerouteSchedule?.(primaryAvoidHint(trigger))}
                   disabled={rerouteLoading}
                 >
-                  {rerouteLoading ? '대안 짜는 중...' : '🏠 대안 일정 추천받기'}
+                  {rerouteLoading ? '대안 짜는 중...' : '🏠 실내 일정으로 바꾸기'}
+                </button>
+              )}
+              {crowdMode && onRerouteSchedule && (
+                <button
+                  className="btn-pinwheel-cta"
+                  onClick={() => onRerouteSchedule?.('CROWD')}
+                  disabled={rerouteLoading}
+                >
+                  {rerouteLoading ? '대안 짜는 중...' : '👥 한산한 일정으로 바꾸기'}
                 </button>
               )}
               {!tangleMode && (

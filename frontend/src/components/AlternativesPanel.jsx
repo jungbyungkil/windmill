@@ -10,6 +10,14 @@ const REASON_COPY = {
     title: '🌡️ 변수: 폭염 · 실내 대안',
     desc: '더위를 피하는 실내 코스예요. 담으면 일정에 반영되고 다른 여행자 참고 데이터로도 남아요.',
   },
+  CROWD_ALTERNATIVE: {
+    title: '👥 변수: 혼잡 · 한산한 대안',
+    desc: '붐비는 곳 대신 여유 있는 장소를 골라보세요. 고르면 일정에 바로 반영돼요.',
+  },
+  ROUTE_ALTERNATIVE: {
+    title: '🔀 변수: 동선 · 가까운 대안',
+    desc: '이동을 줄인 순서로 다시 짜거나, 근처 장소로 바꿔 보세요.',
+  },
 };
 
 export default function AlternativesPanel({
@@ -47,7 +55,11 @@ export default function AlternativesPanel({
             onClick={onApplyAll}
             disabled={applyLoading}
           >
-            {applyLoading ? '일정 바꾸는 중...' : '🏠 야외 일정 전부 실내로 바꾸기'}
+            {applyLoading
+              ? '일정 바꾸는 중...'
+              : reason === 'CROWD_ALTERNATIVE'
+                ? '👥 혼잡한 곳 전부 한산한 곳으로'
+                : '🏠 야외 일정 전부 실내로 바꾸기'}
           </button>
         )}
 

@@ -180,7 +180,9 @@ public class ItineraryController {
                 ? "RAIN_ALTERNATIVE"
                 : avoid == RecommendationRequest.AvoidanceHint.HEAT
                         ? "HEAT_ALTERNATIVE"
-                        : null;
+                        : avoid == RecommendationRequest.AvoidanceHint.CROWD
+                                ? "CROWD_ALTERNATIVE"
+                                : null;
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> recommendationPipeline.recommend(buildAlternativeRequest(itinerary, avoid, seedPlaceName)))
@@ -191,8 +193,8 @@ public class ItineraryController {
     /**
      * 핵심 스마트 일정: TourAPI 후보 → 혼잡↓ 필터 → 날씨 실내 전환 → 동선 최적화 → 시각 배정.
      * AI가 장소를 만들지 않으며, 검증된 API 데이터만 사용한다.
-     * standard=true면 "당일치기 시작하기" 전용 표준 4단계(아침 일정·점심 식사·오후 일정·저녁 식사)를
-     * 현재 시각과 무관하게 무조건 채워서 돌려준다(placeCount/date는 이 모드에서는 무시).
+     * standard=true면 "당일치기 시작하기" 전용 표준 7슬롯(그외 4 · 식당 2 · 카페 1)을
+     * 현재 시각과 무관하게 무조건 채워서 돌려준다.
      */
     @GetMapping("/{id}/smart-plan")
     public Mono<ResponseEntity<SmartPlanResponse>> smartPlan(

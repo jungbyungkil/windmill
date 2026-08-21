@@ -9,6 +9,8 @@ import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
+import VariableActionCards from './components/VariableActionCards';
+import CoachTour from './components/CoachTour';
 import PinwheelLoader from './components/PinwheelLoader';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
@@ -315,7 +317,7 @@ export default function App() {
   async function autoApplySmartPlan(created) {
     let stops = [];
     try {
-      setCreatingStage('오전·점심·오후·저녁 장소를 찾고 있어요...');
+      setCreatingStage('식당 2 · 카페 1 · 일정 4곳을 찾고 있어요...');
       const plan = await api.getSmartPlan(created.itineraryId, { date: created.startDate, standard: true });
       stops = plan?.stops || [];
     } catch {
@@ -630,7 +632,7 @@ export default function App() {
     try {
       const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
       setAltCandidates(candidates);
-      setAltReason(reason || (avoidHint === 'HEAT' ? 'HEAT_ALTERNATIVE' : avoidHint === 'WEATHER' ? 'RAIN_ALTERNATIVE' : null));
+      setAltReason(reason || (avoidHint === 'HEAT' ? 'HEAT_ALTERNATIVE' : avoidHint === 'WEATHER' ? 'RAIN_ALTERNATIVE' : avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : avoidHint === 'ROUTE' ? 'ROUTE_ALTERNATIVE' : null));
     } catch {
       setAltCandidates([]);
     } finally {
@@ -729,8 +731,7 @@ export default function App() {
   }
 
   /**
-   * 비/폭염: 영향 받은 야외 일정 전체를 실내 대안 동선으로 교체.
-   * 기존 방문 시각은 유지해 타임라인 리듬을 살린다.
+   * 비/폭염: 야외 → 실내. 혼잡: 붐비는 곳 → 한산한 곳. 기존 방문 시각은 유지.
    */
   async function handleRerouteSchedule(avoidHint) {
     setRerouteLoading(true);
@@ -741,31 +742,39 @@ export default function App() {
         ? '비 소식에 맞춰 실내 일정으로 바꿨어요.'
         : reason === 'HEAT_ALTERNATIVE'
           ? '폭염 소식에 맞춰 실내 일정으로 바꿨어요.'
-          : '대체 일정으로 바꿨어요.';
+          : avoidHint === 'CROWD'
+            ? '혼잡한 곳을 한산한 일정으로 바꿨어요.'
+            : '대체 일정으로 바꿨어요.';
 
       if (!candidates?.length) {
-        setAutoReplaceNotice('지금은 바꿀 실내 일정이 없어요. 후보만 먼저 볼게요.');
+        setAutoReplaceNotice('지금은 바꿀 대안이 없어요. 후보만 먼저 볼게요.');
         await handleRequestAlternatives(avoidHint);
         return;
       }
 
-      const affectedIds = (trigger?.weatherAffectedItemIds?.length
+      const crowdIds = (trigger?.crowdAffectedItemIds || []).map(Number);
+      const weatherIds = (trigger?.weatherAffectedItemIds?.length
         ? trigger.weatherAffectedItemIds
         : (trigger?.affectedItemIds || [])).map(Number);
+      const affectedIds = avoidHint === 'CROWD' ? crowdIds : weatherIds;
       const affectedItems = itinerary.items.filter((i) => affectedIds.includes(Number(i.itemId)));
       const targets = affectedItems.length > 0
         ? affectedItems
         : itinerary.items.filter((i) => {
             if ((i.visitDate || itinerary.startDate) !== activeDate) return false;
+            if (avoidHint === 'CROWD') return (i.crowdRate ?? 0) >= 70;
             const tags = i.tags || [];
-            if (tags.includes('#실내') || tags.includes('#맛집')) return false;
+            if (tags.includes('#실내') || tags.includes('#맛집') || tags.includes('#카페')) return false;
             return true;
           });
 
       if (targets.length === 0) {
         setAltCandidates(candidates);
+        setAltReason(avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : undefined);
         setAltOpen(true);
-        setAutoReplaceNotice('교체할 야외 일정이 없어 후보만 보여드려요.');
+        setAutoReplaceNotice(avoidHint === 'CROWD'
+          ? '바꿀 혼잡 일정이 없어 한산한 후보만 보여드려요.'
+          : '교체할 야외 일정이 없어 후보만 보여드려요.');
         return;
       }
 
@@ -1247,6 +1256,16 @@ export default function App() {
                   optimizeLoading={optimizeLoading}
                 />
 
+                <VariableActionCards
+                  trigger={trigger}
+                  onWeather={() => handleRerouteSchedule(trigger?.heatTrigger ? 'HEAT' : 'WEATHER')}
+                  onCrowd={() => handleRerouteSchedule('CROWD')}
+                  onRoute={() => handleOptimizeRoute()}
+                  weatherLoading={rerouteLoading}
+                  crowdLoading={rerouteLoading}
+                  routeLoading={optimizeLoading}
+                />
+
                 {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
 
                 <WeatherBanner items={weatherItems} />
@@ -1307,7 +1326,12 @@ export default function App() {
                 reason={altReason}
                 onAdd={handleAddAlternative}
                 addingId={addingContentId}
-                onApplyAll={() => handleRerouteSchedule(trigger?.heatTrigger ? 'HEAT' : trigger?.weatherTrigger ? 'WEATHER' : undefined)}
+                onApplyAll={() => handleRerouteSchedule(
+                  trigger?.heatTrigger ? 'HEAT'
+                    : trigger?.weatherTrigger ? 'WEATHER'
+                    : trigger?.crowdTrigger ? 'CROWD'
+                    : undefined
+                )}
                 applyLoading={rerouteLoading}
                 onClose={() => setAltOpen(false)}
               />
@@ -1338,6 +1362,16 @@ export default function App() {
                 submitting={tripSubmitting}
                 onSubmit={handleSubmitTripRecord}
                 onClose={() => setTripRecordOpen(false)}
+              />
+
+              <CoachTour
+                tourId="trip"
+                enabled={Boolean(itinerary)}
+                steps={[
+                  { selector: '.pinwheel-hero', title: '바람개비가 변수를 알려줘요', body: '비·폭염·혼잡·동선이 바뀌면 색이 바뀌어요. 탭하면 대안을 바로 볼 수 있어요.' },
+                  { selector: '[data-coach="variables"]', title: '여기서 바로 대응하세요', body: '세 장 모두 눌러 볼 수 있어요. 반짝이면 지금 바꾸라는 신호입니다.' },
+                  { selector: '.itinerary-list', title: '오늘 일정이 여기 있어요', body: '장소를 고치고, 순서를 바꾸고, 마무리는 위쪽 버튼으로 남기면 됩니다.' },
+                ]}
               />
             </div>
           )

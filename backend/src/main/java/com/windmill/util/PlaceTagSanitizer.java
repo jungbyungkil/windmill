@@ -76,6 +76,23 @@ public final class PlaceTagSanitizer {
         return sanitize(rawTags, contentTypeId, placeName, category, null);
     }
 
+    public static boolean looksLikeCafe(Integer contentTypeId, String placeName, String category, List<String> tags) {
+        String text = ((placeName == null ? "" : placeName) + " "
+                + (category == null ? "" : category) + " "
+                + (tags == null ? "" : String.join(" ", tags))).toLowerCase(Locale.ROOT);
+        if (containsAny(text, "카페", "커피", "cafe", "coffee", "디저트", "베이커리", "브런치")) {
+            return true;
+        }
+        if (tags != null) {
+            for (String tag : tags) {
+                if (tag != null && tag.contains("카페")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public static boolean looksLikeFood(Integer contentTypeId, String placeName, String category) {
         if (contentTypeId != null && contentTypeId == 39) {
             return true;

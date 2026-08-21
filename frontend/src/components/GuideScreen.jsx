@@ -9,15 +9,21 @@ const PAGE1_STEPS = [
 const PAGE1_BRANCH = [
   {
     tag: 'A',
-    icon: '📖',
-    title: '당일치기 추천 기록 참고',
-    body: '다른 여행자가 다녀온 일정 카드를 보고 "이 일정으로 시작"을 누르면, 같은 장소·순서 그대로 내 일정으로 복제돼요.',
+    icon: '🌬️',
+    title: '스마트 동선 자동',
+    body: '식당 2곳 · 카페 1곳 · 일정 4곳을 지금 시각과 상관없이 채워 드려요. 인기 명소를 먼저 담고, 붐비면 비교적 한산한 오전에 배치해요.',
   },
   {
     tag: 'B',
-    icon: '🌬️',
-    title: '"당일치기 시작하기" 버튼',
-    body: '혼잡이 덜하고 동선이 짧은 스마트 동선을 새로 만들어 자동으로 담아드려요.',
+    icon: '📖',
+    title: '다른 여행자 일정 참고',
+    body: '다녀온 사람이 남긴 당일치기 카드를 보고 "이 일정으로 시작"을 누르면, 같은 장소·순서 그대로 복제돼요.',
+  },
+  {
+    tag: 'C',
+    icon: '📌',
+    title: '꼭 가고 싶은 곳 중심',
+    body: '공연·예약처럼 시각이 정해진 장소를 등록하면, 앞뒤 빈 시간(식사·가벼운 관광)을 자동으로 채워 드려요.',
   },
 ];
 
@@ -46,10 +52,10 @@ const PAGE2_STEPS = [
     title: '태그 선택 → 추천받기',
     body: '#자연 #실내 #맛집 #아이동반 #액티비티 #역사 중 원하는 태그를 고르고 "추천받기"를 누르면 어울리는 장소 목록이 떠요. 마음에 드는 곳을 일정에 담고 방문 시간을 정해요.',
   },
-  {
+    {
     icon: '🌀',
-    title: '실제 여행 진행 - 바람개비',
-    body: '일정 화면 위쪽 바람개비가 지금 날씨·혼잡·영업 상황을 알려줘요. 비/폭염/혼잡이 감지되면 대안 코스를 추천받거나, 영향받은 장소만 자동으로 바꿀 수 있어요.',
+    title: '실제 여행 진행 - 세 가지 변수',
+    body: '일정 화면 위쪽 바람개비와 바로 아래 세 장(비·폭염 / 혼잡 / 동선)이 지금 상황을 알려줘요. 반짝이면 그 버튼을 눌러 실내·한산한 곳·짧은 동선으로 바로 바꿀 수 있어요.',
   },
   {
     icon: '✅',
@@ -110,7 +116,7 @@ export default function GuideScreen() {
         <StepList steps={PAGE1_STEPS} startNumber={1} />
 
         <div className="guide-branch">
-          <span className="guide-branch-label">4. 여기서 둘 중 하나를 골라요</span>
+          <span className="guide-branch-label">4. 여기서 셋 중 하나를 골라요</span>
           <div className="guide-branch-options">
             {PAGE1_BRANCH.map((b) => (
               <div key={b.tag} className="guide-item guide-branch-item">

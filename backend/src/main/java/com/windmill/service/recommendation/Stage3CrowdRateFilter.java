@@ -11,13 +11,13 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Comparator;
 import java.util.List;
 
 /**
- * 4단계 검증 로직 - 3단계: 집중률(혼잡도) 필터링 (TatsCnctrRateService).
- * 관광지명(tAtsNm) 기준으로 오늘자 집중률을 조회해 여유율(=100-집중률) 높은 순으로 정렬한다.
- * 집중률 조회 실패/데이터 없음인 후보는 제외하지 않고 crowdRate=null로 유지해 리스트 뒤쪽에 배치한다.
+ * 4단계 검증 로직 - 3단계: 집중률(혼잡도) 조회 (TatsCnctrRateService).
+ * 관광지명(tAtsNm) 기준으로 오늘자 집중률을 붙여 두고, 들어온 순서(Stage1 관련도)는 유지한다.
+ * 한산한 곳 우선은 혼잡 회피(CROWD) 요청에서만 적용하고, 스마트 동선은 인기(집중률↑) 명소를
+ * 오전에 배치한다. 조회 실패/데이터 없음은 crowdRate=null로 두고 제외하지 않는다.
  */
 @Slf4j
 @Service
@@ -31,14 +31,9 @@ public class Stage3CrowdRateFilter {
 
     public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates, RegionCode region) {
         return Flux.fromIterable(candidates)
-                .flatMap(c -> attachCrowdRate(c, region), EXTERNAL_CALL_CONCURRENCY)
+                .flatMapSequential(c -> attachCrowdRate(c, region), EXTERNAL_CALL_CONCURRENCY)
                 .collectList()
-                .map(list -> {
-                    list.sort(Comparator.comparing(RelatedCandidate::getCrowdRate,
-                            Comparator.nullsLast(Comparator.naturalOrder())));
-                    log.info("[Stage3] 집중률 조회 완료, 여유율 높은 순 정렬 ({}건)", list.size());
-                    return list;
-                });
+                .doOnNext(list -> log.info("[Stage3] 집중률 조회 완료, 순서 유지 ({}건)", list.size()));
     }
 
     private Mono<RelatedCandidate> attachCrowdRate(RelatedCandidate candidate, RegionCode region) {

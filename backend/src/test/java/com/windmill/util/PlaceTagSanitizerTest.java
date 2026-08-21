@@ -33,6 +33,12 @@ class PlaceTagSanitizerTest {
     }
 
     @Test
+    void looksLikeCafe_matchesNameAndTag() {
+        assertTrue(PlaceTagSanitizer.looksLikeCafe(39, "속초해변카페", "카페", List.of("#카페")));
+        assertFalse(PlaceTagSanitizer.looksLikeCafe(12, "설악산", "관광지", List.of("#자연")));
+    }
+
+    @Test
     void filtersToRequestedTagsOnly() {
         List<String> tags = PlaceTagSanitizer.sanitize(
                 List.of("#맛집", "#실내", "#자연"),

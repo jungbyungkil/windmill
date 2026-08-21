@@ -127,7 +127,7 @@ public class RecommendationPipeline {
 
     /**
      * 장소명 직접 검색 - "이미 가려는 곳이 정해진" 사용자를 위한 경로(앵커 등록에도 재사용). 연관추천
-     * (Stage1 seed)이 아니라 KorService2 키워드 검색으로 그 이름 자체를 찾는다. Stage3(집중률 정렬)·
+     * (Stage1 seed)이 아니라 KorService2 키워드 검색으로 그 이름 자체를 찾는다. Stage3(집중률 조회)·
      * Stage4(LLM 태그/문장)는 건너뛴다 - 정확한 이름 매칭이지 취향 추천이 아니라 굳이 LLM이 필요 없다.
      */
     public Mono<List<RecommendationCandidate>> searchByName(String regionCode, String query) {
@@ -248,14 +248,20 @@ public class RecommendationPipeline {
     };
 
     /**
-     * 트리거 우선회피 정렬. 혼잡도 트리거는 Stage3에서 이미 여유율 순으로 정렬되어 있으므로 그대로 두고,
-     * 비/폭염 트리거는 #실내 태그가 매칭된 후보를 앞으로 당긴다. 동반 자녀가 있으면 그 안에서도
-     * 아이 동반에 어울리는 실내 장소(체험관·키즈카페·박물관 등)를 한 번 더 앞으로 당긴다 - 폭염철
-     * 아이 동반 여행은 실내 중에서도 "아이가 할 게 있는 곳"이 우선이라는 요구 반영.
+     * 트리거 우선회피 정렬. 혼잡 회피(CROWD)는 여유율 높은 순, 비/폭염은 #실내를 앞으로 당긴다.
+     * 동반 자녀가 있으면 그 안에서도 아이 동반에 어울리는 실내 장소(체험관·키즈카페·박물관 등)를
+     * 한 번 더 앞으로 당긴다 - 폭염철 아이 동반 여행은 실내 중에서도 "아이가 할 게 있는 곳"이 우선.
+     * 스마트 동선(힌트 없음)은 여기 타지 않고, 인기 명소를 오전에 두는 쪽은 SmartPlanService가 담당한다.
      */
     private List<RecommendationCandidate> applyAvoidanceOrdering(List<RecommendationCandidate> candidates,
                                                                    RecommendationRequest.AvoidanceHint hint,
                                                                    List<Integer> childAges) {
+        if (hint == RecommendationRequest.AvoidanceHint.CROWD) {
+            return candidates.stream()
+                    .sorted(Comparator.comparing(RecommendationCandidate::getCrowdRate,
+                            Comparator.nullsLast(Comparator.naturalOrder())))
+                    .collect(Collectors.toList());
+        }
         if (hint == RecommendationRequest.AvoidanceHint.WEATHER
                 || hint == RecommendationRequest.AvoidanceHint.HEAT) {
             boolean hasChildren = childAges != null && !childAges.isEmpty();

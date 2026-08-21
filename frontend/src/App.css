@@ -5758,3 +5758,207 @@
   font-weight: 700;
 }
 
+/* ---------- 3가지 일정 짜기 ---------- */
+
+.plan-mode-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.plan-mode-heading {
+  font-size: 18px;
+  margin: 0;
+}
+
+.plan-mode-lead {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plan-mode-card {
+  position: relative;
+  background: var(--sand-card);
+  border: 1px solid var(--sand-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 16px 16px 20px;
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-mode-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--breeze);
+  color: var(--sea-deep);
+  font-size: 13px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.plan-mode-title {
+  font-size: 16px;
+  margin: 0 36px 0 0;
+}
+
+.plan-mode-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.plan-mode-card .btn-start {
+  width: 100%;
+}
+
+/* ---------- 변수 대응 카드 ---------- */
+
+.variable-cards {
+  margin: 8px 0 12px;
+}
+
+.variable-cards-head strong {
+  display: block;
+  font-size: 15px;
+}
+
+.variable-cards-head p {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.variable-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 560px) {
+  .variable-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.variable-card {
+  text-align: left;
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.variable-card.active {
+  border-color: var(--level-warning);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--level-warning) 28%, transparent);
+}
+
+.variable-card-icon {
+  font-size: 20px;
+}
+
+.variable-card-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.variable-card-body {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.variable-card-cta {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sea);
+}
+
+.variable-card.sparkle {
+  animation: sparkle-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sparkle-pulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.pinwheel-hero.crowd-alert {
+  --level-color: var(--level-warning);
+}
+
+/* ---------- 첫 사용 코치 ---------- */
+
+.coach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(8, 24, 32, 0.45);
+}
+
+.coach-spotlight {
+  position: absolute;
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(8, 24, 32, 0.5);
+  outline: 2px solid #fff;
+  pointer-events: none;
+  animation: sparkle-pulse 1.4s ease-in-out infinite;
+}
+
+.coach-tip {
+  position: absolute;
+  max-width: min(360px, calc(100vw - 32px));
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  z-index: 81;
+}
+
+.coach-step {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea);
+}
+
+.coach-title {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.coach-body {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.coach-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.coach-skip {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+

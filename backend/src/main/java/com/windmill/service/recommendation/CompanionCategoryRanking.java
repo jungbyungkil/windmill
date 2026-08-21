@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 /**
  * 동반유형별 카테고리 가중치 - LLM 없이 정적 키워드 매핑으로 후보 순서를 보정한다.
  * TarRlteTarService1의 categoryMcls/categoryScls(한글 분류명) 안에 선호 키워드가 포함된 후보를 앞으로
- * 당기는 안정 정렬(stable sort)이라, 같은 그룹 내에서는 Stage3가 정한 여유율 순서가 그대로 유지된다.
+ * 당기는 안정 정렬(stable sort)이라, 같은 그룹 내에서는 Stage1·개인화 순위가 그대로 유지된다.
  *
  * ⚠ 알려진 한계(2026-08-20): "당일치기 시작하기"가 쓰는 태그 검색 경로
  * (Stage1RelatedAttractionService.fetchByThemes → mapKorItems)는 categoryMcls/categoryScls를 채우지
