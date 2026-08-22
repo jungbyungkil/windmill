@@ -65,7 +65,7 @@ export default function VariableActionCards({
   };
 
   return (
-    <section className="variable-cards" data-coach="variables" aria-label="여행 중 변수 대응">
+    <section className="variable-cards" aria-label="여행 중 변수 대응">
       <div className="variable-cards-head">
         <strong>지금 변수에 대응하기</strong>
         <p>비·폭염, 혼잡, 동선 — 바람따라가 미리 알려주고 바로 바꿔 드려요.</p>

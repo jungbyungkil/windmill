@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import PinwheelHero from './PinwheelHero';
 import PinwheelLoader from './PinwheelLoader';
 import TripStoryFeed from './TripStoryFeed';
-import CoachTour from './CoachTour';
 import RecommendationCard from './RecommendationCard';
 import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
 import * as api from '../api/windmillApi';
@@ -320,7 +319,7 @@ export default function CreateTripScreen({
       <p className="brand-tagline">당일치기 여행의 날씨·혼잡·동선 변수를 미리 알려주고, 대안을 쌓아 모두가 참고하는 가이드</p>
 
       <form id="trip-form" className="trip-form" onSubmit={handleSubmit}>
-        <div className="trip-form-row" data-coach="region">
+        <div className="trip-form-row">
           <label className="trip-form-label">여행 지역</label>
           {regionsError && <div className="error-msg">❌ 지역 목록을 불러오지 못했어요: {regionsError}</div>}
           <div className="trip-form-region-selects">
@@ -473,11 +472,11 @@ export default function CreateTripScreen({
           </div>
         </div>
 
-        <div className="plan-mode-section" data-coach="modes">
+        <div className="plan-mode-section">
           <h2 className="plan-mode-heading">일정은 이렇게 짜요</h2>
           <p className="plan-mode-lead">세 가지 중 하나만 고르면 바로 시작해요.</p>
 
-          <article className="plan-mode-card" data-coach="mode-smart">
+          <article className="plan-mode-card">
             <span className="plan-mode-badge">1</span>
             <h3 className="plan-mode-title">스마트 동선 자동</h3>
             <p className="plan-mode-desc">
@@ -489,7 +488,7 @@ export default function CreateTripScreen({
             </button>
           </article>
 
-          <article className="plan-mode-card" data-coach="mode-story">
+          <article className="plan-mode-card">
             <span className="plan-mode-badge">2</span>
             <h3 className="plan-mode-title">다른 여행자 일정 참고</h3>
             <p className="plan-mode-desc">
@@ -505,7 +504,7 @@ export default function CreateTripScreen({
             />
           </article>
 
-          <article className="plan-mode-card" data-coach="mode-anchor">
+          <article className="plan-mode-card">
             <span className="plan-mode-badge">3</span>
             <h3 className="plan-mode-title">꼭 가고 싶은 곳 중심</h3>
             <p className="plan-mode-desc">
@@ -663,15 +662,6 @@ export default function CreateTripScreen({
           }}
         />
       )}
-
-      <CoachTour
-        tourId="home"
-        steps={[
-          { selector: '[data-coach="region"]', title: '먼저 지역을 고르세요', body: '시/도 → 시/군/구 순서로 오늘 다녀올 곳을 선택해요.' },
-          { selector: '[data-coach="modes"]', title: '일정 짜는 방법은 세 가지예요', body: '스마트 자동 · 다른 사람 일정 참고 · 꼭 가고 싶은 곳 중심. 하나만 고르면 됩니다.' },
-          { selector: '[data-coach="mode-smart"]', title: '처음이면 여기를 누르세요', body: '식당 2곳, 카페 1곳, 일정 4곳을 지금 시각과 상관없이 채워 드려요.' },
-        ]}
-      />
     </div>
   );
 }

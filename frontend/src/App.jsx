@@ -10,7 +10,6 @@ import AutoPlanScreen from './components/AutoPlanScreen';
 import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
 import VariableActionCards from './components/VariableActionCards';
-import CoachTour from './components/CoachTour';
 import PinwheelLoader from './components/PinwheelLoader';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
@@ -1364,15 +1363,6 @@ export default function App() {
                 onClose={() => setTripRecordOpen(false)}
               />
 
-              <CoachTour
-                tourId="trip"
-                enabled={Boolean(itinerary)}
-                steps={[
-                  { selector: '.pinwheel-hero', title: '바람개비가 변수를 알려줘요', body: '비·폭염·혼잡·동선이 바뀌면 색이 바뀌어요. 탭하면 대안을 바로 볼 수 있어요.' },
-                  { selector: '[data-coach="variables"]', title: '여기서 바로 대응하세요', body: '세 장 모두 눌러 볼 수 있어요. 반짝이면 지금 바꾸라는 신호입니다.' },
-                  { selector: '.itinerary-list', title: '오늘 일정이 여기 있어요', body: '장소를 고치고, 순서를 바꾸고, 마무리는 위쪽 버튼으로 남기면 됩니다.' },
-                ]}
-              />
             </div>
           )
         }
