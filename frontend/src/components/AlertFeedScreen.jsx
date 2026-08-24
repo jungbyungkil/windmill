@@ -16,7 +16,7 @@ function formatRelativeTime(createdAt) {
 }
 
 /** 알림 - 실제로 발송된 알림 이력을 최신순 리스트로. NudgeCard와 달리 읽기 전용(닫기 없음). */
-export default function AlertFeedScreen({ itineraryId }) {
+export default function AlertFeedScreen({ itineraryId, showTitle = true }) {
   const [alerts, setAlerts] = useState(null); // null = 로딩 중
   const [error, setError] = useState(null);
 
@@ -31,7 +31,7 @@ export default function AlertFeedScreen({ itineraryId }) {
 
   return (
     <div className="alert-feed">
-      <h2 className="section-title">알림</h2>
+      {showTitle && <h2 className="section-title">알림</h2>}
       {error && <p className="error-msg">{error}</p>}
       {!error && alerts === null && <p className="empty-state">불러오는 중...</p>}
       {!error && alerts !== null && alerts.length === 0 && (

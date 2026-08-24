@@ -44,7 +44,7 @@ export const AGE_GROUP_OPTIONS = [
   { value: 'SEVENTIES_PLUS', label: '70대 이상' },
 ];
 
-// 검색 시 예산 필터(1인 기준, 이하) - 단일 선택. 값 없음(null)이면 필터 없음(전체)
+// 식당·카페 고를 때 1인 식사 참고 필터(이하). 일정 합계용이 아님. 값 없음(null)이면 필터 없음
 export const BUDGET_OPTIONS = [
   { value: 10000, label: '1만원 이하' },
   { value: 20000, label: '2만원 이하' },
@@ -52,6 +52,25 @@ export const BUDGET_OPTIONS = [
   { value: 40000, label: '4만원 이하' },
   { value: 50000, label: '5만원 이하' },
 ];
+
+export const FOOD_TAGS = TAG_GROUPS[0].tags;
+/** TourAPI 음식점 contentTypeId */
+export const TOUR_FOOD_CONTENT_TYPE_ID = 39;
+
+const FOOD_QUERY_HINTS = ['맛집', '식당', '음식', '카페', '한식', '중식', '일식', '양식', '레스토랑'];
+
+export function isFoodPlace(place) {
+  if (!place) return false;
+  if (Number(place.contentTypeId) === TOUR_FOOD_CONTENT_TYPE_ID) return true;
+  const tags = place.matchedTags || place.tags || [];
+  return tags.some((t) => FOOD_TAGS.includes(t));
+}
+
+export function isFoodSearch({ tags = [], query = '' } = {}) {
+  if (tags.some((t) => FOOD_TAGS.includes(t))) return true;
+  const q = (query || '').trim();
+  return q.length > 0 && FOOD_QUERY_HINTS.some((hint) => q.includes(hint));
+}
 
 // 동반 자녀 만 나이 선택지 (0~17세)
 export const CHILD_AGE_OPTIONS = Array.from({ length: 18 }, (_, age) => ({

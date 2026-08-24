@@ -92,8 +92,10 @@ public class RouteRecalculationService {
             fromOrigin = kakaoDirectionsClient.minutesFromOrigin(origin, points);
         }
 
-        List<ItineraryItem> tspOrder = VisitOrderOptimizer.optimizeWithTravelMinutes(
-                withCoords, matrix.minutes(), fromOrigin);
+        // 바람개비 "지금 Xkm → 재배치 시 약 Ykm"와 같은 직선거리 최단 순서를 쓴다.
+        // 카카오 분 단위 TSP는 도로 시간은 반영하지만, 식사 분리(declump)와 맞물리면
+        // 감지기가 약속한 단축이 실제로 적용되지 않아 재계산 버튼이 먹통처럼 보였다.
+        List<ItineraryItem> tspOrder = chooseShortestVisitOrder(withCoords, originLon, originLat);
 
         // 정기휴무인 곳은 뒤로 — 영업 가능한 슬롯을 먼저 채움
         LocalDate visitDate = resolveVisitDate(tspOrder);
@@ -106,12 +108,9 @@ public class RouteRecalculationService {
                 open.add(item);
             }
         }
-        // TSP는 순수 이동거리만 보므로 맛집 태그 장소끼리 가까이 있으면 연달아 붙어버릴 수 있다
-        // (예: 맛집→맛집→관광→관광). 그대로 두면 점심/저녁 앵커가 서로 붙어 배정되고 관광 일정이
-        // 저녁 시간대로 몰린다 - 두 식사 사이에 그 뒤에 오는 가장 가까운(순서상) 비-식사 장소를
-        // 끌어와 끼워 넣어 자연스럽게 하루에 흩어지도록 한다. 영업 가능한(open) 구간에만 적용 -
-        // 정기휴무(closed)·좌표없음(without) 뒤로 미는 순서는 그대로 유지.
-        open = declumpAdjacentMeals(open);
+        // 맛집이 연달아 있으면 점심·저녁 사이에 관광을 끼워 하루가 저녁으로 몰리지 않게 한다.
+        // 다만 그 때문에 동선이 다시 꼬이면(감지기 기준) 최단 순서를 유지한다.
+        open = declumpIfItDoesNotRetangle(open);
 
         Map<Long, Integer> idToIdx = new HashMap<>();
         for (int i = 0; i < withCoords.size(); i++) {
@@ -130,10 +129,9 @@ public class RouteRecalculationService {
         finalOrder.addAll(without);
 
         int totalTravel = assignSchedule(finalOrder, matrix.minutes(), idToIdx, fromOrigin, overrideStartTime);
-        String source = matrix.roadBased() ? "카카오 도로 이동시간" : "직선거리 추정";
         String message = useOrigin
-                ? String.format("현재 위치 기준으로 %s TSP 재계산 · 이동 약 %d분 · 시간표를 다시 잡았어요.", source, totalTravel)
-                : String.format("%s TSP로 순서를 잡고, 체류·이동을 반영해 시간표를 다시 잡았어요. (이동 약 %d분)", source, totalTravel);
+                ? String.format("현재 위치를 출발점으로 최단 순서를 잡고 시간표를 다시 잡았어요. (이동 약 %d분)", totalTravel)
+                : String.format("꼬인 동선을 최단 순서로 바꾸고, 체류·이동을 반영해 시간표를 다시 잡았어요. (이동 약 %d분)", totalTravel);
         log.info("[RouteRecalc] n={} roadBased={} travelMin={} closedToday={}",
                 withCoords.size(), matrix.roadBased(), totalTravel, closed.size());
         return new Result(finalOrder, message, totalTravel, matrix.roadBased());
@@ -326,6 +324,45 @@ public class RouteRecalculationService {
             return first.getItinerary().getStartDate();
         }
         return null;
+    }
+
+    /**
+     * 바람개비 동선 꼬임 감지기와 동일한 직선거리 최단 방문 순서.
+     */
+    static List<ItineraryItem> chooseShortestVisitOrder(List<ItineraryItem> withCoords,
+                                                        Double originLon, Double originLat) {
+        if (originLon != null && originLat != null) {
+            return VisitOrderOptimizer.optimizeFromOrigin(
+                    withCoords,
+                    String.valueOf(originLon),
+                    String.valueOf(originLat),
+                    ItineraryItem::getMapX,
+                    ItineraryItem::getMapY);
+        }
+        return VisitOrderOptimizer.optimize(withCoords, ItineraryItem::getMapX, ItineraryItem::getMapY);
+    }
+
+    /**
+     * 식사 분리가 최단 동선을 다시 꼬이게 하면 원래 순서를 유지한다.
+     */
+    static List<ItineraryItem> declumpIfItDoesNotRetangle(List<ItineraryItem> open) {
+        List<ItineraryItem> declumped = declumpAdjacentMeals(open);
+        if (declumped.equals(open)) {
+            return declumped;
+        }
+        boolean wasShort = !RouteTangleDetector.detect(copyWithDisplayOrder(open)).isTangled();
+        boolean nowTangled = RouteTangleDetector.detect(copyWithDisplayOrder(declumped)).isTangled();
+        if (wasShort && nowTangled) {
+            return open;
+        }
+        return declumped;
+    }
+
+    private static List<ItineraryItem> copyWithDisplayOrder(List<ItineraryItem> items) {
+        for (int i = 0; i < items.size(); i++) {
+            items.get(i).setDisplayOrder(i);
+        }
+        return items;
     }
 
     /**

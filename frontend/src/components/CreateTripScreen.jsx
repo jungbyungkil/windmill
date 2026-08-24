@@ -75,6 +75,7 @@ export default function CreateTripScreen({
   const [anchorTime, setAnchorTime] = useState('19:00');
   const [anchorResolvingKey, setAnchorResolvingKey] = useState(null);
   const [anchorResolveError, setAnchorResolveError] = useState(null);
+  const [storyFeedAvailable, setStoryFeedAvailable] = useState(false);
 
   useEffect(() => {
     api.getRegions()
@@ -393,7 +394,9 @@ export default function CreateTripScreen({
               }}
               onBlur={() => setPartySizeTouched(true)}
             />
-            <span className="trip-form-hint-inline">명 - 슬롯별/전체 예상 비용 계산에 쓰여요</span>
+            <span className="trip-form-hint-inline">
+              {isExtendedFamily ? '명 · 5~9명까지 적을 수 있어요' : '명 · 동반 유형에 맞춰 표시돼요'}
+            </span>
           </label>
           {isExtendedFamily && partySizeTouched && partySizeError && (
             <div className="error-msg">❌ {partySizeError}</div>
@@ -488,7 +491,7 @@ export default function CreateTripScreen({
             </button>
           </article>
 
-          <article className="plan-mode-card">
+          <article className="plan-mode-card" hidden={!storyFeedAvailable}>
             <span className="plan-mode-badge">2</span>
             <h3 className="plan-mode-title">다른 여행자 일정 참고</h3>
             <p className="plan-mode-desc">
@@ -501,11 +504,12 @@ export default function CreateTripScreen({
               onStartFromStory={handleStartFromStory}
               startingStoryId={startingStoryId}
               startDisabled={dateInvalid || loading}
+              onAvailabilityChange={setStoryFeedAvailable}
             />
           </article>
 
           <article className="plan-mode-card">
-            <span className="plan-mode-badge">3</span>
+            <span className="plan-mode-badge">{storyFeedAvailable ? '3' : '2'}</span>
             <h3 className="plan-mode-title">꼭 가고 싶은 곳 중심</h3>
             <p className="plan-mode-desc">
               공연·예약처럼 시각이 정해진 장소를 등록하면, 앞뒤 빈 시간을 자동으로 채워 드려요.

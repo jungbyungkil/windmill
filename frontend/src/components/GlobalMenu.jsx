@@ -2,7 +2,7 @@ import useModalHistory from '../hooks/useModalHistory';
 
 /**
  * 전체 메뉴(GNB) - 좌측 슬라이드 패널. 뒤로가기(popstate)로도 닫힘(useModalHistory).
- * 알림/프로필·설정은 하단 탭바(BottomTabBar)로 이동해 여기서 뺐음(중복 진입점 방지).
+ * 알림/프로필은 일정 한 페이지 안의 구간으로 옮겨, 여기서는 내 여행·가이드만 남긴다.
  * 새 여행 시작은 일단 메뉴에서 뺐음(화면·라우트 자체는 남아있어 필요하면 바로 복원 가능).
  */
 export default function GlobalMenu({

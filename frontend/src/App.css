@@ -581,12 +581,6 @@
   padding: 3px 10px;
 }
 
-.daytrip-cost {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
 .trip-form select,
 .trip-form input[type='date'] {
   flex: 1;
@@ -1876,6 +1870,13 @@
   color: var(--muted);
 }
 
+.reco-budget-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .tag-accordion {
   display: flex;
   flex-direction: column;
@@ -3006,9 +3007,8 @@
   color: var(--level-warning);
 }
 
-.reco-cost-unknown {
+.reco-cost-hint {
   font-style: italic;
-  opacity: 0.75;
 }
 
 .reco-close {
@@ -4366,7 +4366,7 @@
   }
 
   .app-main {
-    padding: 14px 14px max(40px, calc(24px + env(safe-area-inset-bottom, 0px)));
+    padding: 14px 14px max(112px, calc(92px + env(safe-area-inset-bottom, 0px)));
     gap: 18px;
   }
 
@@ -5694,68 +5694,134 @@
   color: var(--sea);
 }
 
+.trip-flow-rail {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+}
+
+.trip-flow-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.trip-flow-item {
+  display: flex;
+  align-items: stretch;
+  flex: 1 0 auto;
+  min-width: 76px;
+}
+
+.trip-flow-connector {
+  width: 10px;
+  margin: 22px 0 0;
+  border-top: 2px dashed color-mix(in srgb, var(--sea) 35%, var(--sand-border));
+  flex-shrink: 0;
+}
+
+.trip-flow-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 2px;
+  color: var(--muted);
+}
+
+.trip-flow-step.active {
+  color: var(--sea-deep);
+}
+
+.trip-flow-n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--sand-border);
+  color: var(--muted);
+}
+
+.trip-flow-step.active .trip-flow-n {
+  background: var(--sea);
+  color: #fff;
+}
+
+.trip-flow-label {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.trip-flow-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.trip-page-section {
+  scroll-margin-top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sand-border);
+}
+
+#trip-section-home {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.trip-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trip-section-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--sea);
+}
+
+.trip-section-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.trip-section-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.trip-page-section .alert-feed,
+.trip-page-section .settings-screen,
+.trip-page-section .reco-search {
+  padding: 0;
+  max-width: none;
+}
+
 .map-tab-screen,
 .search-tab-screen {
   max-width: 720px;
   margin: 0 auto;
   width: 100%;
   padding: 4px 16px max(112px, calc(92px + env(safe-area-inset-bottom, 0px)));
-}
-
-.map-tab-place-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.map-tab-place-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--sand-card);
-  border: 1px solid var(--sand-border);
-  border-radius: var(--radius-md);
-  padding: 12px 16px;
-}
-
-.map-tab-place-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.map-tab-place-dot.level-normal { background: var(--level-normal); }
-.map-tab-place-dot.level-warning { background: var(--level-warning); }
-.map-tab-place-dot.level-danger { background: var(--level-danger); }
-
-.map-tab-place-status.level-normal { color: var(--level-normal); }
-.map-tab-place-status.level-warning { color: var(--level-warning); }
-.map-tab-place-status.level-danger { color: var(--level-danger); }
-
-.map-tab-place-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.map-tab-place-name {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.map-tab-place-addr {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.map-tab-place-status {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 700;
 }
 
 /* ---------- 3가지 일정 짜기 ---------- */

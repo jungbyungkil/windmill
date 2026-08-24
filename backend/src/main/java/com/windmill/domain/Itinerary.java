@@ -71,9 +71,9 @@ public class Itinerary {
     private boolean withPet = false;
 
     /**
-     * 전체 인원수 - 슬롯별/전체 예상 비용 합산의 곱셈 기준(1인 요금 × partySize). companionType은 라벨용
-     * enum이라 정확한 인원수를 담지 못해 별도 컬럼으로 추가한다. ColumnDefault: 이미 행이 있는 테이블에
-     * NOT NULL 컬럼을 추가할 때 기존 행을 1명으로 채우기 위함(strollerFriendly와 동일 이유).
+     * 전체 인원수. companionType은 라벨용 enum이라 정확한 인원수를 담지 못해 별도 컬럼으로 둔다.
+     * ColumnDefault: 이미 행이 있는 테이블에 NOT NULL 컬럼을 추가할 때 기존 행을 1명으로 채우기 위함
+     * (strollerFriendly와 동일 이유).
      */
     @Builder.Default
     @ColumnDefault("1")

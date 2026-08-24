@@ -15,9 +15,6 @@ function draftFromItem(src) {
     tel: src.tel || '',
     useFeeText: src.useFeeText || '',
     isFree: Boolean(src.isFree),
-    estimatedCostPerPerson: src.estimatedCostPerPerson === null || src.estimatedCostPerPerson === undefined
-      ? ''
-      : String(src.estimatedCostPerPerson),
     restDateText: src.restDateText || '',
   };
 }
@@ -79,9 +76,6 @@ export default function ItineraryItemCard({
         tel: draft.tel.trim(),
         useFeeText: draft.isFree ? '' : draft.useFeeText.trim(),
         isFree: draft.isFree,
-        estimatedCostPerPerson: draft.isFree
-          ? 0
-          : (draft.estimatedCostPerPerson.trim() === '' ? null : Number(draft.estimatedCostPerPerson)),
         restDateText: draft.restDateText.trim(),
       });
       setEditing(false);
@@ -186,13 +180,6 @@ export default function ItineraryItemCard({
               {(item.isFree || item.useFeeText) && (
                 <div className="reco-info-row">🎫 {item.isFree ? '무료' : item.useFeeText}</div>
               )}
-              {item.estimatedCostPerPerson === null || item.estimatedCostPerPerson === undefined ? (
-                <div className="reco-info-row reco-cost-unknown">💰 정보없음</div>
-              ) : (
-                <div className="reco-info-row">
-                  💰 {item.estimatedCostPerPerson === 0 ? '무료' : `1인 ${item.estimatedCostPerPerson.toLocaleString()}원`}
-                </div>
-              )}
               {item.tel && (
                 <a className="reco-info-row reco-info-link" href={`tel:${item.tel}`}>☎️ {item.tel}</a>
               )}
@@ -265,27 +252,15 @@ export default function ItineraryItemCard({
             </label>
 
             {!draft.isFree && (
-              <>
-                <label className="item-edit-label">
-                  이용요금
-                  <input
-                    type="text"
-                    value={draft.useFeeText}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, useFeeText: e.target.value }))}
-                    placeholder="예: 성인 3,000원"
-                  />
-                </label>
-                <label className="item-edit-label">
-                  1인 예상 비용(원)
-                  <input
-                    type="number"
-                    min={0}
-                    value={draft.estimatedCostPerPerson}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, estimatedCostPerPerson: e.target.value }))}
-                    placeholder="모르면 비워두세요"
-                  />
-                </label>
-              </>
+              <label className="item-edit-label">
+                이용요금
+                <input
+                  type="text"
+                  value={draft.useFeeText}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, useFeeText: e.target.value }))}
+                  placeholder="예: 성인 3,000원"
+                />
+              </label>
             )}
 
             <label className="item-edit-label">

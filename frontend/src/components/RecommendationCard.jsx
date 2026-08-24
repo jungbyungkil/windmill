@@ -1,9 +1,16 @@
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
+import { isFoodPlace } from '../constants';
 
 const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
 export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [], addLabel = '+ 일정에 추가', addingLabel = '담는 중...' }) {
+  const food = isFoodPlace(candidate);
+  const mealHint = food
+    && candidate.estimatedCostPerPerson !== null
+    && candidate.estimatedCostPerPerson !== undefined
+    && candidate.estimatedCostPerPerson > 0;
+  const showAdmission = (candidate.isFree || candidate.useFeeText) && (!food || !mealHint);
   return (
     <article className="reco-card">
       <div className="reco-media">
@@ -39,12 +46,12 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
 
       <div className="reco-info">
         {candidate.addr1 && <div className="reco-info-row">📍 {candidate.addr1}</div>}
-        {(candidate.isFree || candidate.useFeeText) && (
+        {showAdmission && (
           <div className="reco-info-row">🎫 {candidate.isFree ? '무료' : candidate.useFeeText}</div>
         )}
-        {candidate.estimatedCostPerPerson !== null && candidate.estimatedCostPerPerson !== undefined && (
-          <div className="reco-info-row">
-            💰 {candidate.estimatedCostPerPerson === 0 ? '무료' : `1인 ${candidate.estimatedCostPerPerson.toLocaleString()}원`}
+        {mealHint && (
+          <div className="reco-info-row reco-cost-hint">
+            💰 1인 약 {candidate.estimatedCostPerPerson.toLocaleString()}원 · 참고
           </div>
         )}
         {candidate.tel && (

@@ -295,7 +295,7 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
 }
 
 /**
- * 오늘 동선 카카오맵 — "지도" 탭 전용 화면 콘텐츠. 순서 마커 + 도로 폴리라인(서버 프록시) + 상태 색.
+ * 오늘 동선 카카오맵 — 일정 화면의 지도 구간. 순서 마커 + 도로 폴리라인 + 상태 색.
  * TourAPI 좌표가 없어도 주소/장소명으로 카카오 지오코딩해 표시한다.
  */
 export default function DayRouteMap({

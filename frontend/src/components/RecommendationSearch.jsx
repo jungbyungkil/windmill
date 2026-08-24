@@ -2,13 +2,15 @@ import { useState } from 'react';
 import RecommendationCard from './RecommendationCard';
 import TrustBadge from './TrustBadge';
 import TagGroupPicker from './TagGroupPicker';
-import { BUDGET_OPTIONS } from '../constants';
+import { BUDGET_OPTIONS, isFoodSearch } from '../constants';
 
 export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId, pinnedPlaceName }) {
   const [query, setQuery] = useState('');
   const [tags, setTags] = useState([]);
   const [freeOnly, setFreeOnly] = useState(false);
   const [budget, setBudget] = useState(null);
+
+  const foodSearch = isFoodSearch({ tags, query });
 
   function toggleTag(tag) {
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
@@ -20,10 +22,14 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSearch({ query, tags, maxBudgetPerPerson: budget });
+    onSearch({
+      query,
+      tags,
+      maxBudgetPerPerson: foodSearch ? budget : null,
+    });
   }
 
-  const visibleResults = freeOnly ? (results || []).filter((c) => c.isFree) : results;
+  const visibleResults = (!foodSearch && freeOnly) ? (results || []).filter((c) => c.isFree) : results;
 
   return (
     <div className="reco-search">
@@ -43,25 +49,30 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
           onChange={(e) => setQuery(e.target.value)}
         />
         <TagGroupPicker selected={tags} onToggle={toggleTag} />
-        <div className="reco-budget-row">
-          <span className="reco-budget-label">💰 예산(1인 기준)</span>
-          <div className="reco-tag-row">
-            {BUDGET_OPTIONS.map((opt) => (
-              <button
-                type="button"
-                key={opt.value}
-                className={`tag ${budget === opt.value ? 'selected' : ''}`}
-                onClick={() => toggleBudget(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
+        {foodSearch && (
+          <div className="reco-budget-row">
+            <span className="reco-budget-label">식사 참고 · 1인 기준</span>
+            <p className="reco-budget-hint">대략적인 눈금이에요. 실제 메뉴와 다를 수 있어요.</p>
+            <div className="reco-tag-row">
+              {BUDGET_OPTIONS.map((opt) => (
+                <button
+                  type="button"
+                  key={opt.value}
+                  className={`tag ${budget === opt.value ? 'selected' : ''}`}
+                  onClick={() => toggleBudget(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <label className="trip-form-checkbox reco-free-filter">
-          <input type="checkbox" checked={freeOnly} onChange={(e) => setFreeOnly(e.target.checked)} />
-          🎫 무료 장소만 보기
-        </label>
+        )}
+        {!foodSearch && (
+          <label className="trip-form-checkbox reco-free-filter">
+            <input type="checkbox" checked={freeOnly} onChange={(e) => setFreeOnly(e.target.checked)} />
+            🎫 무료 장소만 보기
+          </label>
+        )}
 
         <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? '찾는 중...' : '🔍 추천받기'}
@@ -71,7 +82,7 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
       {results !== null && (
         visibleResults.length === 0 ? (
           <p className="empty-state">
-            {freeOnly
+            {!foodSearch && freeOnly
               ? '무료 장소가 없어요. 필터를 해제해보세요.'
               : '조건에 맞는 추천 결과가 없어요. 태그(#자연·#실내·#맛집·#아이동반·#액티비티·#역사)로 다시 찾아보세요.'}
           </p>

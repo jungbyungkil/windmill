@@ -13,7 +13,7 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
   const [overallRating, setOverallRating] = useState(null);
   const [overallNote, setOverallNote] = useState('');
 
-  useModalHistory(open, onClose);
+  const skipHistoryRestore = useModalHistory(open, onClose);
 
   if (!open) return null;
 
@@ -24,16 +24,21 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
   const taggedCount = Object.keys(ratings).length;
   const canSubmit = Boolean(overallRating);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return;
     const visitFeedback = items
       .filter((item) => ratings[item.itemId])
       .map((item) => ({ itemId: item.itemId, placeName: item.placeName, rating: ratings[item.itemId] }));
-    onSubmit({
-      overallRating,
-      overallNote: overallNote.trim(),
-      visitFeedback,
-    });
+    skipHistoryRestore();
+    try {
+      await Promise.resolve(onSubmit({
+        overallRating,
+        overallNote: overallNote.trim(),
+        visitFeedback,
+      }));
+    } catch {
+      skipHistoryRestore.cancel();
+    }
   }
 
   return (

@@ -18,6 +18,7 @@ import ItineraryList from './components/ItineraryList';
 import DayRouteMap from './components/DayRouteMap';
 import RecommendationSearch from './components/RecommendationSearch';
 import BottomTabBar from './components/BottomTabBar';
+import TripFlowRail from './components/TripFlowRail';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
@@ -32,10 +33,20 @@ import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
 import { recordView } from './utils/viewHistory';
-import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from './utils/statusLevel';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
+const TRIP_SECTIONS = ['home', 'map', 'search', 'alerts', 'profile'];
+
+function tripSectionPath(key) {
+  return key === 'home' ? '/trip' : `/trip#${key}`;
+}
+
+function tripSectionFromHash(hash) {
+  const fromHash = (hash || '').replace('#', '');
+  if (!fromHash || fromHash === 'home') return 'home';
+  return TRIP_SECTIONS.includes(fromHash) ? fromHash : 'home';
+}
 
 function readShareTokenFromHash() {
   const m = window.location.hash.match(/^#\/share\/([A-Za-z0-9_-]+)/);
@@ -136,9 +147,12 @@ export default function App() {
   const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const autoOptimizedRef = useRef(false);
+  const skipSectionObserveRef = useRef(false);
+  const ignoreHashScrollRef = useRef(false);
 
   const [activeDate, setActiveDate] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tripSection, setTripSection] = useState('home');
 
   useEffect(() => {
     function onHash() {
@@ -243,19 +257,66 @@ export default function App() {
     : [];
   const pinnedOrigin = itinerary ? pinnedOriginItem(itinerary.items) : null;
 
-  // 슬롯별 예상 비용(1인 기준 × 인원수) 합산 - 정보없음 항목은 합계에서 빼고 별도로 안내한다(0원과 구분)
-  const costSummary = visibleItems.reduce(
-    (acc, item) => {
-      if (item.estimatedCostPerPerson === null || item.estimatedCostPerPerson === undefined) {
-        acc.unknownCount += 1;
-      } else {
-        acc.total += item.estimatedCostPerPerson * (itinerary?.partySize || 1);
-        acc.hasKnown = true;
-      }
-      return acc;
-    },
-    { total: 0, unknownCount: 0, hasKnown: false },
-  );
+  function selectTripSection(key) {
+    if (!TRIP_SECTIONS.includes(key)) return;
+    skipSectionObserveRef.current = true;
+    setTripSection(key);
+    const next = tripSectionPath(key);
+    if (`${location.pathname}${location.hash}` !== next) {
+      navigate(next, { replace: true });
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById(`trip-section-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    window.setTimeout(() => {
+      skipSectionObserveRef.current = false;
+    }, 800);
+  }
+
+  useEffect(() => {
+    if (!itinerary || location.pathname !== '/trip') return undefined;
+    const key = tripSectionFromHash(location.hash);
+    setTripSection(key);
+
+    if (ignoreHashScrollRef.current) {
+      ignoreHashScrollRef.current = false;
+      return undefined;
+    }
+
+    // 해시 없이 /trip 진입(새 일정·이어하기·알림)은 맨 위가 홈이므로 강제 스크롤하지 않는다
+    if (key === 'home' && !location.hash) {
+      return undefined;
+    }
+
+    skipSectionObserveRef.current = true;
+    const timer = window.setTimeout(() => {
+      document.getElementById(`trip-section-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      skipSectionObserveRef.current = false;
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [itinerary, location.pathname, location.hash]);
+
+  useEffect(() => {
+    if (!itinerary || location.pathname !== '/trip') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (skipSectionObserveRef.current) return;
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      const id = visible[0]?.target?.id?.replace('trip-section-', '');
+      if (!id || !TRIP_SECTIONS.includes(id)) return;
+      setTripSection(id);
+      const next = tripSectionPath(id);
+      if (`${window.location.pathname}${window.location.hash}` === next) return;
+      ignoreHashScrollRef.current = true;
+      navigate(next, { replace: true });
+    }, { rootMargin: '-18% 0px -62% 0px', threshold: [0.12, 0.35] });
+    TRIP_SECTIONS.forEach((key) => {
+      const el = document.getElementById(`trip-section-${key}`);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [itinerary, location.pathname, navigate]);
 
   const refreshTrigger = useCallback(async () => {
     if (!itineraryId) return;
@@ -1080,13 +1141,11 @@ export default function App() {
       setTrigger(null);
       setRecoResults(null);
       setRerouteCount(0);
-      // navigate('/')를 직접 부르지 않는다 - /trip 라우트 가드(!itinerary → <Navigate to="/"/>)가
-      // itinerary=null이 되는 순간 자연스럽게 처리한다. 여기서 navigate까지 같이 부르면, 모달이
-      // 방금 닫히며 useModalHistory 클린업이 실행하는 history.back()과 겹쳐 방금 이동한 "/"에서
-      // 다시 "/trip"(빈 화면)으로 되돌아가버리는 경합이 있었음(2026-08-16 사용자 제보 - 여행 마무리
-      // 후 첫 화면으로 안 넘어가고 빈 화면만 남음).
+      // 모달 쪽에서 skipNextRestore를 먼저 호출하므로 history.back()과 겹치지 않는다.
+      navigate('/', { replace: true });
     } catch (e) {
       alert(e.message);
+      throw e;
     } finally {
       setTripSubmitting(false);
     }
@@ -1227,7 +1286,7 @@ export default function App() {
               {creating && (
                 <PinwheelLoader message={creatingStage || '지금 일정을 스마트하게 고르고 있어요...'} />
               )}
-              <BackHeader title="바람따라" onMenuClick={() => setMenuOpen(true)} />
+              <BackHeader title="바람따라" showBack={false} />
               <header className="app-header">
                 <div className="header-inner">
                   <button type="button" className="logo logo-btn" onClick={handleGoHome} title="메인으로">
@@ -1243,6 +1302,14 @@ export default function App() {
               </header>
 
               <main className="app-main">
+                <TripFlowRail active={tripSection} onSelect={selectTripSection} />
+
+                <section id="trip-section-home" className="trip-page-section">
+                <header className="trip-section-head">
+                  <p className="trip-section-kicker">1 · 오늘 일정</p>
+                  <h2>홈</h2>
+                  <p>실시간 변수를 보고 오늘 일정을 다듬어요. 아래 지도·검색·알림·설정도 이 페이지에서 이어서 볼 수 있어요.</p>
+                </header>
                 <PinwheelHero
                   trigger={trigger}
                   onRequestAlternatives={handleRequestAlternatives}
@@ -1272,12 +1339,6 @@ export default function App() {
                 <div className="daytrip-chip-row">
                   <span className="daytrip-chip">당일치기</span>
                   {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
-                  {visibleItems.length > 0 && (
-                    <span className="daytrip-cost" title={costSummary.unknownCount > 0 ? `정보없음 ${costSummary.unknownCount}곳 제외` : undefined}>
-                      💰 Σ {costSummary.total.toLocaleString()}원
-                      {costSummary.unknownCount > 0 && ` (정보없음 ${costSummary.unknownCount}곳 제외)`}
-                    </span>
-                  )}
                   <span className="daytrip-count">{visibleItems.length}곳</span>
                 </div>
 
@@ -1310,13 +1371,63 @@ export default function App() {
                 />
 
                 <MidWeatherBanner forecast={midWeather} />
+                </section>
+
+                <section id="trip-section-map" className="trip-page-section">
+                  <header className="trip-section-head">
+                    <p className="trip-section-kicker">2 · 동선 확인</p>
+                    <h2>지도</h2>
+                    <p>오늘 가는 순서를 지도에서 이어 보고, 상태 색으로 주의할 곳을 확인해요.</p>
+                  </header>
+                  <DayRouteMap
+                    items={visibleItems}
+                    weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
+                    closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
+                    hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
+                    crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
+                  />
+                </section>
+
+                <section id="trip-section-search" className="trip-page-section">
+                  <header className="trip-section-head">
+                    <p className="trip-section-kicker">3 · 장소 더 찾기</p>
+                    <h2>검색</h2>
+                    <p>태그나 이름으로 장소를 찾아 오늘 일정에 보태요.</p>
+                  </header>
+                  <RecommendationSearch
+                    onSearch={handleSearch}
+                    onAdd={handleAddRecommendation}
+                    results={recoResults}
+                    loading={recoLoading}
+                    addingId={addingContentId}
+                    pinnedPlaceName={pinnedOrigin?.placeName}
+                  />
+                </section>
+
+                <section id="trip-section-alerts" className="trip-page-section">
+                  <header className="trip-section-head">
+                    <p className="trip-section-kicker">4 · 실시간 변수</p>
+                    <h2>알림</h2>
+                    <p>비·폭염·혼잡처럼 이미 알려 드린 내용을 시간 순으로 모아 봐요.</p>
+                  </header>
+                  <AlertFeedScreen itineraryId={itineraryId} showTitle={false} />
+                </section>
+
+                <section id="trip-section-profile" className="trip-page-section">
+                  <header className="trip-section-head">
+                    <p className="trip-section-kicker">5 · 내 설정</p>
+                    <h2>프로필</h2>
+                    <p>글씨 크기와 알림을 맞추고, 내 여행·이용 가이드로 이어가요.</p>
+                  </header>
+                  <SettingsScreen sessionId={sessionId} />
+                </section>
               </main>
 
               <footer className="app-footer">
                 <p>바람따라 · 바람이 알려주는 실시간 여행</p>
               </footer>
 
-              <BottomTabBar active="home" />
+              <BottomTabBar active={tripSection} onSelect={selectTripSection} />
 
               <AlternativesPanel
                 open={altOpen}
@@ -1369,87 +1480,15 @@ export default function App() {
       />
       <Route
         path="/trip/map"
-        element={
-          !itinerary ? <Navigate to="/" replace /> : (
-            <>
-              <BackHeader title="지도 · 스팟" showBack={false} onMenuClick={() => setMenuOpen(true)} />
-              <div className="map-tab-screen">
-                <DayRouteMap
-                  items={visibleItems}
-                  weatherAffectedItemIds={trigger?.weatherAffectedItemIds}
-                  closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
-                  hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
-                  crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
-                />
-                {visibleItems.length > 0 && (() => {
-                  const weather = new Set((trigger?.weatherAffectedItemIds || []).map(Number));
-                  const closedDay = new Set((trigger?.closedDayAffectedItemIds || []).map(Number));
-                  const hoursEnded = new Set((trigger?.hoursEndedAffectedItemIds || []).map(Number));
-                  const crowd = new Set((trigger?.crowdAffectedItemIds || []).map(Number));
-                  return (
-                  <ul className="map-tab-place-list">
-                    {visibleItems.map((item) => {
-                      const id = Number(item.itemId);
-                      const indoor = isIndoorPlace(item);
-                      const level = itemStatusLevel(item, {
-                        weatherAlerted: weather.has(id) && !indoor,
-                        businessAlerted: closedDay.has(id) || hoursEnded.has(id),
-                        crowdAlerted: crowd.has(id),
-                      }).toLowerCase();
-                      return (
-                        <li key={item.itemId} className="map-tab-place-row">
-                          <span className={`map-tab-place-dot level-${level}`} />
-                          <div className="map-tab-place-body">
-                            <div className="map-tab-place-name">{item.placeName}</div>
-                            {item.addr1 && <div className="map-tab-place-addr">{item.addr1}</div>}
-                          </div>
-                          <span className={`map-tab-place-status level-${level}`}>
-                            {STATUS_LABEL[level.toUpperCase()]}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  );
-                })()}
-              </div>
-              <BottomTabBar active="map" />
-            </>
-          )
-        }
+        element={<Navigate to={itinerary ? '/trip#map' : '/'} replace />}
       />
       <Route
         path="/trip/search"
-        element={
-          !itinerary ? <Navigate to="/" replace /> : (
-            <>
-              <BackHeader showBack={false} onMenuClick={() => setMenuOpen(true)} />
-              <div className="search-tab-screen">
-                <RecommendationSearch
-                  onSearch={handleSearch}
-                  onAdd={handleAddRecommendation}
-                  results={recoResults}
-                  loading={recoLoading}
-                  addingId={addingContentId}
-                  pinnedPlaceName={pinnedOrigin?.placeName}
-                />
-              </div>
-              <BottomTabBar active="search" />
-            </>
-          )
-        }
+        element={<Navigate to={itinerary ? '/trip#search' : '/'} replace />}
       />
       <Route
         path="/alerts"
-        element={
-          !itinerary ? <Navigate to="/" replace /> : (
-            <>
-              <BackHeader title="알림" showBack={false} onMenuClick={() => setMenuOpen(true)} />
-              <AlertFeedScreen itineraryId={itineraryId} />
-              <BottomTabBar active="alerts" />
-            </>
-          )
-        }
+        element={<Navigate to={itinerary ? '/trip#alerts' : '/'} replace />}
       />
       <Route
         path="/my-trips"
@@ -1472,11 +1511,12 @@ export default function App() {
       <Route
         path="/settings"
         element={
-          <>
-            <BackHeader title="프로필 · 설정" showBack={false} onMenuClick={() => setMenuOpen(true)} />
-            <SettingsScreen sessionId={sessionId} />
-            <BottomTabBar active="profile" />
-          </>
+          itinerary ? <Navigate to="/trip#profile" replace /> : (
+            <>
+              <BackHeader title="프로필 · 설정" onMenuClick={() => setMenuOpen(true)} />
+              <SettingsScreen sessionId={sessionId} />
+            </>
+          )
         }
       />
       <Route

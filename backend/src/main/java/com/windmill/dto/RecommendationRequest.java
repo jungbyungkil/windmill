@@ -36,8 +36,8 @@ public class RecommendationRequest {
     /** 거리(km) 계산 기준점 - 보통 일정에 이미 담긴 마지막 장소. null이면 distanceKm 없이 반환 */
     private String originContentId;
     private Integer originContentTypeId;
-    /** 예산 필터(1인 기준, 이 금액 이하만) - null이면 필터 없음. estimatedCostPerPerson이 null(정보없음)인
-     *  후보는 필터에서 걸러내지 않고 통과시킨다(있는지 없는지 모르는 걸 "비싸다"로 단정하지 않기 위함) */
+    /** 식당·카페 고를 때 1인 식사 참고 필터(이 금액 이하). 관광지 입장료에는 적용하지 않는다.
+     *  null이면 필터 없음. estimatedCostPerPerson이 null인 후보는 걸러내지 않는다. */
     private Integer maxBudgetPerPerson;
     /** true면 Stage4(LLM 태그·문장 생성)를 건너뛰고 키워드 기반 폴백만 쓴다 - 표준 스마트 일정처럼
      *  "최대한 빨리 큼직한 일정을 보여줘야" 하는 자동 생성 경로 전용. LLM은 순위를 안 바꾸므로

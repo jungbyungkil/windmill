@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -172,6 +173,58 @@ class RouteRecalculationServiceTest {
         service.assignSchedule(List.of(attr1), null, null, null, null);
 
         assertEquals("09:00", attr1.getScheduledTime()); // 미래 날짜라 기본 09:00
+    }
+
+    @Test
+    void chooseShortestVisitOrder_untanglesCrossingPath() {
+        // 한 줄에 늘어선 네 곳을 A→D→B→C 로 건너뛰면 최단(A→B→C→D) 대비 크게 길어진다.
+        ItineraryItem a = coord(1, "A", "127.00", "37.00", false);
+        ItineraryItem b = coord(2, "B", "127.02", "37.00", false);
+        ItineraryItem c = coord(3, "C", "127.04", "37.00", false);
+        ItineraryItem d = coord(4, "D", "127.06", "37.00", false);
+        a.setDisplayOrder(0);
+        d.setDisplayOrder(1);
+        b.setDisplayOrder(2);
+        c.setDisplayOrder(3);
+
+        assertEquals(true, RouteTangleDetector.detect(List.of(a, d, b, c)).isTangled());
+
+        List<ItineraryItem> ordered = RouteRecalculationService.chooseShortestVisitOrder(
+                List.of(a, d, b, c), null, null);
+        for (int i = 0; i < ordered.size(); i++) {
+            ordered.get(i).setDisplayOrder(i);
+        }
+
+        assertEquals(false, RouteTangleDetector.detect(ordered).isTangled());
+    }
+
+    @Test
+    void declumpIfItDoesNotRetangle_keepsShortPathWhenDeclumpWouldCross() {
+        ItineraryItem food1 = coord(1, "맛집1", "127.00", "37.00", true);
+        ItineraryItem food2 = coord(2, "맛집2", "127.01", "37.00", true);
+        ItineraryItem near = coord(3, "가까운관광", "127.02", "37.00", false);
+        ItineraryItem far = coord(4, "먼관광", "127.03", "37.00", false);
+
+        List<ItineraryItem> shortest = new ArrayList<>(List.of(food1, food2, near, far));
+        for (int i = 0; i < shortest.size(); i++) {
+            shortest.get(i).setDisplayOrder(i);
+        }
+
+        List<ItineraryItem> result = RouteRecalculationService.declumpIfItDoesNotRetangle(shortest);
+
+        assertEquals(List.of(food1, food2, near, far), result,
+                "최단 동선을 다시 꼬이게 하는 식사 분리는 건너뛰어야 함");
+    }
+
+    private static ItineraryItem coord(long id, String placeName, String mapX, String mapY, boolean meal) {
+        return ItineraryItem.builder()
+                .id(id)
+                .placeName(placeName)
+                .visitDate(TOMORROW)
+                .mapX(mapX)
+                .mapY(mapY)
+                .tags(meal ? List.of("#맛집") : List.of("#자연"))
+                .build();
     }
 
     @Test

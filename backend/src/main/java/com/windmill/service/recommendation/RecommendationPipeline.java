@@ -287,17 +287,29 @@ public class RecommendationPipeline {
     }
 
     /**
-     * 예산 필터(1인 기준, 이하만 통과) - Stage1~4에서는 걸러내지 않고 후보 풀을 그대로 유지하다가
-     * (유모차 필터가 AccessibilityRanking에서 속성만 참고하고 후보를 안 줄이는 것과 같은 이유 -
-     * 앞 단계 랭킹/LLM이 온전한 풀을 보고 판단하게 하기 위함) 최종 목록에서만 실제로 제거한다.
-     * estimatedCostPerPerson이 null(정보없음)이면 "비싸다"고 단정하지 않고 통과시킨다.
+     * 식당·카페 참고 금액 필터(1인 기준, 이하만 통과). 관광지·체험은 걸러내지 않는다.
+     * Stage1~4에서는 후보 풀을 유지하다가 최종 목록에서만 제거한다.
+     * estimatedCostPerPerson이 null이면 "비싸다"고 단정하지 않고 통과시킨다.
      */
     private static boolean withinBudget(RecommendationCandidate c, Integer maxBudgetPerPerson) {
-        if (maxBudgetPerPerson == null) {
+        if (maxBudgetPerPerson == null || !isFoodCandidate(c)) {
             return true;
         }
         Integer cost = c.getEstimatedCostPerPerson();
         return cost == null || cost <= maxBudgetPerPerson;
+    }
+
+    private static boolean isFoodCandidate(RecommendationCandidate c) {
+        if (c.getContentTypeId() != null && c.getContentTypeId() == 39) {
+            return true;
+        }
+        List<String> tags = c.getMatchedTags();
+        if (tags == null || tags.isEmpty()) {
+            return false;
+        }
+        return tags.stream().anyMatch(t -> t != null && (
+                t.equals("#맛집") || t.equals("#카페") || t.equals("#한식")
+                        || t.equals("#중식") || t.equals("#일식") || t.equals("#양식")));
     }
 
     /** #맛집 태그 또는 식당/맛집/레스토랑 등 검색어면 음식점 전용 Stage1 경로 */

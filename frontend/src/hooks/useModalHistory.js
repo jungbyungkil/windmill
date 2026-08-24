@@ -12,15 +12,20 @@ import { useEffect, useRef } from 'react';
  * 모달 열기 전 페이지로 되돌아가버린다(2026-08-16 사용자 제보 - "내 여행 관리" 클릭해도 새 화면이
  * 안 뜨던 문제). 모달이 열렸을 때의 경로와 닫히는 시점의 경로가 다르면(=그 사이 다른 곳으로 이미
  * 이동함) history.back()을 생략한다 - 순수하게 배경 클릭·✕ 버튼으로만 닫힐 때만 되돌린다.
+ *
+ * 반환값 skipNextRestore()는 모달을 닫으면서 다른 화면으로 보낼 때 쓴다. 호출하면 클린업의
+ * history.back()을 건너뛰어, 방금 이동한 메인 화면이 /trip으로 되돌아가지 않게 한다.
  */
 export default function useModalHistory(open, onClose) {
   const pushedRef = useRef(false);
   const onCloseRef = useRef(onClose);
   const pathAtOpenRef = useRef(null);
+  const skipRestoreRef = useRef(false);
   onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
+    skipRestoreRef.current = false;
     pathAtOpenRef.current = window.location.pathname;
     window.history.pushState({ windmillModal: true }, '');
     pushedRef.current = true;
@@ -35,10 +40,20 @@ export default function useModalHistory(open, onClose) {
       window.removeEventListener('popstate', handlePopState);
       if (pushedRef.current) {
         pushedRef.current = false;
-        if (window.location.pathname === pathAtOpenRef.current) {
+        const skip = skipRestoreRef.current;
+        skipRestoreRef.current = false;
+        if (!skip && window.location.pathname === pathAtOpenRef.current) {
           window.history.back();
         }
       }
     };
   }, [open]);
+
+  const skipNextRestore = () => {
+    skipRestoreRef.current = true;
+  };
+  skipNextRestore.cancel = () => {
+    skipRestoreRef.current = false;
+  };
+  return skipNextRestore;
 }

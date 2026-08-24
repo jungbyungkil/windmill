@@ -27,7 +27,7 @@ public class ItineraryResponse {
     private boolean accessibleFriendly;
     private AgeGroup adultAgeGroup;
     private List<Integer> childAges;
-    /** 전체 인원수 - 프론트 예상 총액(Σ) 계산에 쓰임(1인 요금 × partySize) */
+    /** 전체 인원수 - 동반 유형에 맞춘 인원 */
     private int partySize;
     private List<ItineraryItemResponse> items;
     /** 확정된 날짜 목록 - 프론트 일자별 페이지 탭에서 체크표시/다음날 이동 가능 여부 판단에 사용 */
