@@ -32,6 +32,43 @@ class VisitTimingTest {
     }
 
     @Test
+    void resolveCloseTime_paidExhibitionWithoutHours_defaultsTo20() {
+        LocalTime close = VisitTiming.resolveCloseTime(null, null, 14, "디자인전시관", null, List.of("#전시"));
+        assertEquals(LocalTime.of(20, 0), close);
+        LocalTime byCat3 = VisitTiming.resolveCloseTime(
+                null, null, 14, "DDP", null, null, "A02060300", null);
+        assertEquals(LocalTime.of(20, 0), byCat3);
+        assertEquals(0, VisitTiming.closeBufferMinutes(null, null));
+    }
+
+    @Test
+    void resolveCloseTime_performanceWithoutHours_defaultsTo22() {
+        LocalTime venue = VisitTiming.resolveCloseTime(null, null, 14, "예술의전당", "공연장", List.of("#공연장"));
+        assertEquals(LocalTime.of(22, 0), venue);
+        LocalTime festival = VisitTiming.resolveCloseTime(null, null, 15, "지역 음악축제", null, null);
+        assertEquals(LocalTime.of(22, 0), festival);
+    }
+
+    @Test
+    void resolveCloseTime_usesPlaytimeFactWhenUseTimeMissing() {
+        List<com.windmill.dto.DetailFact> facts = List.of(com.windmill.dto.DetailFact.builder()
+                .key("playtime").label("공연시간").value("19:00~21:00").build());
+        LocalTime close = VisitTiming.resolveCloseTime(null, null, 15, "뮤지컬", null, null, null, facts);
+        assertEquals(LocalTime.of(21, 0), close);
+        assertTrue(VisitTiming.hasAccurateCloseTime(null, null, facts));
+        assertEquals(60, VisitTiming.closeBufferMinutes(null, null, facts));
+    }
+
+    @Test
+    void stayMinutes_usesSpendtimeThenExhibitionDefault() {
+        List<com.windmill.dto.DetailFact> facts = List.of(com.windmill.dto.DetailFact.builder()
+                .key("spendtime").label("관람소요시간").value("1시간 30분").build());
+        assertEquals(90, VisitTiming.stayMinutes(14, "기획전", "전시", List.of("#전시"), "A02060300", facts));
+        assertEquals(90, VisitTiming.stayMinutes(14, "유료전시", null, List.of("#전시"), "A02060300", null));
+        assertEquals(120, VisitTiming.stayMinutes(15, "뮤지컬", null, null, null, null));
+    }
+
+    @Test
     void resolveCloseTime_otherSlotWithoutHours_defaultsTo18() {
         LocalTime close = VisitTiming.resolveCloseTime(null, null, 12, "남산타워", null, null);
         assertEquals(LocalTime.of(18, 0), close);

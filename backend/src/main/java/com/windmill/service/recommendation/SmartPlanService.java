@@ -14,10 +14,11 @@ import com.windmill.service.trip.TripRecordService;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.GeoUtils;
-import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.KoreaClock;
+import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.RouteOptimizer;
 import com.windmill.util.TriggerThresholds;
+import com.windmill.util.VisitTiming;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -674,15 +675,20 @@ public class SmartPlanService {
      *               그마저 불가능하면(안전 시각이 하루 시작보다 이르는 등) 요청 시각 그대로 강행한다.
      */
     private void placeStop(RecommendationCandidate stop, LocalTime time, String slotLabel, SlotKind kind, boolean forced) {
-        LocalTime close = ClosingTimeGate.parseHhMm(stop.getCloseTime());
-        if (close == null) {
-            close = BusinessHoursEvaluator.extractCloseTimeFromText(stop.getUseTimeText());
-        }
+        LocalTime close = VisitTiming.resolveCloseTime(
+                stop.getCloseTime(), stop.getUseTimeText(), stop.getContentTypeId(),
+                stop.getPlaceName(), stop.getCategory(), stop.getMatchedTags(),
+                stop.getCat3(), stop.getDetailFacts());
+        int buffer = VisitTiming.closeBufferMinutes(
+                stop.getCloseTime(), stop.getUseTimeText(), stop.getDetailFacts());
         LocalTime visit = time;
-        ClosingTimeGate.CheckResult check = ClosingTimeGate.check(close, visit);
+        ClosingTimeGate.CheckResult check = ClosingTimeGate.check(close, visit, buffer);
         if (check.blocked()) {
-            LocalTime safe = close.minusMinutes(BusinessHoursEvaluator.CLOSE_BUFFER_MINUTES + 1L);
-            boolean safeWorks = !safe.isBefore(DAY_START) && !ClosingTimeGate.check(close, safe).blocked();
+            int pull = Math.max(buffer, 0) + 1;
+            LocalTime safe = close.minusMinutes(pull);
+            boolean nearRequested = !safe.isBefore(time.minusMinutes(90));
+            boolean safeWorks = nearRequested && !safe.isBefore(DAY_START)
+                    && !ClosingTimeGate.check(close, safe, buffer).blocked();
             if (safeWorks) {
                 visit = safe;
             } else if (forced) {

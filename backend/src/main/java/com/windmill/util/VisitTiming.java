@@ -2,6 +2,7 @@ package com.windmill.util;
 
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.DetailFact;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 
 import java.time.LocalTime;
@@ -9,10 +10,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 일정 슬롯의 체류·마감·점유 구간. TourAPI에 장소별 평균 체류시간은 없어서 카테고리 기본값을 쓰고,
- * 마감은 파싱된 CLOSE가 있으면 그걸, 없으면 장소 유형별 기본 시각을 쓴다.
+ * 마감은 TourAPI usetime/playtime에서 가장 늦은 끝 시각을 쓰고, 없으면 유형별 상식 기본값
+ * (박물관 17시, 유료 전시 20시, 공연·축제 22시, 식사 21시 등)을 쓴다.
  *
  * <p>이동시간 버퍼는 겹침 판단에 넣지 않는다(카카오 모빌리티 비용 트레이드오프와 같은 축 — 점유는
  * "한 사람이 같은 시각에 두 장소에 있을 수 없다"만 본다).
@@ -21,22 +26,48 @@ import java.util.Locale;
  */
 public final class VisitTiming {
 
-    /** 관광/문화 기본 체류. TourAPI에 평균 체류 필드가 없어 하드코딩. */
+    /** 관광/문화 기본 체류. TourAPI에 평균 체류 필드가 없어 하드코딩. spendtime이 있으면 그걸 우선. */
     public static final int ATTRACTION_STAY_MINUTES = 75;
     public static final int MEAL_STAY_MINUTES = 60;
-    /** 박물관·미술관 등 마감 미상일 때 (한국 문화시설 흔한 폐관) */
+    /** 유료 전시·기획전 — 관람이 박물관보다 긴 편 */
+    public static final int EXHIBITION_STAY_MINUTES = 90;
+    /** 공연·축제 — 앵커 플랜과 같은 2시간 가정 */
+    public static final int PERFORMANCE_STAY_MINUTES = 120;
+    /** 박물관·기념관·도서관 등 마감 미상일 때 (한국 문화시설 흔한 폐관) */
     public static final LocalTime DEFAULT_CLOSE_MUSEUM = LocalTime.of(17, 0);
+    /** 미술관·일반 문화시설 마감 미상일 때 */
+    public static final LocalTime DEFAULT_CLOSE_GALLERY = LocalTime.of(18, 0);
     /** 그 외 관광 슬롯 마감 미상일 때 */
     public static final LocalTime DEFAULT_CLOSE_OTHER = LocalTime.of(18, 0);
+    /** 유료 전시·전시관 — 저녁 관람이 흔함 */
+    public static final LocalTime DEFAULT_CLOSE_EXHIBITION = LocalTime.of(20, 0);
     /**
      * 식사 슬롯 마감 미상일 때. 17/18시로 두면 저녁 창(17:00~19:30) 자체가 마감 게이트에 막힌다.
      */
     public static final LocalTime DEFAULT_CLOSE_MEAL = LocalTime.of(21, 0);
+    /** 공연장·축제·야경 — 밤 슬롯이 본 일정인 경우가 많음 */
+    public static final LocalTime DEFAULT_CLOSE_PERFORMANCE = LocalTime.of(22, 0);
+    public static final LocalTime DEFAULT_CLOSE_SHOPPING = LocalTime.of(21, 0);
     public static final LocalTime DAY_START = LocalTime.of(9, 0);
-    public static final LocalTime LATEST_START = LocalTime.of(20, 0);
+    /** 제안·동선 재계산의 시작 상한. 전시/공연 저녁 슬롯(20시대)이 잘리지 않게 21시까지. */
+    public static final LocalTime LATEST_START = LocalTime.of(21, 0);
     public static final int SUGGEST_STEP_MINUTES = 15;
     public static final int MAX_SUGGESTIONS = 3;
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
+    private static final Set<String> MUSEUM_CAT3 = Set.of(
+            "A02060100", "A02060200", "A02060900");
+    private static final Set<String> GALLERY_CAT3 = Set.of("A02060500");
+    private static final Set<String> EXHIBITION_CAT3 = Set.of("A02060300");
+    private static final Set<String> PERFORMANCE_CAT3 = Set.of("A02060600", "A02061000");
+    private static final Set<String> HOURS_FACT_KEYS = Set.of(
+            "playtime", "usetime", "opentime", "usetimeculture", "usetimefestival",
+            "usetimeleports", "opentimefood");
+    private static final Set<String> STAY_FACT_KEYS = Set.of("spendtime", "spendtimefestival", "taketime", "playtime");
+    private static final Pattern STAY_HOUR_MIN = Pattern.compile("(\\d+)\\s*시간\\s*(\\d+)\\s*분");
+    private static final Pattern STAY_HOUR = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*시간");
+    private static final Pattern STAY_MIN = Pattern.compile("(\\d+)\\s*분");
+    private static final int MIN_STAY = 30;
+    private static final int MAX_STAY = 180;
 
     private VisitTiming() {
     }
@@ -65,14 +96,8 @@ public final class VisitTiming {
 
     public static boolean isMuseumOrGallery(Integer contentTypeId, String placeName, String category,
                                             List<String> tags) {
-        if (contentTypeId != null && contentTypeId == 14) {
-            return true;
-        }
-        String blob = join(placeName, category);
-        if (tags != null) {
-            blob = blob + " " + String.join(" ", tags);
-        }
-        return containsAny(blob, "박물관", "미술관", "갤러리", "전시관");
+        return isMuseum(contentTypeId, placeName, category, tags, null)
+                || isGallery(contentTypeId, placeName, category, tags, null);
     }
 
     public static boolean isMuseumOrGallery(ItineraryItem item) {
@@ -83,39 +108,44 @@ public final class VisitTiming {
     }
 
     /**
-     * 정확한 CLOSE(스냅샷 또는 usetime 파싱)가 있으면 그걸 쓰고, 없으면 유형별 기본 마감.
-     * 박물관·미술관 → 17:00, 식사 → 21:00, 그 외 → 18:00.
+     * 정확한 CLOSE(스냅샷·usetime·playtime 파싱)가 있으면 그걸 쓰고, 없으면 유형별 기본 마감.
+     * 박물관 → 17:00, 미술관 → 18:00, 유료 전시 → 20:00, 공연/축제 → 22:00, 식사/카페/쇼핑 → 21:00,
+     * 그 외 → 18:00.
      */
     public static LocalTime resolveCloseTime(String closeTime, String useTimeText, Integer contentTypeId,
                                              String placeName, String category, List<String> tags) {
-        LocalTime parsed = ClosingTimeGate.parseHhMm(closeTime);
-        if (parsed == null) {
-            parsed = BusinessHoursEvaluator.extractCloseTimeFromText(useTimeText);
-        }
+        return resolveCloseTime(closeTime, useTimeText, contentTypeId, placeName, category, tags, null, null);
+    }
+
+    public static LocalTime resolveCloseTime(String closeTime, String useTimeText, Integer contentTypeId,
+                                             String placeName, String category, List<String> tags,
+                                             String cat3, List<DetailFact> detailFacts) {
+        LocalTime parsed = parsedClose(closeTime, useTimeText, detailFacts);
         if (parsed != null) {
             return parsed;
         }
-        if (isMuseumOrGallery(contentTypeId, placeName, category, tags)) {
-            return DEFAULT_CLOSE_MUSEUM;
-        }
-        if (isMeal(contentTypeId, placeName, category, tags)) {
-            return DEFAULT_CLOSE_MEAL;
-        }
-        return DEFAULT_CLOSE_OTHER;
+        return defaultClose(contentTypeId, placeName, category, tags, cat3);
     }
 
-    /** TourAPI에서 파싱된 마감이면 true. 17/18시 기본값은 추정이라 입장마감 1시간 버퍼를 붙이지 않는다. */
+    /** TourAPI에서 파싱된 마감이면 true. 유형 기본값은 추정이라 입장마감 1시간 버퍼를 붙이지 않는다. */
     public static boolean hasAccurateCloseTime(String closeTime, String useTimeText) {
-        return ClosingTimeGate.parseHhMm(closeTime) != null
-                || BusinessHoursEvaluator.extractCloseTimeFromText(useTimeText) != null;
+        return hasAccurateCloseTime(closeTime, useTimeText, null);
+    }
+
+    public static boolean hasAccurateCloseTime(String closeTime, String useTimeText, List<DetailFact> detailFacts) {
+        return parsedClose(closeTime, useTimeText, detailFacts) != null;
     }
 
     public static boolean hasAccurateCloseTime(ItineraryItem item) {
-        return item != null && hasAccurateCloseTime(item.getCloseTime(), item.getUseTimeText());
+        return item != null && hasAccurateCloseTime(item.getCloseTime(), item.getUseTimeText(), item.getDetailFacts());
     }
 
     public static int closeBufferMinutes(String closeTime, String useTimeText) {
-        return hasAccurateCloseTime(closeTime, useTimeText) ? BusinessHoursEvaluator.CLOSE_BUFFER_MINUTES : 0;
+        return closeBufferMinutes(closeTime, useTimeText, null);
+    }
+
+    public static int closeBufferMinutes(String closeTime, String useTimeText, List<DetailFact> detailFacts) {
+        return hasAccurateCloseTime(closeTime, useTimeText, detailFacts) ? BusinessHoursEvaluator.CLOSE_BUFFER_MINUTES : 0;
     }
 
     public static LocalTime resolveCloseTime(ItineraryItem item) {
@@ -123,7 +153,7 @@ public final class VisitTiming {
             return DEFAULT_CLOSE_OTHER;
         }
         return resolveCloseTime(item.getCloseTime(), item.getUseTimeText(), item.getContentTypeId(),
-                item.getPlaceName(), item.getCategory(), item.getTags());
+                item.getPlaceName(), item.getCategory(), item.getTags(), null, item.getDetailFacts());
     }
 
     public static LocalTime resolveCloseTime(AddItineraryItemRequest request) {
@@ -131,18 +161,48 @@ public final class VisitTiming {
             return DEFAULT_CLOSE_OTHER;
         }
         return resolveCloseTime(request.getCloseTime(), request.getUseTimeText(), request.getContentTypeId(),
-                request.getPlaceName(), request.getCategory(), request.getTags());
+                request.getPlaceName(), request.getCategory(), request.getTags(),
+                request.getCat3(), request.getDetailFacts());
     }
 
     public static int stayMinutes(Integer contentTypeId, String placeName, String category, List<String> tags) {
-        return isMeal(contentTypeId, placeName, category, tags) ? MEAL_STAY_MINUTES : ATTRACTION_STAY_MINUTES;
+        return stayMinutes(contentTypeId, placeName, category, tags, null, null);
+    }
+
+    public static int stayMinutes(Integer contentTypeId, String placeName, String category, List<String> tags,
+                                  String cat3, List<DetailFact> detailFacts) {
+        Integer fromApi = stayFromFacts(detailFacts);
+        if (fromApi != null) {
+            return fromApi;
+        }
+        if (isMeal(contentTypeId, placeName, category, tags) || isCafe(placeName, category, tags)) {
+            return MEAL_STAY_MINUTES;
+        }
+        if (isPerformance(contentTypeId, placeName, category, tags, cat3)) {
+            return PERFORMANCE_STAY_MINUTES;
+        }
+        if (isExhibition(contentTypeId, placeName, category, tags, cat3)
+                && !isMuseum(contentTypeId, placeName, category, tags, cat3)
+                && !isGallery(contentTypeId, placeName, category, tags, cat3)) {
+            return EXHIBITION_STAY_MINUTES;
+        }
+        return ATTRACTION_STAY_MINUTES;
     }
 
     public static int stayMinutes(ItineraryItem item) {
         if (item == null) {
             return ATTRACTION_STAY_MINUTES;
         }
-        return stayMinutes(item.getContentTypeId(), item.getPlaceName(), item.getCategory(), item.getTags());
+        return stayMinutes(item.getContentTypeId(), item.getPlaceName(), item.getCategory(), item.getTags(),
+                null, item.getDetailFacts());
+    }
+
+    public static int stayMinutes(AddItineraryItemRequest request) {
+        if (request == null) {
+            return ATTRACTION_STAY_MINUTES;
+        }
+        return stayMinutes(request.getContentTypeId(), request.getPlaceName(), request.getCategory(),
+                request.getTags(), request.getCat3(), request.getDetailFacts());
     }
 
     /**
@@ -282,6 +342,189 @@ public final class VisitTiming {
             }
         }
         return containsAny(join(placeName, category), "카페", "커피", "디저트");
+    }
+
+    private static LocalTime parsedClose(String closeTime, String useTimeText, List<DetailFact> detailFacts) {
+        LocalTime parsed = ClosingTimeGate.parseHhMm(closeTime);
+        if (parsed != null) {
+            return parsed;
+        }
+        return BusinessHoursEvaluator.extractCloseTimeFromText(mergeHoursText(useTimeText, detailFacts));
+    }
+
+    private static String mergeHoursText(String useTimeText, List<DetailFact> facts) {
+        StringBuilder sb = new StringBuilder(useTimeText == null ? "" : useTimeText);
+        if (facts != null) {
+            for (DetailFact fact : facts) {
+                if (fact == null || fact.getValue() == null || fact.getValue().isBlank()) {
+                    continue;
+                }
+                String key = fact.getKey() == null ? "" : fact.getKey().trim().toLowerCase(Locale.ROOT);
+                if (HOURS_FACT_KEYS.contains(key)) {
+                    sb.append(' ').append(fact.getValue());
+                }
+            }
+        }
+        String merged = sb.toString().trim();
+        return merged.isEmpty() ? null : merged;
+    }
+
+    private static LocalTime defaultClose(Integer contentTypeId, String placeName, String category,
+                                          List<String> tags, String cat3) {
+        if (isPerformance(contentTypeId, placeName, category, tags, cat3)
+                || containsAny(blob(placeName, category, tags), "야경", "야시장", "야간개장", "야간 개장")) {
+            return DEFAULT_CLOSE_PERFORMANCE;
+        }
+        if (isMuseum(contentTypeId, placeName, category, tags, cat3)) {
+            return DEFAULT_CLOSE_MUSEUM;
+        }
+        if (isGallery(contentTypeId, placeName, category, tags, cat3)) {
+            return DEFAULT_CLOSE_GALLERY;
+        }
+        if (isExhibition(contentTypeId, placeName, category, tags, cat3)) {
+            return DEFAULT_CLOSE_EXHIBITION;
+        }
+        if (isMeal(contentTypeId, placeName, category, tags) || isCafe(placeName, category, tags)) {
+            return DEFAULT_CLOSE_MEAL;
+        }
+        if (contentTypeId != null && contentTypeId == 38) {
+            return DEFAULT_CLOSE_SHOPPING;
+        }
+        if (contentTypeId != null && contentTypeId == 14) {
+            return DEFAULT_CLOSE_GALLERY;
+        }
+        return DEFAULT_CLOSE_OTHER;
+    }
+
+    private static boolean isPerformance(Integer contentTypeId, String placeName, String category,
+                                         List<String> tags, String cat3) {
+        if (contentTypeId != null && contentTypeId == 15) {
+            return true;
+        }
+        if (cat3 != null && PERFORMANCE_CAT3.contains(cat3.trim())) {
+            return true;
+        }
+        if (hasTag(tags, "#공연장")) {
+            return true;
+        }
+        return containsAny(blob(placeName, category, tags),
+                "공연장", "콘서트홀", "콘서트", "뮤지컬", "연극", "오페라", "무용공연",
+                "예술의전당", "오페라하우스", "문화회관", "아트홀", "씨어터", "공연");
+    }
+
+    private static boolean isMuseum(Integer contentTypeId, String placeName, String category,
+                                    List<String> tags, String cat3) {
+        if (cat3 != null && MUSEUM_CAT3.contains(cat3.trim())) {
+            return true;
+        }
+        if (hasTag(tags, "#박물관")) {
+            return true;
+        }
+        return containsAny(blob(placeName, category, tags), "박물관", "뮤지엄", "기념관", "도서관", "과학관");
+    }
+
+    private static boolean isGallery(Integer contentTypeId, String placeName, String category,
+                                     List<String> tags, String cat3) {
+        if (cat3 != null && GALLERY_CAT3.contains(cat3.trim())) {
+            return true;
+        }
+        if (hasTag(tags, "#미술관")) {
+            return true;
+        }
+        return containsAny(blob(placeName, category, tags), "미술관", "갤러리");
+    }
+
+    private static boolean isExhibition(Integer contentTypeId, String placeName, String category,
+                                        List<String> tags, String cat3) {
+        if (cat3 != null && EXHIBITION_CAT3.contains(cat3.trim())) {
+            return true;
+        }
+        if (hasTag(tags, "#전시")) {
+            return true;
+        }
+        return containsAny(blob(placeName, category, tags), "전시관", "전시회", "기획전", "특별전", "유료전시", "전시");
+    }
+
+    private static Integer stayFromFacts(List<DetailFact> facts) {
+        if (facts == null) {
+            return null;
+        }
+        Integer fromSpend = null;
+        Integer fromPlay = null;
+        for (DetailFact fact : facts) {
+            if (fact == null || fact.getValue() == null) {
+                continue;
+            }
+            String key = fact.getKey() == null ? "" : fact.getKey().trim().toLowerCase(Locale.ROOT);
+            if (!STAY_FACT_KEYS.contains(key)) {
+                continue;
+            }
+            if ("playtime".equals(key)) {
+                fromPlay = durationMinutes(fact.getValue());
+            } else {
+                Integer parsed = parseStayPhrase(fact.getValue());
+                if (parsed != null) {
+                    fromSpend = parsed;
+                }
+            }
+        }
+        return fromSpend != null ? fromSpend : fromPlay;
+    }
+
+    private static Integer durationMinutes(String hoursText) {
+        LocalTime open = BusinessHoursEvaluator.extractOpenTimeFromText(hoursText);
+        LocalTime close = BusinessHoursEvaluator.extractCloseTimeFromText(hoursText);
+        if (open == null || close == null || !close.isAfter(open)) {
+            return parseStayPhrase(hoursText);
+        }
+        int minutes = minutesOf(close) - minutesOf(open);
+        if (minutes < MIN_STAY || minutes > MAX_STAY) {
+            return null;
+        }
+        return minutes;
+    }
+
+    private static Integer parseStayPhrase(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        Matcher hm = STAY_HOUR_MIN.matcher(text);
+        if (hm.find()) {
+            return clampStay(Integer.parseInt(hm.group(1)) * 60 + Integer.parseInt(hm.group(2)));
+        }
+        Matcher h = STAY_HOUR.matcher(text);
+        if (h.find()) {
+            return clampStay((int) Math.round(Double.parseDouble(h.group(1)) * 60));
+        }
+        Matcher m = STAY_MIN.matcher(text);
+        if (m.find()) {
+            return clampStay(Integer.parseInt(m.group(1)));
+        }
+        return null;
+    }
+
+    private static Integer clampStay(int minutes) {
+        if (minutes < MIN_STAY || minutes > MAX_STAY) {
+            return null;
+        }
+        return minutes;
+    }
+
+    private static boolean hasTag(List<String> tags, String expected) {
+        if (tags == null) {
+            return false;
+        }
+        for (String t : tags) {
+            if (expected.equals(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String blob(String placeName, String category, List<String> tags) {
+        String extra = tags == null ? "" : String.join(" ", tags);
+        return join(placeName, category) + " " + extra.toLowerCase(Locale.ROOT);
     }
 
     private static String join(String a, String b) {

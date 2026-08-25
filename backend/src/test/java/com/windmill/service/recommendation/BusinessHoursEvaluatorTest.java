@@ -182,6 +182,24 @@ class BusinessHoursEvaluatorTest {
     }
 
     @Test
+    void extractCloseTimePicksLatestRangeIncludingNightHours() {
+        assertEquals(LocalTime.of(21, 0),
+                BusinessHoursEvaluator.extractCloseTimeFromText("09:00~18:00 / 야간개장 19:00~21:00"));
+    }
+
+    @Test
+    void extractCloseTimeFromPlaytimeField() {
+        assertEquals(LocalTime.of(21, 30),
+                BusinessHoursEvaluator.extractCloseTime(Map.of("playtime", "19:00 ~ 21:30")));
+    }
+
+    @Test
+    void extractCloseTimeUntilPhraseWhenNoRange() {
+        assertEquals(LocalTime.of(21, 0),
+                BusinessHoursEvaluator.extractCloseTimeFromText("21시까지 관람 가능"));
+    }
+
+    @Test
     void missingCloseAllows() {
         assertNull(BusinessHoursEvaluator.extractCloseTimeFromText("상시개방"));
         assertFalse(ClosingTimeGate.check(null, LocalTime.of(17, 0)).blocked());

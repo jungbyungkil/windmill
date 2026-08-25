@@ -292,9 +292,9 @@ public class ItineraryService {
         List<ItineraryItem> dayItems = null;
         Integer insertBeforeDayIndex = null;
         LocalTime close = VisitTiming.resolveCloseTime(request);
-        int stay = VisitTiming.stayMinutes(request.getContentTypeId(), request.getPlaceName(),
-                request.getCategory(), request.getTags());
-        int closeBuffer = VisitTiming.closeBufferMinutes(request.getCloseTime(), request.getUseTimeText());
+        int stay = VisitTiming.stayMinutes(request);
+        int closeBuffer = VisitTiming.closeBufferMinutes(
+                request.getCloseTime(), request.getUseTimeText(), request.getDetailFacts());
 
         if (scheduledTime != null) {
             assertScheduleFeasible(itinerary, visitDate, scheduledTime, null, close, stay, closeBuffer);
@@ -537,7 +537,8 @@ public class ItineraryService {
                     : item.getVisitDate();
             LocalTime close = VisitTiming.resolveCloseTime(item);
             int stay = VisitTiming.stayMinutes(item);
-            int closeBuffer = VisitTiming.closeBufferMinutes(item.getCloseTime(), item.getUseTimeText());
+            int closeBuffer = VisitTiming.closeBufferMinutes(
+                    item.getCloseTime(), item.getUseTimeText(), item.getDetailFacts());
             assertScheduleFeasible(itinerary, targetVisitDate, request.getScheduledTime(), item.getId(),
                     close, stay, closeBuffer);
             item.setScheduledTime(request.getScheduledTime());

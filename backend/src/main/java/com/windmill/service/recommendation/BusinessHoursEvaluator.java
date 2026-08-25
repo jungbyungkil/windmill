@@ -8,6 +8,7 @@ import com.windmill.util.SentryBreadcrumbs;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -22,7 +23,10 @@ import java.util.regex.Pattern;
 public final class BusinessHoursEvaluator {
 
     private static final List<String> USETIME_FIELDS = List.of(
-            "usetime", "opentime", "usetimeculture", "usetimefestival", "usetimeleports", "opentimefood");
+            "usetime", "opentime", "usetimeculture", "usetimefestival", "usetimeleports", "opentimefood",
+            "playtime");
+    /** 관람소요시간 — 일정 체류 추정용 (문화시설 spendtime, 축제 spendtimefestival) */
+    private static final List<String> SPENDTIME_FIELDS = List.of("spendtime", "spendtimefestival", "taketime");
     private static final List<String> RESTDATE_FIELDS = List.of(
             "restdate", "restdateculture", "restdateshopping", "restdatefood", "restdateleports");
     private static final List<String> USEFEE_FIELDS = List.of(
@@ -318,45 +322,65 @@ public final class BusinessHoursEvaluator {
             }
         }
 
+        boolean sawRange = false;
+        boolean open = false;
+        LocalTime nowTime = at.toLocalTime();
         for (String field : USETIME_FIELDS) {
             String v = fieldAccessor.apply(field);
-            int[] range = parseTimeRange(v);
-            if (range != null) {
+            for (int[] range : parseAllTimeRanges(v)) {
+                sawRange = true;
                 LocalTime start = LocalTime.of(range[0], range[1]);
                 LocalTime end = LocalTime.of(range[2], range[3]);
-                LocalTime nowTime = at.toLocalTime();
-                boolean open = end.isBefore(start)
+                boolean inRange = end.isBefore(start)
                         ? (nowTime.isAfter(start) || nowTime.isBefore(end))
                         : (!nowTime.isBefore(start) && !nowTime.isAfter(end));
-                return open ? BusinessStatus.OPEN : BusinessStatus.HOURS_ENDED;
+                if (inRange) {
+                    open = true;
+                }
             }
+        }
+        if (sawRange) {
+            return open ? BusinessStatus.OPEN : BusinessStatus.HOURS_ENDED;
         }
         return BusinessStatus.OPEN;
     }
 
     /**
-     * "09:00~18:00"(24시간제, 우선) 또는 "오전 9시~오후 6시"/"10시~18시"(12시간제·오전오후 폴백)에서
-     * [시작시,시작분,종료시,종료분]을 뽑는다. 둘 다 못 찾거나 시/분이 범위를 벗어나면 null.
+     * "09:00~18:00"(24시간제) 또는 "오전 9시~오후 6시"/"10시~18시"에서
+     * [시작시,시작분,종료시,종료분]을 모두 뽑는다. 야간개장처럼 구간이 여러 개면 전부 담는다.
      */
-    private static int[] parseTimeRange(String text) {
+    private static List<int[]> parseAllTimeRanges(String text) {
         if (text == null || text.isBlank()) {
-            return null;
+            return List.of();
         }
+        List<int[]> ranges = new ArrayList<>();
         Matcher m = TIME_RANGE.matcher(text);
-        if (m.find()) {
-            return validRangeOrNull(
+        while (m.find()) {
+            int[] range = validRangeOrNull(
                     Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
                     Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)));
+            if (range != null) {
+                ranges.add(range);
+            }
         }
         Matcher am = AMPM_TIME_RANGE.matcher(text);
-        if (am.find()) {
+        while (am.find()) {
             int startH = resolveMeridiemHour(am.group(1), Integer.parseInt(am.group(2)));
             int startM = am.group(3) != null ? Integer.parseInt(am.group(3)) : 0;
             int endH = resolveMeridiemHour(am.group(4), Integer.parseInt(am.group(5)));
             int endM = am.group(6) != null ? Integer.parseInt(am.group(6)) : 0;
-            return validRangeOrNull(startH, startM, endH, endM);
+            int[] range = validRangeOrNull(startH, startM, endH, endM);
+            if (range != null) {
+                ranges.add(range);
+            }
         }
-        return null;
+        return ranges;
+    }
+
+    /** 첫 구간만 — 시작 시각 추출용 */
+    private static int[] parseTimeRange(String text) {
+        List<int[]> ranges = parseAllTimeRanges(text);
+        return ranges.isEmpty() ? null : ranges.get(0);
     }
 
     private static int[] validRangeOrNull(int startH, int startM, int endH, int endM) {
@@ -454,30 +478,76 @@ public final class BusinessHoursEvaluator {
     }
 
     /**
-     * 영업 종료(close) 시각. "09:00 ~ 17:00" 형태에서 끝 시각.
-     * 야간 영업(종료&lt;시작)도 종료 시각 자체를 반환한다.
+     * 영업 종료(close) 시각. 이용시간·공연시간 필드와 원문 안의 모든 구간 중 가장 늦은 끝 시각.
+     * 야간개장(09:00~18:00 / 19:00~21:00)은 21:00을 쓴다.
      */
     public static LocalTime extractCloseTime(Map<String, String> introFields) {
-        String text = extractUseTimeText(introFields);
-        return extractCloseTimeFromText(text);
+        if (introFields == null || introFields.isEmpty()) {
+            return null;
+        }
+        LocalTime latest = null;
+        for (String field : USETIME_FIELDS) {
+            LocalTime close = extractCloseTimeFromText(introFields.get(field));
+            if (close != null && (latest == null || close.isAfter(latest))) {
+                latest = close;
+            }
+        }
+        return latest;
     }
 
     public static LocalTime extractCloseTimeFromText(String useTimeText) {
-        int[] range = parseTimeRange(useTimeText);
-        if (range == null) {
+        LocalTime latest = null;
+        for (int[] range : parseAllTimeRanges(useTimeText)) {
+            LocalTime end = LocalTime.of(range[2], range[3]);
+            if (latest == null || end.isAfter(latest)) {
+                latest = end;
+            }
+        }
+        if (latest != null) {
+            return latest;
+        }
+        return parseUntilClock(useTimeText);
+    }
+
+    /** "21시까지", "20:00까지"처럼 구간 없이 끝 시각만 적힌 경우 */
+    private static final Pattern UNTIL_COLON = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*까지");
+    private static final Pattern UNTIL_SI = Pattern.compile("(\\d{1,2})\\s*시(?:\\s*(\\d{1,2})\\s*분)?\\s*까지");
+
+    private static LocalTime parseUntilClock(String text) {
+        if (text == null || text.isBlank()) {
             return null;
         }
-        return LocalTime.of(range[2], range[3]);
+        Matcher colon = UNTIL_COLON.matcher(text);
+        if (colon.find()) {
+            int[] range = validRangeOrNull(0, 0, Integer.parseInt(colon.group(1)), Integer.parseInt(colon.group(2)));
+            return range == null ? null : LocalTime.of(range[2], range[3]);
+        }
+        Matcher si = UNTIL_SI.matcher(text);
+        if (si.find()) {
+            int hour = Integer.parseInt(si.group(1));
+            int min = si.group(2) != null ? Integer.parseInt(si.group(2)) : 0;
+            if (hour <= 12 && text.contains("오후") && hour != 12) {
+                hour += 12;
+            }
+            int[] range = validRangeOrNull(0, 0, hour, min);
+            return range == null ? null : LocalTime.of(range[2], range[3]);
+        }
+        return null;
     }
 
     public static LocalTime extractOpenTimeFromText(String useTimeText) {
-        int[] range = parseTimeRange(useTimeText);
-        if (range == null) {
-            return null;
+        LocalTime earliest = null;
+        for (int[] range : parseAllTimeRanges(useTimeText)) {
+            LocalTime start = LocalTime.of(range[0], range[1]);
+            if (earliest == null || start.isBefore(earliest)) {
+                earliest = start;
+            }
         }
-        int h = range[0];
-        int min = range[1];
-        return LocalTime.of(h, min);
+        return earliest;
+    }
+
+    public static String extractSpendTimeText(Map<String, String> introFields) {
+        return firstNonBlank(introFields, SPENDTIME_FIELDS);
     }
 
     /** "HH:mm" 스냅샷용 */
