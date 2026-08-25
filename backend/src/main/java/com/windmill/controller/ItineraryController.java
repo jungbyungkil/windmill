@@ -117,8 +117,11 @@ public class ItineraryController {
     }
 
     @DeleteMapping("/{id}/items/{itemId}")
-    public Mono<ResponseEntity<ItineraryResponse>> deleteItem(@PathVariable Long id, @PathVariable Long itemId) {
-        return Mono.fromCallable(() -> itineraryService.deleteItem(id, itemId))
+    public Mono<ResponseEntity<ItineraryResponse>> deleteItem(
+            @PathVariable Long id,
+            @PathVariable Long itemId,
+            @RequestParam(defaultValue = "true") boolean reflow) {
+        return Mono.fromCallable(() -> itineraryService.deleteItem(id, itemId, reflow))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(result -> {
                     ItineraryResponse body = toResponse(result.itinerary());
@@ -335,7 +338,7 @@ public class ItineraryController {
 
     /** 응답 변환 - 상태(ACTIVE/ENDED)를 함께 계산해 내려준다 */
     private ItineraryResponse toResponse(Itinerary itinerary) {
-        return ItineraryResponse.from(itinerary, itineraryService.statusOf(itinerary));
+        return itineraryService.toEnrichedResponse(itinerary);
     }
 
     /**

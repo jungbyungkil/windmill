@@ -23,4 +23,8 @@ public class UpdateItineraryItemRequest {
     private Integer estimatedCostPerPerson;
     private String restDateText;
     private String category;
+    /** 상황 태그 수동 보정 — null이면 기존 값 유지 */
+    private Boolean indoorYn;
+    private com.windmill.domain.RainSensitivity rainSensitivity;
+    private com.windmill.domain.CongestionSensitivity congestionSensitivity;
 }

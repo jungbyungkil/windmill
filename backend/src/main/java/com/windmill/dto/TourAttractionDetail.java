@@ -23,6 +23,9 @@ public class TourAttractionDetail {
     private String mapX;
     private String mapY;
     private String tel;
+    private String cat1;
+    private String cat2;
+    private String cat3;
     private Map<String, String> introFields;
     private List<String> imageUrls;
 }

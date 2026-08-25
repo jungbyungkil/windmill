@@ -57,7 +57,7 @@ public final class ClosingTimeGate {
         }
     }
 
-    static String formatFriendly(LocalTime time) {
+    public static String formatFriendly(LocalTime time) {
         if (time.getMinute() == 0) {
             return time.getHour() + "시";
         }

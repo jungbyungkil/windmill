@@ -1,5 +1,8 @@
 package com.windmill.dto;
 
+import com.windmill.domain.CongestionSensitivity;
+import com.windmill.domain.InferredSource;
+import com.windmill.domain.RainSensitivity;
 import lombok.Builder;
 import lombok.Data;
 
@@ -49,4 +52,12 @@ public class RecommendationCandidate {
     private String backupContentId;
     private Integer backupContentTypeId;
     private String backupPlaceName;
+
+    private String overview;
+    private List<DetailFact> detailFacts;
+    private String cat3;
+    private Boolean indoor;
+    private RainSensitivity rainSensitivity;
+    private CongestionSensitivity congestionSensitivity;
+    private InferredSource inferredSource;
 }

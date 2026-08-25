@@ -1,5 +1,6 @@
 package com.windmill.exception;
 
+import com.windmill.dto.ClosingTimeInfeasibleResponse;
 import com.windmill.dto.DuplicateItineraryResponse;
 import com.windmill.dto.TimeSlotConflictResponse;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TimeSlotConflictException.class)
     public ResponseEntity<TimeSlotConflictResponse> handleTimeSlotConflict(TimeSlotConflictException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(TimeSlotConflictResponse.from(e));
+    }
+
+    /**
+     * 영업 마감으로 해당 시각 배치 불가. 409(TIME_OVERLAP)와 구분하려고 422를 쓴다 —
+     * 프론트가 errorCode로 모달 문구를 고른다.
+     */
+    @ExceptionHandler(ClosingTimeInfeasibleException.class)
+    public ResponseEntity<ClosingTimeInfeasibleResponse> handleClosingTimeInfeasible(
+            ClosingTimeInfeasibleException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(ClosingTimeInfeasibleResponse.from(e));
     }
 
     /**

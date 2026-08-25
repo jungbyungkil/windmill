@@ -1,7 +1,12 @@
 package com.windmill.dto;
 
+import com.windmill.domain.CongestionSensitivity;
+import com.windmill.domain.InferredSource;
+import com.windmill.domain.RainSensitivity;
 import lombok.Builder;
 import lombok.Data;
+
+import java.util.List;
 
 /** Stage1(연관관광지 조회) 결과 - KorService2와는 이름(placeName) 기준으로만 연결 가능 */
 @Data
@@ -39,6 +44,16 @@ public class RelatedCandidate {
     private Boolean strollerFriendly; // "가능"/"불가능" 추정 - 모르면 null
     private boolean accessibleFriendly; // overview/카테고리 텍스트 키워드 매칭 근사(휴리스틱, 단정 아님)
     private String ageRangeText;   // expagerange 계열 원문("만 7세 이상" 등), 없으면 null
+
+    /** detailCommon2 개요 — 빈 값은 Stage2에서 넣지 않음 */
+    private String overview;
+    /** detailIntro2 원본 중 전용 UI가 없는 필드 */
+    private List<DetailFact> detailFacts;
+    private String cat3;
+    private Boolean indoor;
+    private RainSensitivity rainSensitivity;
+    private CongestionSensitivity congestionSensitivity;
+    private InferredSource inferredSource;
 
     private Double crowdRate;      // Stage3 결과 (원본, 0~100)
 }

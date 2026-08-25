@@ -49,8 +49,19 @@ class ItineraryServiceTest {
         routeRecalculationService = mock(RouteRecalculationService.class);
         com.windmill.service.tourapi.TourAttractionService tourAttractionService =
                 mock(com.windmill.service.tourapi.TourAttractionService.class);
+        com.windmill.service.recommendation.SituationalTagService situationalTagService =
+                mock(com.windmill.service.recommendation.SituationalTagService.class);
+        when(situationalTagService.ensureInferred(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> com.windmill.domain.PlaceSituationalTags.builder()
+                        .contentId(inv.getArgument(0))
+                        .indoorYn(false)
+                        .rainSensitivity(com.windmill.domain.RainSensitivity.SENSITIVE)
+                        .congestionSensitivity(com.windmill.domain.CongestionSensitivity.SENSITIVE)
+                        .inferredSource(com.windmill.domain.InferredSource.RULE)
+                        .updatedAt(java.time.LocalDateTime.now())
+                        .build());
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService);
+                routeRecalculationService, tourAttractionService, situationalTagService);
 
         when(regionCodeService.find("51210")).thenReturn(Optional.of(RegionCode.builder()
                 .sidoName("강원특별자치도").signguName("속초시").signguFullCode("51210")

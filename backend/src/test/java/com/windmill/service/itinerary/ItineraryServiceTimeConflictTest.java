@@ -4,6 +4,7 @@ import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.UpdateItineraryItemRequest;
+import com.windmill.exception.ClosingTimeInfeasibleException;
 import com.windmill.exception.TimeSlotConflictException;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
@@ -16,7 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -25,7 +28,7 @@ import static org.mockito.Mockito.when;
  * 시간 겹침(TimeConflictGate) 검증 - 사용자 제보: 이미 17시에 다른 일정이 있는데 새 장소를 넣으려
  * 하면 실제 원인(시간 겹침)이 아니라 "이 장소 자체가 마감 임박"이라는 엉뚱한 안내가 뜨던 문제.
  * 겹침은 마감시간 게이트(ClosingTimeGate)와 별개 원인이라 별도 예외(TimeSlotConflictException)로
- * 구분해 던지고, 겹침 검사를 마감시간 검사보다 먼저 한다.
+ * 구분해 던지고, 겹침 검사를 마감시간 검사보다 먼저 한다. 명시 시각 추가는 저장을 막는다.
  */
 class ItineraryServiceTimeConflictTest {
 
@@ -43,8 +46,19 @@ class ItineraryServiceTimeConflictTest {
         RouteRecalculationService routeRecalculationService = mock(RouteRecalculationService.class);
         com.windmill.service.tourapi.TourAttractionService tourAttractionService =
                 mock(com.windmill.service.tourapi.TourAttractionService.class);
+        com.windmill.service.recommendation.SituationalTagService situationalTagService =
+                mock(com.windmill.service.recommendation.SituationalTagService.class);
+        when(situationalTagService.ensureInferred(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> com.windmill.domain.PlaceSituationalTags.builder()
+                        .contentId(inv.getArgument(0))
+                        .indoorYn(false)
+                        .rainSensitivity(com.windmill.domain.RainSensitivity.SENSITIVE)
+                        .congestionSensitivity(com.windmill.domain.CongestionSensitivity.SENSITIVE)
+                        .inferredSource(com.windmill.domain.InferredSource.RULE)
+                        .updatedAt(java.time.LocalDateTime.now())
+                        .build());
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService);
+                routeRecalculationService, tourAttractionService, situationalTagService);
         when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -83,31 +97,41 @@ class ItineraryServiceTimeConflictTest {
     }
 
     /**
-     * 2026-08-22 - "일정에 추가" 버튼은 마감·겹침을 이유로 더 이상 거절하지 않는다(사용자 요청:
-     * 이미 넣기로 판단하고 누른 액션이니 조건 없이 그대로 반영). updateItem(기존 항목 시간 수정)의
-     * 겹침 검사는 그대로 유지됨 - 아래 updateItem_* 테스트 참고.
+     * 명시 시각이 기존 슬롯과 겹치면 저장을 막고 TIME_OVERLAP + 대안 시각을 돌려준다.
      */
     @Test
-    void addItem_explicitTimeOverlapsExistingItem_addsAnywayWithoutBlocking() {
-        itineraryWith(existing(1, 0, "경복궁", "17:00"));
+    void addItem_explicitTimeOverlapsExistingItem_throwsTimeSlotConflictWithSuggestions() {
+        itineraryWith(existing(1, 0, "세종뮤지엄갤러리", "11:30"));
 
-        Itinerary result = service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "21:00"));
+        TimeSlotConflictException ex = assertThrows(TimeSlotConflictException.class,
+                () -> service.addItem(ITINERARY_ID, candidate("호재래", "11:30", "21:00")));
 
-        assertEquals(2, result.getItems().size());
-        ItineraryItem added = result.getItems().stream()
-                .filter(i -> "창덕궁".equals(i.getPlaceName())).findFirst().orElseThrow();
-        assertEquals("17:20", added.getScheduledTime());
+        assertEquals(1L, ex.getConflictingItemId());
+        assertEquals("세종뮤지엄갤러리", ex.getConflictingPlaceName());
+        assertFalse(ex.getSuggestedTimes().isEmpty());
+        assertTrue(ex.getMessage().contains("세종뮤지엄갤러리"));
     }
 
     @Test
-    void addItem_bothConflictAndClosingTimeIssues_stillAddsAnyway() {
-        // 새 장소 자체는 17:30에 마감(입력 17:20 도착도 마감 임박 버퍼 안에 걸림)이면서 기존 경복궁
-        // 17:00과도 겹치는 상황이지만, 두 사유 모두 더 이상 추가 자체를 막지 않는다.
+    void addItem_bothConflictAndClosingTimeIssues_reportsOverlapFirst() {
+        // 새 장소 자체는 17:30에 마감이면서 기존 경복궁 17:00과도 겹친다 — 겹침이 우선.
         itineraryWith(existing(1, 0, "경복궁", "17:00"));
 
-        Itinerary result = service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "17:30"));
+        TimeSlotConflictException ex = assertThrows(TimeSlotConflictException.class,
+                () -> service.addItem(ITINERARY_ID, candidate("창덕궁", "17:20", "17:30")));
 
-        assertEquals(2, result.getItems().size());
+        assertEquals("경복궁", ex.getConflictingPlaceName());
+    }
+
+    @Test
+    void addItem_explicitTimeAfterClose_throwsClosingTimeInfeasible() {
+        itineraryWith(existing(1, 0, "경복궁", "10:00"));
+
+        ClosingTimeInfeasibleException ex = assertThrows(ClosingTimeInfeasibleException.class,
+                () -> service.addItem(ITINERARY_ID, candidate("우표박물관", "16:20", "16:50")));
+
+        assertEquals(java.time.LocalTime.of(16, 50), ex.getCloseTime());
+        assertFalse(ex.getSuggestedTimes().isEmpty());
     }
 
     @Test

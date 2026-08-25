@@ -81,8 +81,11 @@ public class Stage4TagMatchingService {
 
     private String buildPrompt(List<RelatedCandidate> candidates, List<String> requestedTags, String query, String childAgeBand) {
         String candidateLines = candidates.stream()
-                .map(c -> String.format("- %s (분류: %s, 여유율: %s)", c.getPlaceName(), c.getCategoryLcls(),
-                        c.getCrowdRate() == null ? "정보없음" : String.format("%.0f%%", 100 - c.getCrowdRate())))
+                .map(c -> String.format("- %s (분류: %s, 여유율: %s, 실내: %s, 우천: %s)",
+                        c.getPlaceName(), c.getCategoryLcls(),
+                        c.getCrowdRate() == null ? "정보없음" : String.format("%.0f%%", 100 - c.getCrowdRate()),
+                        Boolean.TRUE.equals(c.getIndoor()) ? "예" : "아니오",
+                        c.getRainSensitivity() == null ? "정보없음" : c.getRainSensitivity().name()))
                 .collect(Collectors.joining("\n"));
         String tagsText = (requestedTags == null || requestedTags.isEmpty()) ? "없음" : String.join(", ", requestedTags);
         String childHint = childAgeBand == null ? "" : String.format("""
@@ -107,6 +110,7 @@ public class Stage4TagMatchingService {
                 - 전시관·박물관·스테이션·체험관 등 관광/문화시설에 #맛집·#카페·#한식·#중식·#일식·#양식 같은
                   음식 관련 태그를 붙이지 마세요 - 실제 음식점·카페에만, 그것도 실제 업종에 맞는 태그만
                   붙이세요(예: 한식당엔 #한식만, 카페엔 #카페만 - 여러 개를 억지로 겹쳐 붙이지 않기).
+                - 실내(indoor)이거나 우천 둔감(INSENSITIVE)인 후보는 비·폭염에도 이용 가능하다는 점이 한 문장에 자연스럽게 드러나도 됩니다.
 
                 각 항목에 대해 아래 JSON 배열 형식으로만 반환하세요. 다른 설명은 하지 마세요.
                 [
@@ -158,9 +162,13 @@ public class Stage4TagMatchingService {
 
     private RecommendationCandidate toCandidate(RelatedCandidate c, List<String> matchedTags, String oneLiner,
                                                   List<String> requestedTags) {
-        List<String> tags = PlaceTagSanitizer.sanitize(
-                matchedTags, c.getContentTypeId(), c.getPlaceName(), c.getCategoryLcls(), requestedTags);
-        return RecommendationCandidate.builder()
+                List<String> tags = PlaceTagSanitizer.sanitize(
+                        matchedTags, c.getContentTypeId(), c.getPlaceName(), c.getCategoryLcls(), requestedTags);
+                if (Boolean.TRUE.equals(c.getIndoor()) && !tags.contains("#실내")) {
+                    tags = new java.util.ArrayList<>(tags);
+                    tags.add(0, "#실내");
+                }
+                return RecommendationCandidate.builder()
                 .contentId(c.getContentId())
                 .contentTypeId(c.getContentTypeId())
                 .placeName(c.getPlaceName())
@@ -189,6 +197,13 @@ public class Stage4TagMatchingService {
                 .strollerFriendly(c.getStrollerFriendly())
                 .accessibleFriendly(c.isAccessibleFriendly())
                 .ageRangeText(c.getAgeRangeText())
+                .overview(c.getOverview())
+                .detailFacts(c.getDetailFacts())
+                .cat3(c.getCat3())
+                .indoor(c.getIndoor())
+                .rainSensitivity(c.getRainSensitivity())
+                .congestionSensitivity(c.getCongestionSensitivity())
+                .inferredSource(c.getInferredSource())
                 .build();
     }
 }

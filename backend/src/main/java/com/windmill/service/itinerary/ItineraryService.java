@@ -2,27 +2,32 @@ package com.windmill.service.itinerary;
 
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
+import com.windmill.domain.PlaceSituationalTags;
 import com.windmill.domain.TripRecord;
 import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.CreateItineraryRequest;
+import com.windmill.dto.ItineraryItemResponse;
 import com.windmill.dto.ItineraryListItemResponse;
+import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.ItineraryStatus;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.SharedItineraryResponse;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.UpdateItineraryItemRequest;
+import com.windmill.exception.ClosingTimeInfeasibleException;
 import com.windmill.exception.DuplicateActiveItineraryException;
 import com.windmill.exception.TimeSlotConflictException;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
-import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.service.recommendation.SituationalTagService;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.GeoUtils;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.TimeConflictGate;
 import com.windmill.util.VisitOrderOptimizer;
+import com.windmill.util.VisitTiming;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +54,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ItineraryService {
 
-    private static final int DEFAULT_STAY_MINUTES = 75;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final ItineraryRepository itineraryRepository;
@@ -57,6 +61,7 @@ public class ItineraryService {
     private final RegionCodeService regionCodeService;
     private final RouteRecalculationService routeRecalculationService;
     private final TourAttractionService tourAttractionService;
+    private final SituationalTagService situationalTagService;
 
     @Transactional
     public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
@@ -167,6 +172,9 @@ public class ItineraryService {
                     .closeTime(src.getCloseTime())
                     .useTimeText(src.getUseTimeText())
                     .homepageUrl(src.getHomepageUrl())
+                    .overview(src.getOverview())
+                    .detailFacts(src.getDetailFacts() == null ? null : new ArrayList<>(src.getDetailFacts()))
+                    .indoorYn(src.getIndoorYn())
                     .strollerFriendly(src.getStrollerFriendly())
                     .accessibleFriendly(src.isAccessibleFriendly())
                     .category(src.getCategory())
@@ -195,6 +203,28 @@ public class ItineraryService {
     public ItineraryStatus statusOf(Itinerary itinerary) {
         return ItineraryStatus.of(itinerary.getStartDate(),
                 tripRecordRepository.existsByItinerary_Id(itinerary.getId()));
+    }
+
+    /** 일정 응답에 상황 태그 테이블 값을 붙인다(수동 보정이 스냅샷보다 우선). */
+    @Transactional(readOnly = true)
+    public ItineraryResponse toEnrichedResponse(Itinerary itinerary) {
+        ItineraryResponse response = ItineraryResponse.from(itinerary, statusOf(itinerary));
+        List<String> ids = response.getItems().stream()
+                .map(ItineraryItemResponse::getContentId)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+        Map<String, PlaceSituationalTags> byId = situationalTagService.findByContentIds(ids);
+        for (ItineraryItemResponse item : response.getItems()) {
+            PlaceSituationalTags tags = byId.get(item.getContentId());
+            if (tags == null) {
+                continue;
+            }
+            item.setIndoor(tags.getIndoorYn());
+            item.setRainSensitivity(tags.getRainSensitivity());
+            item.setCongestionSensitivity(tags.getCongestionSensitivity());
+            item.setInferredSource(tags.getInferredSource());
+        }
+        return response;
     }
 
     /**
@@ -240,10 +270,9 @@ public class ItineraryService {
     }
 
     /**
-     * 일정에 담기 - 마감시간·시간겹침을 이유로 추가 자체를 막지 않는다(2026-08-22 사용자 요청:
-     * "이미 넣기로 판단하고 누른 버튼이니 조건 없이 그대로 넣어달라"). scheduledTime이 없는
-     * 경우엔 여전히 가능하면 마감을 안 넘기는 자리를 찾아 끼워 넣어 주지만(findFeasibleInsertion),
-     * 그런 자리가 없어도 더 이상 거절하지 않고 그냥 하루 끝에 이어붙인다.
+     * 일정에 담기. 시각이 명시된 추가는 같은 날 겹침(TIME_OVERLAP)을 마감(CLOSING_TIME_INFEASIBLE)보다
+     * 먼저 검사해 저장을 막는다. 시각이 없으면 가능하면 마감을 안 넘기는 자리에 끼워 넣고,
+     * 자리가 없어도 거절하지 않고 하루 끝에 이어붙인다(시간 미지정).
      */
     @Transactional
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
@@ -251,31 +280,39 @@ public class ItineraryService {
         LocalDate visitDate = request.getVisitDate() != null ? request.getVisitDate() : itinerary.getStartDate();
         List<String> tags = PlaceTagSanitizer.sanitizeStored(
                 request.getTags(), request.getContentTypeId(), request.getPlaceName(), request.getCategory());
+        PlaceSituationalTags situational = situationalTagService.ensureInferred(
+                request.getContentId(), request.getContentTypeId(), request.getCat3(),
+                request.getPlaceName(), request.getOverview());
+        if (Boolean.TRUE.equals(situational.getIndoorYn()) && !tags.contains("#실내")) {
+            tags = new ArrayList<>(tags);
+            tags.add(0, "#실내");
+        }
 
         String scheduledTime = request.getScheduledTime();
         List<ItineraryItem> dayItems = null;
         Integer insertBeforeDayIndex = null;
+        LocalTime close = VisitTiming.resolveCloseTime(request);
+        int stay = VisitTiming.stayMinutes(request.getContentTypeId(), request.getPlaceName(),
+                request.getCategory(), request.getTags());
+        int closeBuffer = VisitTiming.closeBufferMinutes(request.getCloseTime(), request.getUseTimeText());
 
-        if (scheduledTime == null) {
-            LocalTime close = ClosingTimeGate.parseHhMm(request.getCloseTime());
-            if (close == null) {
-                close = BusinessHoursEvaluator.extractCloseTimeFromText(request.getUseTimeText());
-            }
-            if (close != null) {
-                LocalTime endArrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
-                ClosingTimeGate.CheckResult endCheck = ClosingTimeGate.check(close, endArrival);
-                if (!endCheck.allowed()) {
-                    // 하루 맨 끝에는 마감 때문에 못 붙는다 - 마감을 안 넘기는 자리 중 가장 늦은(=기존
-                    // 앞쪽 일정을 최대한 안 건드리는) 위치를 찾아 그 자리에 끼워 넣는다. 못 찾으면
-                    // (예전엔 여기서 차단했지만) 그냥 하루 끝에 이어붙인다 - scheduledTime 미배정 상태로
-                    // 남아 기존 "시간 미지정 항목"과 동일하게 처리됨.
-                    dayItems = dayItemsSorted(itinerary, visitDate);
-                    InsertionPlan plan = dayItems.isEmpty() ? null
-                            : findFeasibleInsertion(dayItems, visitDate, request.getMapX(), request.getMapY(), close);
-                    if (plan != null) {
-                        insertBeforeDayIndex = plan.index();
-                        scheduledTime = plan.arrival().format(TIME_FMT);
-                    }
+        if (scheduledTime != null) {
+            assertScheduleFeasible(itinerary, visitDate, scheduledTime, null, close, stay, closeBuffer);
+        } else {
+            LocalTime endArrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
+            ClosingTimeGate.CheckResult endCheck = ClosingTimeGate.check(close, endArrival, closeBuffer);
+            if (!endCheck.allowed()) {
+                // 하루 맨 끝에는 마감 때문에 못 붙는다 - 마감을 안 넘기는 자리 중 가장 늦은(=기존
+                // 앞쪽 일정을 최대한 안 건드리는) 위치를 찾아 그 자리에 끼워 넣는다. 못 찾으면
+                // 그냥 하루 끝에 이어붙인다 - scheduledTime 미배정 상태로 남아 기존 "시간 미지정 항목"과
+                // 동일하게 처리됨.
+                dayItems = dayItemsSorted(itinerary, visitDate);
+                InsertionPlan plan = dayItems.isEmpty() ? null
+                        : findFeasibleInsertion(dayItems, visitDate, request.getMapX(), request.getMapY(),
+                                close, closeBuffer);
+                if (plan != null) {
+                    insertBeforeDayIndex = plan.index();
+                    scheduledTime = plan.arrival().format(TIME_FMT);
                 }
             }
         }
@@ -299,6 +336,9 @@ public class ItineraryService {
                 .closeTime(request.getCloseTime())
                 .useTimeText(request.getUseTimeText())
                 .homepageUrl(request.getHomepageUrl())
+                .overview(request.getOverview())
+                .detailFacts(request.getDetailFacts())
+                .indoorYn(situational.getIndoorYn())
                 .strollerFriendly(request.getStrollerFriendly())
                 .accessibleFriendly(Boolean.TRUE.equals(request.getAccessibleFriendly()))
                 .category(request.getCategory())
@@ -320,24 +360,48 @@ public class ItineraryService {
     }
 
     /**
-     * 같은 날 이미 예정된 다른 일정과 시간대가 겹치는지 검사(마감시간 게이트와 독립적인 원인).
-     * excludeItemId는 기존 항목의 시간을 수정할 때 자기 자신을 겹침 대상에서 빼기 위함(신규 추가 시엔 null).
+     * 명시된 시각으로 넣거나 옮길 때: 같은 날 겹침을 먼저, 그다음 마감. 둘 다면 겹침만 노출.
+     * 이동시간은 점유 구간에 넣지 않는다.
      */
-    private void assertNoTimeConflict(Itinerary itinerary, LocalDate visitDate, String scheduledTime,
-                                       Long excludeItemId) {
+    private void assertScheduleFeasible(Itinerary itinerary, LocalDate visitDate, String scheduledTime,
+                                        Long excludeItemId, LocalTime close, int stayMinutes, int closeBuffer) {
         LocalTime start = ClosingTimeGate.parseHhMm(scheduledTime);
         if (start == null) {
             return;
         }
-        List<TimeConflictGate.Occupant> occupants = dayItemsSorted(itinerary, visitDate).stream()
-                .map(i -> new TimeConflictGate.Occupant(
-                        i.getId(), i.getPlaceName(), ClosingTimeGate.parseHhMm(i.getScheduledTime())))
-                .toList();
-        TimeConflictGate.CheckResult result = TimeConflictGate.check(start, occupants, excludeItemId);
-        if (result.blocked()) {
-            throw new TimeSlotConflictException(result.message(), result.conflictingItemId(),
-                    result.conflictingPlaceName(), result.conflictingTime());
+        List<TimeConflictGate.Occupant> occupants = occupantsOf(itinerary, visitDate);
+        LocalTime end = VisitTiming.occupancyEnd(start, stayMinutes, close);
+        TimeConflictGate.CheckResult overlap = TimeConflictGate.check(start, end, occupants, excludeItemId);
+        if (overlap.blocked()) {
+            throw new TimeSlotConflictException(overlap.message(), overlap.conflictingItemId(),
+                    overlap.conflictingPlaceName(), overlap.conflictingTime(),
+                    suggestTimes(start, close, stayMinutes, occupants, visitDate, excludeItemId, closeBuffer));
         }
+        ClosingTimeGate.CheckResult closing = ClosingTimeGate.check(close, start, closeBuffer);
+        if (closing.blocked()) {
+            throw new ClosingTimeInfeasibleException(closing.message(), closing.closeTime(),
+                    closing.latestArrivalBy(),
+                    suggestTimes(start, close, stayMinutes, occupants, visitDate, excludeItemId, closeBuffer));
+        }
+    }
+
+    private List<String> suggestTimes(LocalTime preferred, LocalTime close, int stayMinutes,
+                                      List<TimeConflictGate.Occupant> occupants, LocalDate visitDate,
+                                      Long excludeItemId, int closeBuffer) {
+        List<VisitTiming.Occupied> occupied = occupants.stream()
+                .map(o -> new VisitTiming.Occupied(o.itemId(), o.placeName(), o.start(), o.end()))
+                .toList();
+        return VisitTiming.suggestAlternativeStarts(preferred, close, stayMinutes, occupied,
+                resolveDayStart(visitDate), excludeItemId, closeBuffer);
+    }
+
+    private List<TimeConflictGate.Occupant> occupantsOf(Itinerary itinerary, LocalDate visitDate) {
+        return dayItemsSorted(itinerary, visitDate).stream()
+                .map(i -> new TimeConflictGate.Occupant(
+                        i.getId(), i.getPlaceName(),
+                        ClosingTimeGate.parseHhMm(i.getScheduledTime()),
+                        VisitTiming.occupancyEnd(i)))
+                .toList();
     }
 
     private List<ItineraryItem> dayItemsSorted(Itinerary itinerary, LocalDate visitDate) {
@@ -355,7 +419,8 @@ public class ItineraryService {
         ItineraryItem last = dayItems.isEmpty() ? null : dayItems.get(dayItems.size() - 1);
         if (last != null && last.getScheduledTime() != null) {
             LocalTime lastStart = ClosingTimeGate.parseHhMm(last.getScheduledTime());
-            cursor = lastStart != null ? lastStart.plusMinutes(DEFAULT_STAY_MINUTES) : LocalTime.of(9, 0);
+            LocalTime lastEnd = VisitTiming.occupancyEnd(last);
+            cursor = lastEnd != null ? lastEnd : (lastStart != null ? lastStart.plusMinutes(VisitTiming.ATTRACTION_STAY_MINUTES) : LocalTime.of(9, 0));
         } else {
             cursor = resolveDayStart(visitDate);
         }
@@ -402,18 +467,20 @@ public class ItineraryService {
      * 못 찾으면 null(어디에도 못 들어감 - 기존처럼 차단해야 함).
      */
     private InsertionPlan findFeasibleInsertion(List<ItineraryItem> dayItems, LocalDate visitDate,
-                                                  String mapX, String mapY, LocalTime close) {
+                                                  String mapX, String mapY, LocalTime close, int closeBuffer) {
         for (int p = dayItems.size() - 1; p >= 0; p--) {
             ItineraryItem predecessor = p == 0 ? null : dayItems.get(p - 1);
             LocalTime prevEnd = predecessor == null
                     ? resolveDayStart(visitDate)
-                    : parseOrDefault(predecessor.getScheduledTime()).plusMinutes(DEFAULT_STAY_MINUTES);
+                    : (VisitTiming.occupancyEnd(predecessor) != null
+                            ? VisitTiming.occupancyEnd(predecessor)
+                            : parseOrDefault(predecessor.getScheduledTime()).plusMinutes(VisitTiming.ATTRACTION_STAY_MINUTES));
             int travelToNew = travelMinutes(
                     predecessor == null ? null : predecessor.getMapX(),
                     predecessor == null ? null : predecessor.getMapY(),
                     mapX, mapY);
             LocalTime arrival = prevEnd.plusMinutes(travelToNew);
-            if (ClosingTimeGate.check(close, arrival).allowed()) {
+            if (ClosingTimeGate.check(close, arrival, closeBuffer).allowed()) {
                 return new InsertionPlan(p, arrival);
             }
         }
@@ -439,7 +506,8 @@ public class ItineraryService {
         for (int i = index; i < dayItems.size(); i++) {
             ItineraryItem next = dayItems.get(i);
             int travel = travelMinutes(prev.getMapX(), prev.getMapY(), next.getMapX(), next.getMapY());
-            cursor = cursor.plusMinutes(DEFAULT_STAY_MINUTES + travel);
+            cursor = VisitTiming.occupancyEnd(cursor, VisitTiming.stayMinutes(prev), VisitTiming.resolveCloseTime(prev))
+                    .plusMinutes(travel);
             next.setScheduledTime(cursor.format(TIME_FMT));
             next.setDisplayOrder(i + 1);
             prev = next;
@@ -467,7 +535,11 @@ public class ItineraryService {
             LocalDate targetVisitDate = (request.getVisitDate() != null && !request.getVisitDate().isBlank())
                     ? LocalDate.parse(request.getVisitDate())
                     : item.getVisitDate();
-            assertNoTimeConflict(itinerary, targetVisitDate, request.getScheduledTime(), item.getId());
+            LocalTime close = VisitTiming.resolveCloseTime(item);
+            int stay = VisitTiming.stayMinutes(item);
+            int closeBuffer = VisitTiming.closeBufferMinutes(item.getCloseTime(), item.getUseTimeText());
+            assertScheduleFeasible(itinerary, targetVisitDate, request.getScheduledTime(), item.getId(),
+                    close, stay, closeBuffer);
             item.setScheduledTime(request.getScheduledTime());
         }
         if (request.getVisitDate() != null && !request.getVisitDate().isBlank()) {
@@ -504,6 +576,25 @@ public class ItineraryService {
         if (request.getCategory() != null) {
             item.setCategory(request.getCategory().isBlank() ? null : request.getCategory().trim());
         }
+        if (request.getIndoorYn() != null || request.getRainSensitivity() != null
+                || request.getCongestionSensitivity() != null) {
+            if (item.getContentId() != null) {
+                PlaceSituationalTags saved = situationalTagService.saveManual(
+                        item.getContentId(), request.getIndoorYn(),
+                        request.getRainSensitivity(), request.getCongestionSensitivity());
+                item.setIndoorYn(saved.getIndoorYn());
+                List<String> nextTags = item.getTags() == null ? new ArrayList<>() : new ArrayList<>(item.getTags());
+                if (Boolean.TRUE.equals(saved.getIndoorYn())) {
+                    if (!nextTags.contains("#실내")) {
+                        nextTags.add(0, "#실내");
+                    }
+                } else {
+                    nextTags.remove("#실내");
+                }
+                item.setTags(PlaceTagSanitizer.sanitizeStored(
+                        nextTags, item.getContentTypeId(), item.getPlaceName(), item.getCategory()));
+            }
+        }
         return itineraryRepository.save(itinerary);
     }
 
@@ -522,6 +613,14 @@ public class ItineraryService {
      */
     @Transactional
     public DeleteItemResult deleteItem(Long itineraryId, Long itemId) {
+        return deleteItem(itineraryId, itemId, true);
+    }
+
+    /**
+     * @param reflowTimes false면 시각을 그대로 둔다(프론트가 같은 슬롯에 대체 장소를 곧 넣을 때).
+     */
+    @Transactional
+    public DeleteItemResult deleteItem(Long itineraryId, Long itemId, boolean reflowTimes) {
         Itinerary itinerary = get(itineraryId);
         ItineraryItem removed = itinerary.getItems().stream()
                 .filter(i -> i.getId().equals(itemId))
@@ -545,12 +644,68 @@ public class ItineraryService {
         if (replacement != null) {
             replacement.setItinerary(itinerary);
             itinerary.getItems().add(replacement);
+        } else if (reflowTimes) {
+            reflowDayAfterRemoval(itinerary, visitDate, displayOrder, scheduledTime);
         }
         Itinerary saved = itineraryRepository.save(itinerary);
         return new DeleteItemResult(saved, replacement == null ? null : replacement.getPlaceName());
     }
 
     public record DeleteItemResult(Itinerary itinerary, String autoReplacedPlaceName) {
+    }
+
+    /**
+     * 슬롯 삭제 후 남은 같은 날 항목의 시각을 앞으로 당긴다. 구멍 앞은 그대로 두고, 구멍 뒤는
+     * 직전 슬롯 체류+이동(Haversine 추정, 카카오 호출 없음)만큼 이어 붙인다. 첫 슬롯을 지웠으면
+     * 지워진 시각(또는 하루 시작)부터 채운다.
+     */
+    private void reflowDayAfterRemoval(Itinerary itinerary, LocalDate visitDate, int removedOrder,
+                                       String removedTime) {
+        List<ItineraryItem> dayItems = dayItemsSorted(itinerary, visitDate);
+        if (dayItems.isEmpty()) {
+            return;
+        }
+        List<ItineraryItem> before = new ArrayList<>();
+        List<ItineraryItem> after = new ArrayList<>();
+        for (ItineraryItem item : dayItems) {
+            if (item.getDisplayOrder() < removedOrder) {
+                before.add(item);
+            } else {
+                after.add(item);
+            }
+        }
+        int order = 0;
+        for (ItineraryItem item : before) {
+            item.setDisplayOrder(order++);
+        }
+        if (after.isEmpty()) {
+            return;
+        }
+        LocalTime cursor;
+        ItineraryItem prev;
+        if (before.isEmpty()) {
+            cursor = ClosingTimeGate.parseHhMm(removedTime);
+            if (cursor == null) {
+                cursor = resolveDayStart(visitDate);
+            }
+            prev = null;
+        } else {
+            prev = before.get(before.size() - 1);
+            LocalTime prevEnd = VisitTiming.occupancyEnd(prev);
+            cursor = prevEnd != null ? prevEnd : parseOrDefault(prev.getScheduledTime());
+        }
+        for (int i = 0; i < after.size(); i++) {
+            ItineraryItem next = after.get(i);
+            if (prev != null) {
+                cursor = cursor.plusMinutes(travelMinutes(prev.getMapX(), prev.getMapY(),
+                        next.getMapX(), next.getMapY()));
+            }
+            next.setScheduledTime(cursor.format(TIME_FMT));
+            next.setDisplayOrder(order++);
+            LocalTime end = VisitTiming.occupancyEnd(next);
+            cursor = end != null ? end : cursor.plusMinutes(VisitTiming.stayMinutes(next));
+            prev = next;
+        }
     }
 
     /** 예비 후보 스냅샷을 지금 다시 조회해 유효성(마감·시간겹침)을 확인한 뒤에만 대체 아이템을 만든다 */
@@ -606,14 +761,17 @@ public class ItineraryService {
         if (arrival == null) {
             return true;
         }
-        if (close != null && ClosingTimeGate.check(close, arrival).blocked()) {
+        LocalTime resolvedClose = close;
+        if (resolvedClose == null) {
+            resolvedClose = VisitTiming.DEFAULT_CLOSE_OTHER;
+        }
+        int buffer = close != null ? BusinessHoursEvaluator.CLOSE_BUFFER_MINUTES : 0;
+        if (ClosingTimeGate.check(resolvedClose, arrival, buffer).blocked()) {
             return false;
         }
-        List<TimeConflictGate.Occupant> occupants = dayItemsSorted(itinerary, visitDate).stream()
-                .map(i -> new TimeConflictGate.Occupant(
-                        i.getId(), i.getPlaceName(), ClosingTimeGate.parseHhMm(i.getScheduledTime())))
-                .toList();
-        return !TimeConflictGate.check(arrival, occupants, excludeItemId).blocked();
+        List<TimeConflictGate.Occupant> occupants = occupantsOf(itinerary, visitDate);
+        LocalTime end = VisitTiming.occupancyEnd(arrival, VisitTiming.ATTRACTION_STAY_MINUTES, resolvedClose);
+        return !TimeConflictGate.check(arrival, end, occupants, excludeItemId).blocked();
     }
 
     /** 일자별 페이지 확정/해제 - 프론트가 "다음 날로 이동"을 허용할지 판단하는 기준 */

@@ -4,6 +4,8 @@
  */
 export function isIndoorPlace(item) {
   if (!item) return false;
+  if (item.indoor === true) return true;
+  if (item.indoor === false) return false;
   const tags = (item.tags || []).map((t) => String(t).trim());
   if (tags.some((t) => t === '#실내' || t === '실내' || t === '#맛집' || t === '맛집')) {
     return true;

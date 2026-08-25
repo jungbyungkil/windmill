@@ -1,6 +1,9 @@
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
 import { isFoodPlace } from '../constants';
+import PlaceOverview from './PlaceOverview';
+import PlaceDetailFacts from './PlaceDetailFacts';
+import SituationalChips from './SituationalChips';
 
 const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
 
@@ -44,6 +47,15 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
 
       {candidate.oneLiner && <p className="reco-oneliner">{candidate.oneLiner}</p>}
 
+      <SituationalChips
+        indoor={candidate.indoor}
+        rainSensitivity={candidate.rainSensitivity}
+        congestionSensitivity={candidate.congestionSensitivity}
+        inferredSource={candidate.inferredSource}
+      />
+
+      <PlaceOverview text={candidate.overview} />
+
       <div className="reco-info">
         {candidate.addr1 && <div className="reco-info-row">📍 {candidate.addr1}</div>}
         {showAdmission && (
@@ -78,6 +90,7 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
             🔗 홈페이지
           </button>
         )}
+        <PlaceDetailFacts facts={candidate.detailFacts} />
       </div>
 
       <div className="reco-meta">

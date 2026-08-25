@@ -33,6 +33,7 @@ import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
 import { recordView } from './utils/viewHistory';
+import { placeSnapshotFields } from './utils/placeSnapshot';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -415,6 +416,7 @@ export default function App() {
           category: stop.category,
           mapX: stop.mapX,
           mapY: stop.mapY,
+          ...placeSnapshotFields(stop),
         });
       } catch {
         // 마감 임박 등으로 담기 실패한 곳은 건너뛰고 계속 - 이미 생성 단계에서 대부분 걸러짐
@@ -475,6 +477,7 @@ export default function App() {
           category: stop.category,
           mapX: stop.mapX,
           mapY: stop.mapY,
+          ...placeSnapshotFields(stop),
         });
       } catch {
         // 마감 임박 등으로 담기 실패한 곳은 건너뛰고 계속
@@ -532,15 +535,39 @@ export default function App() {
   }
 
   /**
-   * 시간 수정 실패를 사용자에게 반드시 보여준다 - 409(TimeSlotConflictException)면 "시간 겹침"
-   * 모달로, 그 외(마감 게이트·네트워크 오류 등 무엇이든)는 최소한 토스트로라도 안내한다.
-   * 예전엔 이 catch가 409 겹침이 아닌 실패는 조용히 넘겨서(App.jsx 상위 호출부도 uncaught),
-   * 시간을 골라도 아무 반응이 없는 것처럼 보이는 문제가 있었다(2026-08-21 사용자 제보).
+   * 시간 수정·추가 실패를 사용자에게 반드시 보여준다.
+   * TIME_OVERLAP(409) → "시간 겹침", CLOSING_TIME_INFEASIBLE(422) → "마감 임박".
+   * 대안 시각이 오면 모달에서 바로 다시 넣을 수 있다.
    */
+  function reportScheduleGate(e, placeName, retryWithTime) {
+    const code = e?.data?.errorCode;
+    const suggestedTimes = e?.data?.suggestedTimes || [];
+    if (code === 'TIME_OVERLAP' || (e?.status === 409 && e?.data?.conflictingPlaceName)) {
+      setClosingGate({
+        kind: 'CONFLICT',
+        placeName,
+        message: e.data.message,
+        suggestedTimes,
+        retryWithTime,
+      });
+      return true;
+    }
+    if (code === 'CLOSING_TIME_INFEASIBLE' || e?.status === 422) {
+      setClosingGate({
+        kind: 'CLOSING',
+        placeName,
+        message: e.data?.message || e.message,
+        suggestedTimes,
+        retryWithTime,
+      });
+      return true;
+    }
+    return false;
+  }
+
   function reportIfTimeConflict(e, itemId) {
     const placeName = itinerary?.items?.find((i) => i.itemId === itemId)?.placeName;
-    if (e?.status === 409 && e?.data?.conflictingPlaceName) {
-      setClosingGate({ placeName, message: e.data.message, kind: 'CONFLICT' });
+    if (reportScheduleGate(e, placeName, (time) => handleUpdateTime(itemId, time))) {
       return;
     }
     setAutoReplaceNotice(`${placeName ? `"${placeName}" ` : ''}시간을 바꾸지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
@@ -617,11 +644,8 @@ export default function App() {
   }
 
   /**
-   * "일정에 추가" 버튼은 무조건 담는다 - 마감시간·시간겹침 사전검사로 막지 않는다. 사용자가 이미
-   * "넣겠다"고 판단하고 누른 액션이라 조건 없이 그대로 반영해야 한다는 요청(2026-08-22)에 따라,
-   * 예전에 여기 있던 checkTimeConflict/checkClosingGate 클라이언트 사전검사를 제거함 - 서버
-   * (ItineraryService.addItem)도 같은 이유로 더 이상 마감·겹침을 사유로 추가를 거절하지 않는다
-   * (가능하면 마감 안 넘기는 자리에 끼워 넣어주는 동작은 유지, 거절만 없앰).
+   * "일정에 추가" — 시각이 명시되면 서버가 같은 날 겹침(TIME_OVERLAP)을 마감보다 먼저 막는다.
+   * 거절되면 겹침/마감 모달에 대안 시각을 띄워 그 시각으로 다시 넣을 수 있게 한다.
    */
   async function addCandidateToItinerary(candidate, visitDate = activeDate, isAlternate = false) {
     let result;
@@ -653,11 +677,18 @@ export default function App() {
         backupContentId: candidate.backupContentId,
         backupContentTypeId: candidate.backupContentTypeId,
         backupPlaceName: candidate.backupPlaceName,
+        ...placeSnapshotFields(candidate),
       });
     } catch (e) {
-      // 마감·겹침으로는 더 이상 거절되지 않으니, 여기 남는 실패는 네트워크 오류 등 진짜 예외뿐이다.
-      setAutoReplaceNotice(`"${candidate.placeName || '이 장소'}"를 담지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
-      setTimeout(() => setAutoReplaceNotice(null), 5000);
+      const reported = reportScheduleGate(
+        e,
+        candidate.placeName,
+        (time) => addCandidateToItinerary({ ...candidate, scheduledTime: time }, visitDate, isAlternate),
+      );
+      if (!reported) {
+        setAutoReplaceNotice(`"${candidate.placeName || '이 장소'}"를 담지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
+        setTimeout(() => setAutoReplaceNotice(null), 5000);
+      }
       throw e;
     }
     setItinerary(result);
@@ -731,7 +762,7 @@ export default function App() {
       const affectedItem = affectedId ? itinerary.items.find((i) => i.itemId === affectedId) : null;
 
       if (affectedItem) {
-        await api.deleteItem(itineraryId, affectedItem.itemId);
+        await api.deleteItem(itineraryId, affectedItem.itemId, { reflow: false });
         // 원래 있던 시간대를 그대로 넘기다 보니(마감 임박 등으로) 1순위 후보가 그 시각엔 못
         // 들어갈 수 있다 - 실패하면 다음 후보로 계속 시도하고, 전부 실패했을 때만 안내한다.
         let result = null;
@@ -763,6 +794,7 @@ export default function App() {
               mapX: candidate.mapX,
               mapY: candidate.mapY,
               isAlternate: true,
+              ...placeSnapshotFields(candidate),
             });
             replacedWith = candidate;
             break;
@@ -846,7 +878,7 @@ export default function App() {
           && !result.items.some((it) => it.contentId === c.contentId));
         if (!next) break;
         used.add(next.contentId);
-        await api.deleteItem(itineraryId, target.itemId);
+        await api.deleteItem(itineraryId, target.itemId, { reflow: false });
         result = await api.addItem(itineraryId, {
           contentId: next.contentId,
           contentTypeId: next.contentTypeId,
@@ -869,6 +901,7 @@ export default function App() {
           mapX: next.mapX,
           mapY: next.mapY,
           isAlternate: true,
+          ...placeSnapshotFields(next),
         });
       }
 
@@ -1463,6 +1496,17 @@ export default function App() {
                 placeName={closingGate?.placeName}
                 message={closingGate?.message}
                 kind={closingGate?.kind}
+                suggestedTimes={closingGate?.suggestedTimes}
+                onPickTime={async (time) => {
+                  const retry = closingGate?.retryWithTime;
+                  setClosingGate(null);
+                  if (!retry) return;
+                  try {
+                    await retry(time);
+                  } catch {
+                    /* retry 실패 시 reportScheduleGate가 모달을 다시 연다 */
+                  }
+                }}
                 onClose={() => setClosingGate(null)}
               />
 

@@ -87,4 +87,21 @@ class OutdoorActivityClassifierTest {
                 .build();
         assertFalse(OutdoorActivityClassifier.isOutdoor(item));
     }
+
+    @Test
+    void indoorYnSnapshotWinsOverNameHeuristic() {
+        ItineraryItem outdoorCafe = ItineraryItem.builder()
+                .placeName("어느멋진날카페")
+                .contentTypeId(12)
+                .indoorYn(false)
+                .build();
+        assertTrue(OutdoorActivityClassifier.isOutdoor(outdoorCafe));
+
+        ItineraryItem indoorPark = ItineraryItem.builder()
+                .placeName("해변 공원")
+                .contentTypeId(12)
+                .indoorYn(true)
+                .build();
+        assertFalse(OutdoorActivityClassifier.isOutdoor(indoorPark));
+    }
 }

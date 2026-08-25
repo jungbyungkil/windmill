@@ -202,6 +202,11 @@ public class CategoryRecommendationService {
         if (thumb == null) {
             thumb = blankToNull(s.getFirstImage2());
         }
+        var inferred = SituationalInference.infer(typeId, s.getCat3(), s.getTitle(), null);
+        List<String> tags = new java.util.ArrayList<>(defaultTags(category));
+        if (inferred.indoor() && !tags.contains("#실내")) {
+            tags.add(0, "#실내");
+        }
         return RecommendationCandidate.builder()
                 .contentId(s.getContentId())
                 .contentTypeId(typeId)
@@ -210,11 +215,16 @@ public class CategoryRecommendationService {
                 .thumbnailUrl(thumb)
                 .crowdRate(crowdRate)
                 .freeRatePercent(crowdRate == null ? null : 100.0 - crowdRate)
-                .matchedTags(defaultTags(category))
+                .matchedTags(tags)
                 .oneLiner(oneLiner(category, s.getTitle(), crowdRate))
                 .addr1(s.getAddr1())
                 .tel(s.getTel())
                 .rank(0)
+                .cat3(s.getCat3())
+                .indoor(inferred.indoor())
+                .rainSensitivity(inferred.rain())
+                .congestionSensitivity(inferred.congestion())
+                .inferredSource(com.windmill.domain.InferredSource.RULE)
                 .build();
     }
 

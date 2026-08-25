@@ -41,4 +41,10 @@ public class AddItineraryItemRequest {
     private String backupContentId;
     private Integer backupContentTypeId;
     private String backupPlaceName;
+    private String overview;
+    private java.util.List<DetailFact> detailFacts;
+    private String cat3;
+    private Boolean indoor;
+    private com.windmill.domain.RainSensitivity rainSensitivity;
+    private com.windmill.domain.CongestionSensitivity congestionSensitivity;
 }

@@ -3003,6 +3003,88 @@
   word-break: keep-all;
 }
 
+.place-overview {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0 0 6px;
+}
+
+.place-overview-compact {
+  -webkit-line-clamp: 2;
+  color: var(--muted);
+}
+
+.place-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.place-fact-row {
+  display: grid;
+  grid-template-columns: 5.5em 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.place-fact-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.place-fact-value {
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.situational-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0 6px;
+}
+
+.situational-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea-deep, var(--sea));
+  background: color-mix(in srgb, var(--sea) 14%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.situational-source {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.item-edit-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.item-edit-label select {
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--sand-card);
+  color: var(--ink);
+}
+
 .reco-restdate {
   color: var(--level-warning);
 }
@@ -4576,6 +4658,39 @@
   margin: 0 0 16px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.closing-gate-suggestions {
+  margin: 0 0 16px;
+}
+
+.closing-gate-suggest-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.closing-gate-suggest-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.closing-gate-suggest {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--sea, #1d6b8a);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--sea, #1d6b8a);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.closing-gate-suggest:hover {
+  background: rgba(29, 107, 138, 0.08);
 }
 
 .closing-gate-ok {

@@ -5,6 +5,9 @@ import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 import TagGroupPicker from './TagGroupPicker';
+import PlaceOverview from './PlaceOverview';
+import PlaceDetailFacts from './PlaceDetailFacts';
+import SituationalChips from './SituationalChips';
 
 function draftFromItem(src) {
   return {
@@ -16,7 +19,19 @@ function draftFromItem(src) {
     useFeeText: src.useFeeText || '',
     isFree: Boolean(src.isFree),
     restDateText: src.restDateText || '',
+    indoorYn: src.indoor ?? null,
+    rainSensitivity: src.rainSensitivity || '',
+    congestionSensitivity: src.congestionSensitivity || '',
   };
+}
+
+function situationalChanged(draft, item) {
+  const origIndoor = item.indoor ?? null;
+  const origRain = item.rainSensitivity || '';
+  const origCrowd = item.congestionSensitivity || '';
+  return draft.indoorYn !== origIndoor
+    || (draft.rainSensitivity || '') !== origRain
+    || (draft.congestionSensitivity || '') !== origCrowd;
 }
 
 /**
@@ -77,6 +92,11 @@ export default function ItineraryItemCard({
         useFeeText: draft.isFree ? '' : draft.useFeeText.trim(),
         isFree: draft.isFree,
         restDateText: draft.restDateText.trim(),
+        ...(situationalChanged(draft, item) ? {
+          indoorYn: draft.indoorYn,
+          rainSensitivity: draft.rainSensitivity || null,
+          congestionSensitivity: draft.congestionSensitivity || null,
+        } : {}),
       });
       setEditing(false);
     } finally {
@@ -167,6 +187,15 @@ export default function ItineraryItemCard({
               </div>
             )}
 
+            <SituationalChips
+              indoor={item.indoor}
+              rainSensitivity={item.rainSensitivity}
+              congestionSensitivity={item.congestionSensitivity}
+              inferredSource={item.inferredSource}
+            />
+
+            <PlaceOverview text={item.overview} />
+
             <div className="reco-info">
               {item.addr1 && (
                 mapAvailable ? (
@@ -198,6 +227,7 @@ export default function ItineraryItemCard({
                   🔗 홈페이지
                 </button>
               )}
+              <PlaceDetailFacts facts={item.detailFacts} />
             </div>
 
             {item.crowdRate !== null && item.crowdRate !== undefined && (
@@ -271,6 +301,44 @@ export default function ItineraryItemCard({
                 onChange={(e) => setDraft((prev) => ({ ...prev, restDateText: e.target.value }))}
                 placeholder="예: 매주 월요일"
               />
+            </label>
+
+            <p className="item-edit-hint">상황 태그는 자동으로 채워져요. 틀린 경우만 바꿔 주세요.</p>
+            <label className="item-edit-label">
+              실내/실외
+              <select
+                value={draft.indoorYn === true ? 'true' : draft.indoorYn === false ? 'false' : ''}
+                onChange={(e) => setDraft((prev) => ({
+                  ...prev,
+                  indoorYn: e.target.value === '' ? null : e.target.value === 'true',
+                }))}
+              >
+                <option value="">자동</option>
+                <option value="true">실내</option>
+                <option value="false">실외</option>
+              </select>
+            </label>
+            <label className="item-edit-label">
+              우천 민감도
+              <select
+                value={draft.rainSensitivity}
+                onChange={(e) => setDraft((prev) => ({ ...prev, rainSensitivity: e.target.value }))}
+              >
+                <option value="">자동</option>
+                <option value="SENSITIVE">우천 민감</option>
+                <option value="INSENSITIVE">우천 둔감</option>
+              </select>
+            </label>
+            <label className="item-edit-label">
+              혼잡 민감도
+              <select
+                value={draft.congestionSensitivity}
+                onChange={(e) => setDraft((prev) => ({ ...prev, congestionSensitivity: e.target.value }))}
+              >
+                <option value="">자동</option>
+                <option value="SENSITIVE">혼잡 민감</option>
+                <option value="INSENSITIVE">혼잡 둔감</option>
+              </select>
             </label>
 
             <div className="item-edit-actions">

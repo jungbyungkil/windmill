@@ -7,6 +7,7 @@ import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.VisitOrderOptimizer;
+import com.windmill.util.VisitTiming;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,10 +28,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RouteRecalculationService {
 
-    private static final int ATTRACTION_STAY = 75;
-    private static final int MEAL_STAY = 60;
-    private static final LocalTime DAY_START = LocalTime.of(9, 0);
-    private static final LocalTime LATEST_START = LocalTime.of(20, 0);
+    private static final LocalTime DAY_START = VisitTiming.DAY_START;
+    private static final LocalTime LATEST_START = VisitTiming.LATEST_START;
     // 식사 시간대는 "정확히 이 시각"이 아니라 창(window)으로 다룬다 - 자연스러운 도착 시각이 이미
     // 창 안이면 건드리지 않고, 창보다 이르면 창 시작으로만 최소한 당긴다(옛날엔 무조건 12:00/18:00
     // 정각으로 점프시켜 미래 일정(하루 전체 09:00부터 사용 가능)에서도 식사 앞뒤로 몇 시간씩 빈
@@ -204,7 +203,7 @@ public class RouteRecalculationService {
             }
             arrivals[i] = cursor;
 
-            int stay = meal ? MEAL_STAY : ATTRACTION_STAY;
+            int stay = VisitTiming.stayMinutes(item);
             cursor = cursor.plusMinutes(stay + travelBetween(ordered, i, minutes, idToIdx));
         }
         return arrivals;
@@ -284,6 +283,10 @@ public class RouteRecalculationService {
         return violations;
     }
 
+    /**
+     * 동선 재계산용 마감. 파싱된 CLOSE/usetime만 쓰고, 편집 게이트의 17/18시 기본값은 넣지 않는다.
+     * 기본 마감을 여기 넣으면 마감 미상 장소까지 저녁 슬롯이 전부 앞으로 밀린다.
+     */
     private static LocalTime closeTimeOf(ItineraryItem item) {
         LocalTime close = ClosingTimeGate.parseHhMm(item.getCloseTime());
         if (close == null) {
@@ -392,15 +395,7 @@ public class RouteRecalculationService {
     }
 
     private static boolean isMeal(ItineraryItem item) {
-        if (item.getTags() != null) {
-            for (String t : item.getTags()) {
-                if ("#맛집".equals(t)) {
-                    return true;
-                }
-            }
-        }
-        String cat = item.getCategory();
-        return cat != null && (cat.contains("맛집") || cat.contains("식사") || cat.contains("음식"));
+        return VisitTiming.isMeal(item);
     }
 
     private static boolean hasCoords(ItineraryItem item) {

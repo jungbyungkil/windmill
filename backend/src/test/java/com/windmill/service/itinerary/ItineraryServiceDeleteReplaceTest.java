@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,8 +45,19 @@ class ItineraryServiceDeleteReplaceTest {
         RegionCodeService regionCodeService = mock(RegionCodeService.class);
         RouteRecalculationService routeRecalculationService = mock(RouteRecalculationService.class);
         tourAttractionService = mock(TourAttractionService.class);
+        com.windmill.service.recommendation.SituationalTagService situationalTagService =
+                mock(com.windmill.service.recommendation.SituationalTagService.class);
+        when(situationalTagService.ensureInferred(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> com.windmill.domain.PlaceSituationalTags.builder()
+                        .contentId(inv.getArgument(0))
+                        .indoorYn(false)
+                        .rainSensitivity(com.windmill.domain.RainSensitivity.SENSITIVE)
+                        .congestionSensitivity(com.windmill.domain.CongestionSensitivity.SENSITIVE)
+                        .inferredSource(com.windmill.domain.InferredSource.RULE)
+                        .updatedAt(java.time.LocalDateTime.now())
+                        .build());
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService);
+                routeRecalculationService, tourAttractionService, situationalTagService);
         when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -130,5 +142,51 @@ class ItineraryServiceDeleteReplaceTest {
 
         assertNull(result.autoReplacedPlaceName());
         assertTrue(result.itinerary().getItems().isEmpty());
+    }
+
+    @Test
+    void deleteMiddleSlot_reflowsLaterItemTimesForward() {
+        ItineraryItem first = ItineraryItem.builder()
+                .id(1L).displayOrder(0).placeName("경복궁").scheduledTime("10:00").visitDate(TOMORROW)
+                .build();
+        ItineraryItem middle = ItineraryItem.builder()
+                .id(2L).displayOrder(1).placeName("창덕궁").scheduledTime("11:35").visitDate(TOMORROW)
+                .build();
+        ItineraryItem last = ItineraryItem.builder()
+                .id(3L).displayOrder(2).placeName("북촌한옥마을").scheduledTime("13:10").visitDate(TOMORROW)
+                .build();
+        itineraryWith(first, middle, last);
+
+        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 2L);
+
+        assertNull(result.autoReplacedPlaceName());
+        List<ItineraryItem> remaining = result.itinerary().getItems().stream()
+                .sorted((a, b) -> Integer.compare(a.getDisplayOrder(), b.getDisplayOrder()))
+                .toList();
+        assertEquals(2, remaining.size());
+        assertEquals("10:00", remaining.get(0).getScheduledTime());
+        // 경복궁 10:00 + 75분 체류 + 기본 이동 20분 = 11:35
+        assertEquals("11:35", remaining.get(1).getScheduledTime());
+        assertEquals("북촌한옥마을", remaining.get(1).getPlaceName());
+    }
+
+    @Test
+    void deleteMiddleSlot_withoutReflow_keepsLaterItemTime() {
+        ItineraryItem first = ItineraryItem.builder()
+                .id(1L).displayOrder(0).placeName("경복궁").scheduledTime("10:00").visitDate(TOMORROW)
+                .build();
+        ItineraryItem middle = ItineraryItem.builder()
+                .id(2L).displayOrder(1).placeName("창덕궁").scheduledTime("11:35").visitDate(TOMORROW)
+                .build();
+        ItineraryItem last = ItineraryItem.builder()
+                .id(3L).displayOrder(2).placeName("북촌한옥마을").scheduledTime("13:10").visitDate(TOMORROW)
+                .build();
+        itineraryWith(first, middle, last);
+
+        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 2L, false);
+
+        ItineraryItem kept = result.itinerary().getItems().stream()
+                .filter(i -> "북촌한옥마을".equals(i.getPlaceName())).findFirst().orElseThrow();
+        assertEquals("13:10", kept.getScheduledTime());
     }
 }

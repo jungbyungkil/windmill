@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import * as api from '../api/windmillApi';
 import BaramiBubble from './BaramiBubble';
 import TrustBadge from './TrustBadge';
+import PlaceOverview from './PlaceOverview';
+import PlaceDetailFacts from './PlaceDetailFacts';
+import SituationalChips from './SituationalChips';
 
 const ICON_GRID_CATEGORIES = new Set(['RESTAURANT', 'CAFE', '음식점', '카페', '맛집', '식당']);
 
@@ -160,8 +163,16 @@ export default function CategoryRecommendScreen({
                         </div>
                         <div className="category-place-body">
                           <h3>{place.placeName}</h3>
+                          <SituationalChips
+                            indoor={place.indoor}
+                            rainSensitivity={place.rainSensitivity}
+                            congestionSensitivity={place.congestionSensitivity}
+                            inferredSource={place.inferredSource}
+                          />
                           {place.oneLiner && <p>{place.oneLiner}</p>}
+                          <PlaceOverview text={place.overview} className="place-overview-compact" />
                           {place.addr1 && <div className="category-place-addr">{place.addr1}</div>}
+                          <PlaceDetailFacts facts={place.detailFacts} />
                           <button
                             type="button"
                             className="btn-add"

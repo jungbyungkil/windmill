@@ -39,6 +39,12 @@ public class ItineraryItemResponse {
     private boolean isAlternate;
     /** 예비 후보 장소명(있으면) - 삭제 시 자동 대체 예고 UI에 사용, ID는 프론트에 노출 안 함 */
     private String backupPlaceName;
+    private String overview;
+    private java.util.List<DetailFact> detailFacts;
+    private Boolean indoor;
+    private com.windmill.domain.RainSensitivity rainSensitivity;
+    private com.windmill.domain.CongestionSensitivity congestionSensitivity;
+    private com.windmill.domain.InferredSource inferredSource;
 
     public static ItineraryItemResponse from(ItineraryItem item) {
         // 이미 저장된 #맛집 오탐도 응답 시점에 바로잡음 (체험관·스테이션 등)
@@ -72,6 +78,9 @@ public class ItineraryItemResponse {
                 .mapY(item.getMapY())
                 .isAlternate(item.isAlternate())
                 .backupPlaceName(item.getBackupPlaceName())
+                .overview(item.getOverview())
+                .detailFacts(item.getDetailFacts())
+                .indoor(item.getIndoorYn())
                 .build();
     }
 }

@@ -1,5 +1,6 @@
 package com.windmill.domain;
 
+import com.windmill.dto.DetailFact;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -60,6 +61,15 @@ public class ItineraryItem {
     private String closeTime;
     private String useTimeText;
     private String homepageUrl;
+    /** detailCommon2 개요 스냅샷 */
+    @Column(length = 4000)
+    private String overview;
+    /** detailIntro2 부가 필드 스냅샷(JSON). 빈 값은 저장하지 않음. */
+    @Convert(converter = DetailFactListConverter.class)
+    @Column(length = 4000)
+    private List<DetailFact> detailFacts;
+    /** 상황 태그 스냅샷 — 트리거/야외 판정용. 원본은 place_situational_tags */
+    private Boolean indoorYn;
 
     /** 예비 후보 스냅샷(대표 다음으로 가까웠던 후보) - 이 항목을 삭제하면 자동 대체 시도에 쓰인다.
      *  없으면(구버전 데이터·예비 후보 자체가 없던 슬롯) 전부 null - 삭제 시 재조회 폴백으로 넘어감. */

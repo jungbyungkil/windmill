@@ -5,6 +5,8 @@ import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
 import com.windmill.dto.TourAttractionDetail;
+import com.windmill.domain.CongestionSensitivity;
+import com.windmill.domain.RainSensitivity;
 import com.windmill.domain.RecommendThemeTag;
 import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
@@ -196,6 +198,13 @@ public class RecommendationPipeline {
                 .strollerFriendly(c.getStrollerFriendly())
                 .accessibleFriendly(c.isAccessibleFriendly())
                 .ageRangeText(c.getAgeRangeText())
+                .overview(c.getOverview())
+                .detailFacts(c.getDetailFacts())
+                .cat3(c.getCat3())
+                .indoor(c.getIndoor())
+                .rainSensitivity(c.getRainSensitivity())
+                .congestionSensitivity(c.getCongestionSensitivity())
+                .inferredSource(c.getInferredSource())
                 .build();
     }
 
@@ -248,7 +257,7 @@ public class RecommendationPipeline {
     };
 
     /**
-     * 트리거 우선회피 정렬. 혼잡 회피(CROWD)는 여유율 높은 순, 비/폭염은 #실내를 앞으로 당긴다.
+     * 트리거 우선회피 정렬. 혼잡 회피는 혼잡 둔감·여유율 높은 순, 비/폭염은 실내·우천 둔감을 앞으로 당긴다.
      * 동반 자녀가 있으면 그 안에서도 아이 동반에 어울리는 실내 장소(체험관·키즈카페·박물관 등)를
      * 한 번 더 앞으로 당긴다 - 폭염철 아이 동반 여행은 실내 중에서도 "아이가 할 게 있는 곳"이 우선.
      * 스마트 동선(힌트 없음)은 여기 타지 않고, 인기 명소를 오전에 두는 쪽은 SmartPlanService가 담당한다.
@@ -258,8 +267,11 @@ public class RecommendationPipeline {
                                                                    List<Integer> childAges) {
         if (hint == RecommendationRequest.AvoidanceHint.CROWD) {
             return candidates.stream()
-                    .sorted(Comparator.comparing(RecommendationCandidate::getCrowdRate,
-                            Comparator.nullsLast(Comparator.naturalOrder())))
+                    .sorted(Comparator
+                            .comparing((RecommendationCandidate c) ->
+                                    c.getCongestionSensitivity() == CongestionSensitivity.INSENSITIVE ? 0 : 1)
+                            .thenComparing(RecommendationCandidate::getCrowdRate,
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
         }
         if (hint == RecommendationRequest.AvoidanceHint.WEATHER
@@ -267,12 +279,20 @@ public class RecommendationPipeline {
             boolean hasChildren = childAges != null && !childAges.isEmpty();
             return candidates.stream()
                     .sorted(Comparator
-                            .comparing((RecommendationCandidate c) ->
-                                    c.getMatchedTags() != null && c.getMatchedTags().contains("#실내") ? 0 : 1)
+                            .comparing((RecommendationCandidate c) -> indoorPreferred(c) ? 0 : 1)
+                            .thenComparing(c -> c.getRainSensitivity() == RainSensitivity.INSENSITIVE ? 0 : 1)
                             .thenComparing(c -> hasChildren && matchesKidsIndoorKeyword(c) ? 0 : 1))
                     .collect(Collectors.toList());
         }
         return candidates;
+    }
+
+    /** 실내 스냅샷이 있으면 그걸 쓰고, 없으면 Stage4가 붙인 #실내 태그를 본다. */
+    private static boolean indoorPreferred(RecommendationCandidate c) {
+        if (Boolean.TRUE.equals(c.getIndoor())) {
+            return true;
+        }
+        return c.getMatchedTags() != null && c.getMatchedTags().contains("#실내");
     }
 
     private boolean matchesKidsIndoorKeyword(RecommendationCandidate c) {

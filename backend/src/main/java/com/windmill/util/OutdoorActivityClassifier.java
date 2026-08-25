@@ -18,6 +18,9 @@ public final class OutdoorActivityClassifier {
         if (item == null) {
             return false;
         }
+        if (item.getIndoorYn() != null) {
+            return !item.getIndoorYn();
+        }
         // 명시적 태그가 최우선 - #실내/#맛집이 있으면 contentTypeId(예: 39=음식점)의 실내 추정보다 먼저 실내로 확정한다.
         if (hasExplicitIndoorTag(item)) {
             return false;
@@ -55,6 +58,9 @@ public final class OutdoorActivityClassifier {
     public static boolean hasIndoorSignal(ItineraryItem item) {
         if (item == null) {
             return false;
+        }
+        if (item.getIndoorYn() != null) {
+            return item.getIndoorYn();
         }
         if (hasExplicitIndoorTag(item)) {
             return true;

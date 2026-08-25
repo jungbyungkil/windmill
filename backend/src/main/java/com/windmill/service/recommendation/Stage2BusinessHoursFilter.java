@@ -3,11 +3,13 @@ package com.windmill.service.recommendation;
 import com.windmill.dto.RelatedCandidate;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.service.tourapi.TourAttractionService;
+import com.windmill.util.IntroFieldCatalog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -31,6 +33,7 @@ public class Stage2BusinessHoursFilter {
     private static final int EXTERNAL_CALL_CONCURRENCY = 4;
 
     private final TourAttractionService tourAttractionService;
+    private final SituationalTagService situationalTagService;
 
     public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates) {
         return Flux.fromIterable(candidates)
@@ -48,7 +51,8 @@ public class Stage2BusinessHoursFilter {
             return Mono.just(candidate);
         }
         return tourAttractionService.getDetail(candidate.getContentId(), candidate.getContentTypeId())
-                .map(detail -> applyDetail(candidate, detail))
+                .flatMap(detail -> Mono.fromCallable(() -> applyDetail(candidate, detail))
+                        .subscribeOn(Schedulers.boundedElastic()))
                 .defaultIfEmpty(openWithoutDetail(candidate))
                 .onErrorReturn(openWithoutDetail(candidate));
     }
@@ -87,7 +91,28 @@ public class Stage2BusinessHoursFilter {
         candidate.setAccessibleFriendly(BusinessHoursEvaluator.matchesAccessibleKeyword(
                 detail.getOverview(), candidate.getCategoryLcls(), candidate.getCategoryMcls(), candidate.getCategoryScls()));
         candidate.setAgeRangeText(BusinessHoursEvaluator.extractAgeRangeText(detail.getIntroFields()));
+
+        String overview = blankToNull(detail.getOverview());
+        candidate.setOverview(overview);
+        candidate.setDetailFacts(IntroFieldCatalog.toFacts(detail.getIntroFields()));
+        candidate.setCat3(detail.getCat3());
+
+        var tags = situationalTagService.ensureInferred(
+                candidate.getContentId(), candidate.getContentTypeId(), detail.getCat3(),
+                candidate.getPlaceName(), overview);
+        candidate.setIndoor(tags.getIndoorYn());
+        candidate.setRainSensitivity(tags.getRainSensitivity());
+        candidate.setCongestionSensitivity(tags.getCongestionSensitivity());
+        candidate.setInferredSource(tags.getInferredSource());
         return candidate;
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String t = value.replaceAll("<[^>]+>", " ").replace("&nbsp;", " ").trim();
+        return t.isBlank() ? null : t.replaceAll("\\s+", " ");
     }
 
     /** 상세조회 실패/빈 응답 - 보수적으로 영업중 취급하되 위치/요금 등 부가정보는 비워둔다 */

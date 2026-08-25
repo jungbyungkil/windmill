@@ -84,7 +84,10 @@ public class TourAttractionService {
                     .addr2(common.path("addr2").asText(null))
                     .mapX(common.path("mapx").asText(null))
                     .mapY(common.path("mapy").asText(null))
-                    .tel(common.path("tel").asText(null));
+                    .tel(common.path("tel").asText(null))
+                    .cat1(blankToNull(common.path("cat1").asText(null)))
+                    .cat2(blankToNull(common.path("cat2").asText(null)))
+                    .cat3(blankToNull(common.path("cat3").asText(null)));
         }
 
         builder.introFields(intro.isNull() ? Map.of() : jsonNodeToMap(intro));
@@ -94,6 +97,10 @@ public class TourAttractionService {
                 .collect(Collectors.toList()));
 
         return builder.build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private Map<String, String> jsonNodeToMap(JsonNode node) {
