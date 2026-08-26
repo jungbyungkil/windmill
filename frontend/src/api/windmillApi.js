@@ -259,6 +259,15 @@ export function registerPush(sessionId, { fcmToken, itineraryId } = {}) {
   });
 }
 
+/** 웹 푸시 구독 해제 */
+export function unregisterPush(sessionId, { fcmToken } = {}) {
+  return request('/push/register', {
+    method: 'DELETE',
+    sessionId,
+    body: { fcmToken },
+  });
+}
+
 /** 추천 기록 일정을 그대로 복제해 당일치기 시작 */
 export function startFromTripRecord(sessionId, id, { startDate }) {
   return request(`/trip-records/${id}/start`, {

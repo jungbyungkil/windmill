@@ -5,9 +5,12 @@ import {
   isIOS,
   isStandalone,
   isPushSupported,
+  isPushOptedOut,
   loadFirebaseWebConfig,
   requestPushToken,
   syncPushSubscription,
+  disablePush,
+  setPushOptedOut,
 } from '../utils/webPush';
 import { registerPush } from '../api/windmillApi';
 
@@ -22,17 +25,24 @@ const PUSH_STATUS_LABEL = {
   unsupported: '이 브라우저·환경은 웹 푸시를 지원하지 않아요.',
   unconfigured: '알림 권한은 허용됐지만, 푸시 서버(Firebase)가 아직 연결되지 않아 휴대폰으로 보낼 수 없어요.',
   token_failed: '알림 권한은 허용됐지만 기기 등록에 실패했어요. 잠시 후 다시 시도해 주세요.',
-  registered: '알림이 켜졌어요. 비·폭염·혼잡·동선 변수가 생기면 휴대폰으로 알려드려요.',
+  registered: '알림이 켜져 있어요. 끄면 이 기기로는 더 이상 보내지 않아요.',
+  disabled: '알림을 껐어요. 다시 켜면 비·폭염·혼잡·동선 변수를 휴대폰으로 알려드려요.',
+  disable_failed: '끄기에 실패했어요. 잠시 후 다시 시도해 주세요.',
 };
 
 /** 전체 메뉴 > 설정 - 글씨 크기(어르신 접근성), 알림(웹 푸시) */
 export default function SettingsScreen({ sessionId, itineraryId }) {
   const navigate = useNavigate();
   const [textScale, setTextScale] = useTextScale();
-  const [pushStatus, setPushStatus] = useState('idle');
+  const [pushStatus, setPushStatus] = useState(() => (isPushOptedOut() ? 'disabled' : 'idle'));
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     if (!sessionId || !isPushSupported()) return;
+    if (isPushOptedOut()) {
+      setPushStatus('disabled');
+      return;
+    }
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     let cancelled = false;
     syncPushSubscription(sessionId, itineraryId)
@@ -56,8 +66,9 @@ export default function SettingsScreen({ sessionId, itineraryId }) {
       setPushStatus('unsupported');
       return;
     }
-    setPushStatus('requesting');
+    setPushBusy(true);
     try {
+      setPushOptedOut(false);
       const token = await requestPushToken();
       if (Notification.permission === 'denied') {
         setPushStatus('denied');
@@ -71,10 +82,25 @@ export default function SettingsScreen({ sessionId, itineraryId }) {
       setPushStatus(await pushStatusAfterGrant());
     } catch {
       setPushStatus('token_failed');
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushBusy(true);
+    try {
+      await disablePush(sessionId);
+      setPushStatus('disabled');
+    } catch {
+      setPushStatus('disable_failed');
+    } finally {
+      setPushBusy(false);
     }
   }
 
   const iosNeedsHomeScreen = isIOS() && !isStandalone();
+  const pushOn = pushStatus === 'registered' || pushStatus === 'disable_failed';
 
   return (
     <div className="settings-screen">
@@ -107,9 +133,25 @@ export default function SettingsScreen({ sessionId, itineraryId }) {
             <p className="settings-section-hint">
               비·폭염·혼잡·동선이 꼬이면 앱을 닫아 두어도 휴대폰으로 알려드려요.
             </p>
-            <button type="button" className="btn-primary settings-push-btn" onClick={handleEnablePush} disabled={pushStatus === 'requesting'}>
-              {pushStatus === 'requesting' ? '확인 중...' : pushStatus === 'registered' ? '알림 켜짐' : '알림 켜기'}
-            </button>
+            {pushOn ? (
+              <button
+                type="button"
+                className="btn-secondary settings-push-btn"
+                onClick={handleDisablePush}
+                disabled={pushBusy}
+              >
+                {pushBusy ? '확인 중...' : '알림 끄기'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary settings-push-btn"
+                onClick={handleEnablePush}
+                disabled={pushBusy}
+              >
+                {pushBusy ? '확인 중...' : '알림 켜기'}
+              </button>
+            )}
             {PUSH_STATUS_LABEL[pushStatus] && (
               <p className="settings-section-hint settings-push-status">{PUSH_STATUS_LABEL[pushStatus]}</p>
             )}

@@ -37,4 +37,19 @@ public class PushController {
         pushSubscriptionRepository.save(sub);
         return ResponseEntity.noContent().build();
     }
+
+    /** 이 기기·세션의 푸시 구독 해제 - 스케줄러가 더 이상 이 토큰으로 보내지 않는다 */
+    @DeleteMapping("/register")
+    @Transactional
+    public ResponseEntity<Void> unregister(
+            @RequestHeader("X-Session-Id") String sessionId,
+            @RequestBody(required = false) PushRegisterRequest request) {
+        if (request != null && request.getFcmToken() != null && !request.getFcmToken().isBlank()) {
+            pushSubscriptionRepository.deleteByFcmToken(request.getFcmToken());
+        }
+        if (sessionId != null && !sessionId.isBlank()) {
+            pushSubscriptionRepository.deleteBySessionUuid(sessionId);
+        }
+        return ResponseEntity.noContent().build();
+    }
 }

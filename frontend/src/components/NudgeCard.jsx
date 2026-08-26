@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isPushOptedOut } from '../utils/webPush';
 
 const DISMISS_KEY = 'windtrail:dismissedNudgeIds';
 
@@ -95,6 +96,7 @@ export async function loadSituationByGeolocation(fetchSituation) {
 
 export function maybeNotifySituation(situation) {
   if (!situation || typeof Notification === 'undefined') return;
+  if (isPushOptedOut()) return;
   const needsAlert = situation.rainAlert || situation.heatAlert || (situation.crowdedPlaceCount > 0);
   if (!needsAlert) return;
   const key = `wm-sit-${situation.regionCode}-${situation.weatherLabel}`;

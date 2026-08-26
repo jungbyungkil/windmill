@@ -1,6 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
-import { getPublicConfig, registerPush } from '../api/windmillApi';
+import { deleteToken, getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
+import { getPublicConfig, registerPush, unregisterPush } from '../api/windmillApi';
+
+const PUSH_OPT_OUT_KEY = 'windtrail:pushOptOut';
 
 export function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -15,6 +17,23 @@ export function isStandalone() {
 
 export function isPushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
+}
+
+export function isPushOptedOut() {
+  try {
+    return localStorage.getItem(PUSH_OPT_OUT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setPushOptedOut(optedOut) {
+  try {
+    if (optedOut) localStorage.setItem(PUSH_OPT_OUT_KEY, '1');
+    else localStorage.removeItem(PUSH_OPT_OUT_KEY);
+  } catch {
+    /* 저장 실패해도 이번 방문의 호출부 상태로 충분하다 */
+  }
 }
 
 function envFirebaseConfig() {
@@ -143,9 +162,30 @@ export async function requestPushToken() {
  */
 export async function syncPushSubscription(sessionId, itineraryId) {
   if (!sessionId || !isPushSupported()) return false;
+  if (isPushOptedOut()) return false;
   if (Notification.permission !== 'granted') return false;
   const token = await getExistingPushToken();
   if (!token) return false;
   await registerPush(sessionId, { fcmToken: token, itineraryId });
+  return true;
+}
+
+/** 서버 구독 삭제 + FCM 토큰 폐기. 브라우저 알림 권한 자체는 JS로 회수할 수 없다. */
+export async function disablePush(sessionId) {
+  let token = null;
+  try {
+    token = await getExistingPushToken();
+  } catch {
+    /* 토큰이 없어도 세션 구독은 지운다 */
+  }
+  await unregisterPush(sessionId, { fcmToken: token });
+  try {
+    const config = await loadFirebaseWebConfig();
+    const messaging = config ? await getMessagingInstance(config) : null;
+    if (messaging) await deleteToken(messaging);
+  } catch {
+    /* 토큰 폐기는 실패해도 서버에서 이미 구독이 빠지면 발송이 멈춘다 */
+  }
+  setPushOptedOut(true);
   return true;
 }

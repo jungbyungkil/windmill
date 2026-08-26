@@ -12,4 +12,8 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
     List<PushSubscription> findBySessionUuid(String sessionUuid);
 
     List<PushSubscription> findByItineraryId(Long itineraryId);
+
+    void deleteByFcmToken(String fcmToken);
+
+    void deleteBySessionUuid(String sessionUuid);
 }
