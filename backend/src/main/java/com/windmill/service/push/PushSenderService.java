@@ -7,12 +7,15 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
+import com.google.firebase.messaging.WebpushConfig;
+import com.google.firebase.messaging.WebpushFcmOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -78,12 +81,30 @@ public class PushSenderService {
             return false;
         }
         try {
-            Message message = Message.builder()
+            Map<String, String> payload = new HashMap<>();
+            if (data != null) {
+                payload.putAll(data);
+            }
+            if (title != null) {
+                payload.put("title", title);
+            }
+            if (body != null) {
+                payload.put("body", body);
+            }
+            Message.Builder builder = Message.builder()
                     .setToken(fcmToken)
-                    .setNotification(Notification.builder().setTitle(title).setBody(body).build())
-                    .putAllData(data)
-                    .build();
-            fm.send(message);
+                    .setNotification(Notification.builder()
+                            .setTitle(title == null ? "" : title)
+                            .setBody(body == null ? "" : body)
+                            .build())
+                    .putAllData(payload);
+            String link = payload.get("url");
+            if (link != null && !link.isBlank()) {
+                builder.setWebpushConfig(WebpushConfig.builder()
+                        .setFcmOptions(WebpushFcmOptions.withLink(link))
+                        .build());
+            }
+            fm.send(builder.build());
             return true;
         } catch (FirebaseMessagingException e) {
             log.warn("[Push] 발송 실패 token={} : {}", fcmToken, e.toString());

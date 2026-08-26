@@ -132,6 +132,8 @@ docker run -p 8080:8080 -e TOURAPI_KEY=디코딩키 windmill
 | `KAKAO_REST_API_KEY` | 선택(길찾기 도로 경로). 없으면 지도에 직선 연결 |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Postgres 접속 정보 |
 | `PORT` | 서버 포트(플랫폼이 주입하는 경우 그대로) |
+| `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` | 선택(웹 푸시 서버 발송). 없으면 폰 알림 비활성 |
+| `FIREBASE_WEB_API_KEY` 등 `FIREBASE_WEB_*` | 선택(브라우저 FCM 토큰). 웹 앱 설정 + VAPID |
 
 프론트 빌드 시(Vite):
 
@@ -155,6 +157,26 @@ docker run -p 8080:8080 -e TOURAPI_KEY=디코딩키 windmill
 2. **JavaScript 키** → `frontend/.env`의 `VITE_KAKAO_JS_KEY`
 3. 플랫폼 → Web 도메인: `http://localhost:5173`, Render 배포 URL 등
 4. **REST API 키** → 서버 `KAKAO_REST_API_KEY` (길찾기 전용, 프론트에 넣지 말 것)
+
+---
+
+## 웹 푸시 (비·폭염·혼잡·동선 알림)
+
+앱을 닫아 둔 상태에서도 휴대폰 알림을 받으려면 **Firebase Cloud Messaging**이 필요합니다. 키가 없으면 바람개비·알림 탭은 그대로 동작하고, 폰 푸시만 나가지 않습니다.
+
+1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트 생성 후 **웹 앱** 추가
+2. 프로젝트 설정 → **일반** → 내 앱(웹) 값을 서버 환경변수로 넣기
+   - `FIREBASE_WEB_API_KEY`
+   - `FIREBASE_WEB_AUTH_DOMAIN`
+   - `FIREBASE_WEB_PROJECT_ID`
+   - `FIREBASE_WEB_MESSAGING_SENDER_ID`
+   - `FIREBASE_WEB_APP_ID`
+3. 프로젝트 설정 → **클라우드 메시징** → 웹 푸시 인증서 → 키 쌍 생성 → `FIREBASE_WEB_VAPID_KEY`
+4. 프로젝트 설정 → **서비스 계정** → 새 비공개 키(JSON) 생성 후 base64 인코딩 → `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`
+5. Firebase 콘솔 → 인증/앱 설정에서 배포 도메인(및 로컬 `localhost`)을 허용
+6. 앱 **프로필 → 알림 켜기** (iPhone은 먼저 홈 화면에 추가)
+
+프론트는 `/api/public-config`에서 웹 설정을 읽으므로, 위 값은 **백엔드 런타임 환경변수**만 넣으면 됩니다. 프론트 재빌드는 필요 없습니다.
 
 ---
 
@@ -194,6 +216,7 @@ windmill/
 - [ ] GitHub 저장소 접근 권한
 - [ ] `TOURAPI_KEY` (Decoding) 및 data.go.kr 활용신청 목록 공유
 - [ ] (선택) `OPENAI_API_KEY`
-- [ ] (선택) 카카오 `KAKAO_REST_API_KEY` + 프론트 `VITE_KAKAO_JS_KEY` 및 Web 도메인 등록
+      - [ ] (선택) 카카오 `KAKAO_REST_API_KEY` + 프론트 `VITE_KAKAO_JS_KEY` 및 Web 도메인 등록
+      - [ ] (선택) 웹 푸시 Firebase `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` + `FIREBASE_WEB_*`
 - [ ] (배포 담당) Render 등 대시보드·Postgres 접속 정보
 - [ ] 로컬에서 `mvn spring-boot:run` + `npm run dev`로 스마트 동선 생성까지 확인

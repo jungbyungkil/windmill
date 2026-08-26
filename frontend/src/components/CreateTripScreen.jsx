@@ -36,6 +36,11 @@ function formatDraftDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()} (${weekday})`;
 }
 
+function isTodayDate(dateStr) {
+  if (!dateStr) return false;
+  return String(dateStr).slice(0, 10) === todayIso();
+}
+
 export default function CreateTripScreen({
   sessionId,
   onCreate,
@@ -607,41 +612,50 @@ export default function CreateTripScreen({
             <p>날짜별 당일치기를 이어 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
           </div>
           <ul className="draft-resume-list">
-            {ongoingTrips.map((trip, index) => (
-              <li key={trip.itineraryId} className="draft-resume-row">
-                <div className="draft-resume-row-main">
-                  <span className="draft-resume-day">당일치기 {index + 1}</span>
-                  <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
-                  {trip.regionDisplayName && (
-                    <span className="draft-resume-region">{trip.regionDisplayName}</span>
-                  )}
-                  <span className="draft-resume-meta">
-                    {trip.placeCount ?? 0}곳
-                    {trip.companionType && COMPANION_LABEL[trip.companionType]
-                      ? ` · ${COMPANION_LABEL[trip.companionType]}`
-                      : ''}
-                  </span>
-                </div>
-                <div className="draft-resume-row-actions">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => onResumeDraft?.(trip.itineraryId)}
-                  >
-                    이어하기
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn danger draft-resume-delete"
-                    aria-label="일정 삭제"
-                    disabled={deletingDraftId === trip.itineraryId}
-                    onClick={() => handleDeleteDraft(trip)}
-                  >
-                    {deletingDraftId === trip.itineraryId ? '…' : '🗑️'}
-                  </button>
-                </div>
-              </li>
-            ))}
+            {ongoingTrips.map((trip, index) => {
+              const isToday = isTodayDate(trip.startDate);
+              return (
+                <li
+                  key={trip.itineraryId}
+                  className={`draft-resume-row${isToday ? ' draft-resume-row--today' : ''}`}
+                >
+                  <div className="draft-resume-row-main">
+                    <span className="draft-resume-day">당일치기 {index + 1}</span>
+                    <span className="draft-resume-date-group">
+                      <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
+                      {isToday && <span className="draft-resume-today-tag">오늘</span>}
+                    </span>
+                    {trip.regionDisplayName && (
+                      <span className="draft-resume-region">{trip.regionDisplayName}</span>
+                    )}
+                    <span className="draft-resume-meta">
+                      {trip.placeCount ?? 0}곳
+                      {trip.companionType && COMPANION_LABEL[trip.companionType]
+                        ? ` · ${COMPANION_LABEL[trip.companionType]}`
+                        : ''}
+                    </span>
+                  </div>
+                  <div className="draft-resume-row-actions">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => onResumeDraft?.(trip.itineraryId)}
+                    >
+                      이어하기
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn danger draft-resume-delete"
+                      aria-label="일정 삭제"
+                      disabled={deletingDraftId === trip.itineraryId}
+                      onClick={() => handleDeleteDraft(trip)}
+                    >
+                      {deletingDraftId === trip.itineraryId ? '…' : '🗑️'}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : draftItineraryId && onResumeDraft ? (

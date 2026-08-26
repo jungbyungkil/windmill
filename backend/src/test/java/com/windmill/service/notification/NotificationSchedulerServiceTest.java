@@ -261,4 +261,39 @@ class NotificationSchedulerServiceTest {
         verify(pushSenderService, never()).send(eq("token-already-sent"), anyString(), anyString(), anyMap());
         verify(pushSenderService, times(1)).send(eq("token-fresh"), anyString(), anyString(), anyMap());
     }
+
+    @Test
+    void sessionOnlySubscription_withoutItineraryId_stillSends() {
+        Itinerary itinerary = itineraryWithItems();
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        itinerary.setLastPeriodicNotifiedAt(null);
+        stubActive(itinerary);
+        stubTrigger(TriggerLevel.NORMAL);
+        when(pushSubscriptionRepository.findByItineraryId(1L)).thenReturn(List.of());
+        PushSubscription sessionSub = PushSubscription.builder()
+                .id(2L).sessionUuid("session-1").fcmToken("token-session").itineraryId(null).build();
+        when(pushSubscriptionRepository.findBySessionUuid("session-1")).thenReturn(List.of(sessionSub));
+
+        scheduler.runTick(NOW);
+
+        verify(pushSenderService, times(1)).send(eq("token-session"), anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void sameTokenOnItineraryAndSession_sendsOnce() {
+        Itinerary itinerary = itineraryWithItems();
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        itinerary.setLastPeriodicNotifiedAt(null);
+        stubActive(itinerary);
+        stubTrigger(TriggerLevel.NORMAL);
+        PushSubscription itinerarySub = sub("token-shared");
+        PushSubscription sessionSub = PushSubscription.builder()
+                .id(9L).sessionUuid("session-1").fcmToken("token-shared").itineraryId(null).build();
+        when(pushSubscriptionRepository.findByItineraryId(1L)).thenReturn(List.of(itinerarySub));
+        when(pushSubscriptionRepository.findBySessionUuid("session-1")).thenReturn(List.of(sessionSub));
+
+        scheduler.runTick(NOW);
+
+        verify(pushSenderService, times(1)).send(eq("token-shared"), anyString(), anyString(), anyMap());
+    }
 }

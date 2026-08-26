@@ -29,7 +29,11 @@ public class PushController {
                 .orElseGet(PushSubscription::new);
         sub.setSessionUuid(sessionId);
         sub.setFcmToken(request.getFcmToken());
-        sub.setItineraryId(request.getItineraryId());
+        // 일정 없이 설정에서만 켠 구독은 세션 공통으로 두고, 이후 여행이 생기면 itineraryId만 보강한다.
+        // null로 덮어쓰면 스케줄러가 일정 구독을 놓칠 수 있다.
+        if (request.getItineraryId() != null) {
+            sub.setItineraryId(request.getItineraryId());
+        }
         pushSubscriptionRepository.save(sub);
         return ResponseEntity.noContent().build();
     }

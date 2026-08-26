@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => {
         '/api': 'http://localhost:8080',
       },
     },
+    optimizeDeps: {
+      include: ['firebase/app', 'firebase/messaging'],
+    },
     build: {
       outDir: '../backend/src/main/resources/static',
       emptyOutDir: true,

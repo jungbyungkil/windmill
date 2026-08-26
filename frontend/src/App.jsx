@@ -34,6 +34,7 @@ import GuideScreen from './components/GuideScreen';
 import ExitConfirmModal from './components/ExitConfirmModal';
 import { recordView } from './utils/viewHistory';
 import { placeSnapshotFields } from './utils/placeSnapshot';
+import { syncPushSubscription } from './utils/webPush';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -187,6 +188,12 @@ export default function App() {
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, [resumeDraftItinerary, navigate]);
+
+  // 알림 권한이 이미 있으면 FCM 토큰을 서버에 등록(팝업 없음). 여행이 생기면 itineraryId도 보강.
+  useEffect(() => {
+    if (!sessionId) return;
+    syncPushSubscription(sessionId, itineraryId).catch(() => {});
+  }, [sessionId, itineraryId]);
 
   // 사용자가 일정을 연 경우에만 로드. 새로고침/재방문 시 메인 대시보드를 유지한다.
   useEffect(() => {
@@ -1452,7 +1459,7 @@ export default function App() {
                     <h2>프로필</h2>
                     <p>글씨 크기와 알림을 맞추고, 내 여행·이용 가이드로 이어가요.</p>
                   </header>
-                  <SettingsScreen sessionId={sessionId} />
+                  <SettingsScreen sessionId={sessionId} itineraryId={itineraryId} />
                 </section>
               </main>
 
@@ -1558,7 +1565,7 @@ export default function App() {
           itinerary ? <Navigate to="/trip#profile" replace /> : (
             <>
               <BackHeader title="프로필 · 설정" onMenuClick={() => setMenuOpen(true)} />
-              <SettingsScreen sessionId={sessionId} />
+              <SettingsScreen sessionId={sessionId} itineraryId={itineraryId} />
             </>
           )
         }

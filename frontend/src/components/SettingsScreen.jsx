@@ -1,7 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useTextScale from '../hooks/useTextScale';
-import { isIOS, isStandalone, isPushSupported, requestPushToken } from '../utils/webPush';
+import {
+  isIOS,
+  isStandalone,
+  isPushSupported,
+  loadFirebaseWebConfig,
+  requestPushToken,
+  syncPushSubscription,
+} from '../utils/webPush';
 import { registerPush } from '../api/windmillApi';
 
 const TEXT_SCALE_OPTIONS = [
@@ -13,15 +20,36 @@ const TEXT_SCALE_OPTIONS = [
 const PUSH_STATUS_LABEL = {
   denied: '브라우저에서 알림이 차단돼 있어요. 브라우저 설정에서 허용해 주세요.',
   unsupported: '이 브라우저·환경은 웹 푸시를 지원하지 않아요.',
-  granted: '알림이 켜졌어요. 서비스 준비가 끝나는 대로 실시간 변수 알림을 보내드릴게요.',
-  registered: '알림이 켜졌어요.',
+  unconfigured: '알림 권한은 허용됐지만, 푸시 서버(Firebase)가 아직 연결되지 않아 휴대폰으로 보낼 수 없어요.',
+  token_failed: '알림 권한은 허용됐지만 기기 등록에 실패했어요. 잠시 후 다시 시도해 주세요.',
+  registered: '알림이 켜졌어요. 비·폭염·혼잡·동선 변수가 생기면 휴대폰으로 알려드려요.',
 };
 
 /** 전체 메뉴 > 설정 - 글씨 크기(어르신 접근성), 알림(웹 푸시) */
-export default function SettingsScreen({ sessionId }) {
+export default function SettingsScreen({ sessionId, itineraryId }) {
   const navigate = useNavigate();
   const [textScale, setTextScale] = useTextScale();
   const [pushStatus, setPushStatus] = useState('idle');
+
+  useEffect(() => {
+    if (!sessionId || !isPushSupported()) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    let cancelled = false;
+    syncPushSubscription(sessionId, itineraryId)
+      .then(async (ok) => {
+        if (cancelled) return;
+        setPushStatus(ok ? 'registered' : await pushStatusAfterGrant());
+      })
+      .catch(() => {
+        if (!cancelled) setPushStatus('token_failed');
+      });
+    return () => { cancelled = true; };
+  }, [sessionId, itineraryId]);
+
+  async function pushStatusAfterGrant() {
+    const config = await loadFirebaseWebConfig();
+    return config ? 'token_failed' : 'unconfigured';
+  }
 
   async function handleEnablePush() {
     if (!isPushSupported()) {
@@ -29,16 +57,20 @@ export default function SettingsScreen({ sessionId }) {
       return;
     }
     setPushStatus('requesting');
-    const token = await requestPushToken();
-    if (Notification.permission === 'denied') {
-      setPushStatus('denied');
-      return;
-    }
-    if (token) {
-      await registerPush(sessionId, { fcmToken: token });
-      setPushStatus('registered');
-    } else {
-      setPushStatus('granted');
+    try {
+      const token = await requestPushToken();
+      if (Notification.permission === 'denied') {
+        setPushStatus('denied');
+        return;
+      }
+      if (token) {
+        await registerPush(sessionId, { fcmToken: token, itineraryId });
+        setPushStatus('registered');
+        return;
+      }
+      setPushStatus(await pushStatusAfterGrant());
+    } catch {
+      setPushStatus('token_failed');
     }
   }
 
@@ -73,10 +105,10 @@ export default function SettingsScreen({ sessionId }) {
         ) : (
           <>
             <p className="settings-section-hint">
-              비·폭염·혼잡 같은 실시간 변수가 생기면 알려드려요.
+              비·폭염·혼잡·동선이 꼬이면 앱을 닫아 두어도 휴대폰으로 알려드려요.
             </p>
             <button type="button" className="btn-primary settings-push-btn" onClick={handleEnablePush} disabled={pushStatus === 'requesting'}>
-              {pushStatus === 'requesting' ? '확인 중...' : '알림 켜기'}
+              {pushStatus === 'requesting' ? '확인 중...' : pushStatus === 'registered' ? '알림 켜짐' : '알림 켜기'}
             </button>
             {PUSH_STATUS_LABEL[pushStatus] && (
               <p className="settings-section-hint settings-push-status">{PUSH_STATUS_LABEL[pushStatus]}</p>

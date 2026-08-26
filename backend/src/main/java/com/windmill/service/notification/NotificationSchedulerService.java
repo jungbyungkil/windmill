@@ -24,6 +24,7 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -76,7 +77,7 @@ public class NotificationSchedulerService {
     }
 
     private void processItinerary(Itinerary itinerary, LocalDateTime now) {
-        List<PushSubscription> subs = pushSubscriptionRepository.findByItineraryId(itinerary.getId());
+        List<PushSubscription> subs = resolveSubscriptions(itinerary);
         if (subs.isEmpty()) {
             return; // 구독자 없으면 트리거 계산 자체를 생략 - 비용 절감
         }
@@ -91,6 +92,39 @@ public class NotificationSchedulerService {
         handlePeriodicAndSlots(itinerary, subs, result, now);  // Type1 + Type2 - 필요 시 병합
 
         itineraryRepository.save(itinerary); // items는 cascade ALL이라 slotNotified도 함께 저장
+    }
+
+    /**
+     * 일정에 묶인 구독 + 같은 세션의 공통 구독(설정에서만 켠 경우 itineraryId=null)을 토큰 기준으로 합친다.
+     * 설정 화면은 일정 ID 없이 등록하므로, 일정 ID만 조회하면 여행 당일 알림이 전부 빠진다.
+     */
+    List<PushSubscription> resolveSubscriptions(Itinerary itinerary) {
+        Map<String, PushSubscription> byToken = new LinkedHashMap<>();
+        if (itinerary.getId() != null) {
+            for (PushSubscription sub : pushSubscriptionRepository.findByItineraryId(itinerary.getId())) {
+                putSubscription(byToken, sub);
+            }
+        }
+        if (itinerary.getSessionUuid() != null && !itinerary.getSessionUuid().isBlank()) {
+            for (PushSubscription sub : pushSubscriptionRepository.findBySessionUuid(itinerary.getSessionUuid())) {
+                putSubscriptionIfAbsent(byToken, sub);
+            }
+        }
+        return List.copyOf(byToken.values());
+    }
+
+    private static void putSubscription(Map<String, PushSubscription> byToken, PushSubscription sub) {
+        if (sub == null || sub.getFcmToken() == null || sub.getFcmToken().isBlank()) {
+            return;
+        }
+        byToken.put(sub.getFcmToken(), sub);
+    }
+
+    private static void putSubscriptionIfAbsent(Map<String, PushSubscription> byToken, PushSubscription sub) {
+        if (sub == null || sub.getFcmToken() == null || sub.getFcmToken().isBlank()) {
+            return;
+        }
+        byToken.putIfAbsent(sub.getFcmToken(), sub);
     }
 
     private void handleStatusDegradation(Itinerary itinerary, List<PushSubscription> subs,

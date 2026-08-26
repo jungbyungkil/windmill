@@ -18,15 +18,54 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicConfigController {
 
     private final String kakaoJsKey;
+    private final String firebaseApiKey;
+    private final String firebaseAuthDomain;
+    private final String firebaseProjectId;
+    private final String firebaseMessagingSenderId;
+    private final String firebaseAppId;
+    private final String firebaseVapidKey;
 
-    public PublicConfigController(@Value("${kakao.js-key:}") String kakaoJsKey) {
-        this.kakaoJsKey = kakaoJsKey == null ? "" : kakaoJsKey.trim();
+    public PublicConfigController(
+            @Value("${kakao.js-key:}") String kakaoJsKey,
+            @Value("${firebase.web.api-key:}") String firebaseApiKey,
+            @Value("${firebase.web.auth-domain:}") String firebaseAuthDomain,
+            @Value("${firebase.web.project-id:}") String firebaseProjectId,
+            @Value("${firebase.web.messaging-sender-id:}") String firebaseMessagingSenderId,
+            @Value("${firebase.web.app-id:}") String firebaseAppId,
+            @Value("${firebase.web.vapid-key:}") String firebaseVapidKey) {
+        this.kakaoJsKey = trimToEmpty(kakaoJsKey);
+        this.firebaseApiKey = trimToEmpty(firebaseApiKey);
+        this.firebaseAuthDomain = trimToEmpty(firebaseAuthDomain);
+        this.firebaseProjectId = trimToEmpty(firebaseProjectId);
+        this.firebaseMessagingSenderId = trimToEmpty(firebaseMessagingSenderId);
+        this.firebaseAppId = trimToEmpty(firebaseAppId);
+        this.firebaseVapidKey = trimToEmpty(firebaseVapidKey);
     }
 
     @GetMapping
     public PublicConfigResponse get() {
+        boolean firebaseReady = !firebaseApiKey.isBlank()
+                && !firebaseAuthDomain.isBlank()
+                && !firebaseProjectId.isBlank()
+                && !firebaseMessagingSenderId.isBlank()
+                && !firebaseAppId.isBlank()
+                && !firebaseVapidKey.isBlank();
         return PublicConfigResponse.builder()
-                .kakaoJsKey(kakaoJsKey.isBlank() ? null : kakaoJsKey)
+                .kakaoJsKey(blankToNull(kakaoJsKey))
+                .firebaseApiKey(firebaseReady ? firebaseApiKey : null)
+                .firebaseAuthDomain(firebaseReady ? blankToNull(firebaseAuthDomain) : null)
+                .firebaseProjectId(firebaseReady ? firebaseProjectId : null)
+                .firebaseMessagingSenderId(firebaseReady ? firebaseMessagingSenderId : null)
+                .firebaseAppId(firebaseReady ? firebaseAppId : null)
+                .firebaseVapidKey(firebaseReady ? firebaseVapidKey : null)
                 .build();
+    }
+
+    private static String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }
