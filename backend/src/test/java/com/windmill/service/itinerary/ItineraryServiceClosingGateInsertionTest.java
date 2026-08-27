@@ -64,7 +64,7 @@ class ItineraryServiceClosingGateInsertionTest {
                 .scheduledTime(scheduledTime)
                 .visitDate(TOMORROW)
                 .build();
-        // mapX/mapY 미설정 - travelMinutes()가 항상 기본 20분을 쓰도록 해 테스트를 결정적으로 만든다.
+        // mapX/mapY 미설정 - travelMinutes()가 기본 10분을 쓰도록 해 테스트를 결정적으로 만든다.
     }
 
     private Itinerary itineraryWith(ItineraryItem... items) {
@@ -107,12 +107,12 @@ class ItineraryServiceClosingGateInsertionTest {
         assertEquals("11:00", byOrder.get(0).getScheduledTime());
         assertEquals("농업박물관", byOrder.get(1).getPlaceName());
         assertEquals("12:20", byOrder.get(1).getScheduledTime());
-        // 마감(16:50-60분=15:50) 안에 드는 가장 늦은 자리 - 농업박물관(12:20) 뒤, 국도발전전시관 앞
+        // 마감(16:50-60분=15:50) 안에 드는 가장 늦은 자리 - 농업박물관(12:20+45+10=13:15) 뒤
         assertEquals("우표박물관", byOrder.get(2).getPlaceName());
-        assertEquals("13:55", byOrder.get(2).getScheduledTime());
+        assertEquals("13:15", byOrder.get(2).getScheduledTime());
         // 뒤로 밀린 국도발전전시관은 새 위치 기준으로 시각이 재계산된다
         assertEquals("국도발전전시관", byOrder.get(3).getPlaceName());
-        assertEquals("15:30", byOrder.get(3).getScheduledTime());
+        assertEquals("14:10", byOrder.get(3).getScheduledTime());
     }
 
     /**

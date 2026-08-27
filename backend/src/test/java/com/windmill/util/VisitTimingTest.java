@@ -64,8 +64,13 @@ class VisitTimingTest {
         List<com.windmill.dto.DetailFact> facts = List.of(com.windmill.dto.DetailFact.builder()
                 .key("spendtime").label("관람소요시간").value("1시간 30분").build());
         assertEquals(90, VisitTiming.stayMinutes(14, "기획전", "전시", List.of("#전시"), "A02060300", facts));
-        assertEquals(90, VisitTiming.stayMinutes(14, "유료전시", null, List.of("#전시"), "A02060300", null));
-        assertEquals(120, VisitTiming.stayMinutes(15, "뮤지컬", null, null, null, null));
+        assertEquals(60, VisitTiming.stayMinutes(14, "유료전시", null, List.of("#전시"), "A02060300", null));
+        assertEquals(90, VisitTiming.stayMinutes(15, "뮤지컬", null, null, null, null));
+        assertEquals(25, VisitTiming.stayMinutes(null, "스타벅스 속초점", "카페", List.of("#카페")));
+        assertEquals(40, VisitTiming.stayMinutes(39, "한식당", "맛집", List.of("#맛집")));
+        assertEquals(45, VisitTiming.stayMinutes(12, "남산타워", "관광지", null));
+        assertEquals(15, VisitTiming.packingStayMinutes(null, "스타벅스 속초점", "카페", List.of("#카페"), null, null));
+        assertEquals(22, VisitTiming.packingStayMinutes(12, "남산타워", "관광지", null, null, null));
     }
 
     @Test
@@ -101,11 +106,11 @@ class VisitTimingTest {
     @Test
     void suggestAlternativeStarts_prefersTimesAfterTheRequestedSlot() {
         List<VisitTiming.Occupied> occupied = List.of(new VisitTiming.Occupied(
-                1L, "세종뮤지엄갤러리", LocalTime.of(11, 30), LocalTime.of(12, 45)));
+                1L, "세종뮤지엄갤러리", LocalTime.of(11, 30), LocalTime.of(12, 15)));
         List<String> times = VisitTiming.suggestAlternativeStarts(
-                LocalTime.of(11, 30), LocalTime.of(18, 0), 75, occupied, LocalTime.of(9, 0), null);
+                LocalTime.of(11, 30), LocalTime.of(18, 0), 45, occupied, LocalTime.of(9, 0), null);
         assertFalse(times.isEmpty());
-        assertEquals("12:45", times.get(0));
+        assertEquals("12:15", times.get(0));
         assertTrue(times.size() <= 3);
     }
 }

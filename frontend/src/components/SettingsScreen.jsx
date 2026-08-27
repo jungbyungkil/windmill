@@ -25,8 +25,8 @@ const PUSH_STATUS_LABEL = {
   unsupported: '이 브라우저·환경은 웹 푸시를 지원하지 않아요.',
   unconfigured: '알림 권한은 허용됐지만, 푸시 서버(Firebase)가 아직 연결되지 않아 휴대폰으로 보낼 수 없어요.',
   token_failed: '알림 권한은 허용됐지만 기기 등록에 실패했어요. 잠시 후 다시 시도해 주세요.',
-  registered: '알림이 켜져 있어요. 끄면 이 기기로는 더 이상 보내지 않아요.',
-  disabled: '알림을 껐어요. 다시 켜면 비·폭염·혼잡·동선 변수를 휴대폰으로 알려드려요.',
+  registered: '알림이 켜져 있어요. 순풍이면 첫 일정 30분 전과 여행 마무리를, 주황·빨강이면 바로 알려드려요.',
+  disabled: '알림을 껐어요. 다시 켜면 일정 시작·마무리와 비·폭염·혼잡·동선 변수를 휴대폰으로 알려드려요.',
   disable_failed: '끄기에 실패했어요. 잠시 후 다시 시도해 주세요.',
 };
 
@@ -131,7 +131,7 @@ export default function SettingsScreen({ sessionId, itineraryId }) {
         ) : (
           <>
             <p className="settings-section-hint">
-              비·폭염·혼잡·동선이 꼬이면 앱을 닫아 두어도 휴대폰으로 알려드려요.
+              순풍이면 오늘 첫 일정 30분 전과 마지막 일정 종료 뒤에, 주황·빨강(비·폭염·혼잡·동선)이면 감지되는 즉시 휴대폰으로 알려드려요.
             </p>
             {pushOn ? (
               <button

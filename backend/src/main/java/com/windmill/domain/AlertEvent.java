@@ -28,7 +28,7 @@ public class AlertEvent {
     @Column(nullable = false)
     private Long itineraryId;
 
-    /** nudgeId 접두사 재사용 - STATUS / PERIODIC / SLOT / PERIODIC+SLOT (필터링 여지용, UI엔 아직 미노출) */
+    /** nudgeId 접두사 재사용 - STATUS / DAY_START / DAY_END (필터링 여지용, UI엔 아직 미노출) */
     @Column(nullable = false, length = 20)
     private String kind;
 

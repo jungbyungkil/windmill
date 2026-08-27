@@ -242,10 +242,14 @@ public class DevSeedService {
                         .icon("🚫").headline("🟡 정기휴무인 곳이 있어요")
                         .detail("오늘 방문 예정인 한 곳이 정기휴무예요. 대체 장소를 골라보세요.")
                         .createdAt(now.minusMinutes(58)).build(),
-                AlertEvent.builder().itineraryId(itineraryId).kind("PERIODIC").level(TriggerLevel.NORMAL)
-                        .icon("🟢").headline("🟢 바람따라가 지켜보고 있어요")
-                        .detail("지금까지 계획대로 순항 중이에요.")
-                        .createdAt(now.minusHours(1)).build()
+                AlertEvent.builder().itineraryId(itineraryId).kind("DAY_START").level(TriggerLevel.NORMAL)
+                        .icon("🟢").headline("🟢 오늘 일정 시작 30분 전입니다")
+                        .detail("오늘 일정 시작 30분 전입니다. 순풍이 부니 바람따라 여행해주세요.")
+                        .createdAt(now.minusHours(1)).build(),
+                AlertEvent.builder().itineraryId(itineraryId).kind("DAY_END").level(TriggerLevel.NORMAL)
+                        .icon("🟢").headline("🟢 오늘 모든 일정을 마칩니다")
+                        .detail("오늘 모든 일정을 마칩니다. 여행 마무리를 남겨주세요.")
+                        .createdAt(now.minusMinutes(90)).build()
         );
         alertEventRepository.saveAll(samples);
         return samples.size();

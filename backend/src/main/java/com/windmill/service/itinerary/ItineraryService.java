@@ -293,12 +293,12 @@ public class ItineraryService {
         List<ItineraryItem> dayItems = null;
         Integer insertBeforeDayIndex = null;
         LocalTime close = VisitTiming.resolveCloseTime(request);
-        int stay = VisitTiming.stayMinutes(request);
+        int packingStay = VisitTiming.packingStayMinutes(request);
         int closeBuffer = VisitTiming.closeBufferMinutes(
                 request.getCloseTime(), request.getUseTimeText(), request.getDetailFacts());
 
         if (scheduledTime != null) {
-            assertScheduleFeasible(itinerary, visitDate, scheduledTime, null, close, stay, closeBuffer);
+            assertScheduleFeasible(itinerary, visitDate, scheduledTime, null, close, packingStay, closeBuffer);
         } else {
             LocalTime endArrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
             ClosingTimeGate.CheckResult endCheck = ClosingTimeGate.check(close, endArrival, closeBuffer);
@@ -362,7 +362,7 @@ public class ItineraryService {
 
     /**
      * 명시된 시각으로 넣거나 옮길 때: 같은 날 겹침을 먼저, 그다음 마감. 둘 다면 겹침만 노출.
-     * 이동시간은 점유 구간에 넣지 않는다.
+     * 겹침은 최소 체류(packing)로만 본다 - 계획 체류만큼 비워 두지 않아도 담을 수 있게.
      */
     private void assertScheduleFeasible(Itinerary itinerary, LocalDate visitDate, String scheduledTime,
                                         Long excludeItemId, LocalTime close, int stayMinutes, int closeBuffer) {
@@ -401,7 +401,7 @@ public class ItineraryService {
                 .map(i -> new TimeConflictGate.Occupant(
                         i.getId(), i.getPlaceName(),
                         ClosingTimeGate.parseHhMm(i.getScheduledTime()),
-                        VisitTiming.occupancyEnd(i)))
+                        VisitTiming.occupancyEndPacking(i)))
                 .toList();
     }
 
@@ -447,16 +447,9 @@ public class ItineraryService {
         return rounded.isBefore(LocalTime.of(9, 0)) ? LocalTime.of(9, 0) : rounded;
     }
 
-    /** Haversine 기반 이동시간 추정(km당 12분, 10~90분 클램프) - 마감 게이트 추정 전용, TarRlte에 이동시간 필드가 없어서 씀 */
+    /** Haversine 기반 이동시간 추정 - 좌표 없으면 기본 10분, 가까우면 5분부터. */
     private int travelMinutes(String mapX1, String mapY1, String mapX2, String mapY2) {
-        if (mapX1 == null || mapY1 == null || mapX2 == null || mapY2 == null) {
-            return 20;
-        }
-        Double km = GeoUtils.distanceKmSafe(mapX1, mapY1, mapX2, mapY2);
-        if (km == null) {
-            return 20;
-        }
-        return Math.max(10, Math.min((int) Math.ceil(km * 12.0), 90));
+        return GeoUtils.estimateTravelMinutes(mapX1, mapY1, mapX2, mapY2);
     }
 
     private record InsertionPlan(int index, LocalTime arrival) {
@@ -537,11 +530,11 @@ public class ItineraryService {
                     ? LocalDate.parse(request.getVisitDate())
                     : item.getVisitDate();
             LocalTime close = VisitTiming.resolveCloseTime(item);
-            int stay = VisitTiming.stayMinutes(item);
+            int packingStay = VisitTiming.packingStayMinutes(item);
             int closeBuffer = VisitTiming.closeBufferMinutes(
                     item.getCloseTime(), item.getUseTimeText(), item.getDetailFacts());
             assertScheduleFeasible(itinerary, targetVisitDate, request.getScheduledTime(), item.getId(),
-                    close, stay, closeBuffer);
+                    close, packingStay, closeBuffer);
             item.setScheduledTime(request.getScheduledTime());
         }
         if (request.getVisitDate() != null && !request.getVisitDate().isBlank()) {
@@ -772,7 +765,7 @@ public class ItineraryService {
             return false;
         }
         List<TimeConflictGate.Occupant> occupants = occupantsOf(itinerary, visitDate);
-        LocalTime end = VisitTiming.occupancyEnd(arrival, VisitTiming.ATTRACTION_STAY_MINUTES, resolvedClose);
+        LocalTime end = VisitTiming.occupancyEnd(arrival, VisitTiming.defaultPackingStayMinutes(), resolvedClose);
         return !TimeConflictGate.check(arrival, end, occupants, excludeItemId).blocked();
     }
 

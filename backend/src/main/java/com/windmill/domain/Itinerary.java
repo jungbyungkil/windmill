@@ -117,16 +117,34 @@ public class Itinerary {
     @Column(unique = true, length = 64)
     private String shareToken;
 
-    /** 알림 스케줄러가 직전 틱에서 관측한 바람개비 상태 - 상태 악화(Type3) 즉시 알림의 판정 기준선.
-     *  null이면 아직 비교 대상이 없다는 뜻(첫 관측 틱은 기준선만 세우고 알림은 보내지 않는다). 발송
-     *  여부와 무관하게 매 틱 최신 레벨로 갱신한다 - "WARNING→NORMAL→WARNING"처럼 되돌아온 경우도
-     *  다시 악화로 감지하기 위함. adultAgeGroup과 동일하게 nullable Enum이라 ColumnDefault 불필요. */
+    /** 알림 스케줄러가 직전 틱에서 관측한 바람개비 상태. 발송 여부와 무관하게 매 틱 최신 레벨로
+     *  갱신한다 - NORMAL로 돌아왔다가 다시 주황·빨강이 되면 즉시 알림을 다시 보내기 위함. */
     @Enumerated(EnumType.STRING)
     private TriggerLevel lastKnownTriggerLevel;
 
-    /** 정기 상태 알림(30분 주기)의 마지막 발송 시각. 같은 일정에 구독(탭/기기)이 여러 개여도
-     *  "발송 대상인가"는 일정 단위로 한 번만 판정하고 대상이면 전체 구독에 팬아웃한다. null이면
-     *  아직 한 번도 안 보낸 상태로 취급해 여행 시작 후 첫 유효 틱에 바로 발송 대상이 된다. */
+    /**
+     * 직전 틱에서 관측한 변경 필요 원인 지문(RAIN,HEAT,CROWD,ROUTE 등). 같은 원인이 유지되면
+     * 주황·빨강 알림을 다시 보내지 않고, 새 깃발이 생기면 즉시 재발송한다.
+     */
+    @Column(length = 120)
+    private String lastKnownTriggerSignature;
+
+    /**
+     * 오늘 일정 중 가장 이른 시작 시각 30분 전 순풍 알림을 이미 보냈는지(또는 창을 놓쳐 마킹만 했는지).
+     * 당일치기라 날짜별 리셋이 필요 없어 boolean 하나로 충분.
+     */
+    @Builder.Default
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean dayStartNotified = false;
+
+    /** 마지막 일정 점유 종료 후 "여행 마무리" 알림을 이미 보냈는지(또는 유예창을 놓쳐 마킹만 했는지). */
+    @Builder.Default
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean dayEndNotified = false;
+
+    /** 예전 30분 주기 하트비트 시각. 새 스케줄러는 쓰지 않지만 기존 컬럼을 유지한다. */
     private LocalDateTime lastPeriodicNotifiedAt;
 
     @PrePersist

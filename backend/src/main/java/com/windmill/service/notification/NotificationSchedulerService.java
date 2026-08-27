@@ -11,45 +11,44 @@ import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.PushSubscriptionRepository;
 import com.windmill.service.push.PushSenderService;
 import com.windmill.service.trigger.TriggerDetectionService;
+import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.KoreaClock;
+import com.windmill.util.VisitTiming;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
- * 여행 당일 알림 3종을 한 틱에서 함께 처리한다 - 정기 상태 알림(30분 주기, 순풍이어도 발송),
- * 슬롯 할일 알림(scheduledTime 도달), 상태 악화 즉시 알림(레벨이 나빠지는 순간, 항상 독립 발송).
- * 정기+슬롯은 같은 틱에 겹치면 하나로 병합하고, 상태 악화 알림은 절대 병합하지 않는다(최우선순위 -
- * 다른 알림과 타이밍이 겹쳐도 별도로 나간다).
+ * 여행 당일 알림:
+ * <ol>
+ *   <li>순풍(NORMAL) - 오늘 일정 중 가장 이른 시작 시각 30분 전, 마지막 일정 점유 종료 직후.</li>
+ *   <li>주황·빨강(WARNING/DANGER) - 비·폭염·혼잡·동선 등 변경이 필요한 순간 즉시.
+ *       같은 원인이 유지되면 재발송하지 않고, 새 원인이 생기거나 단계가 나빠지면 다시 보낸다.</li>
+ * </ol>
+ * 주황·빨강은 북엔드와 절대 병합하지 않는다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationSchedulerService {
 
-    private static final int PERIODIC_INTERVAL_MINUTES = 30;
-    /** 슬롯 "방금 도달" 판정 유예창 - 이 안에 들어오면 발송 대상, 넘으면 발송 없이 마킹만(캐치업 스팸 방지) */
-    private static final int SLOT_DUE_GRACE_MINUTES = 10;
-    private static final int WINDOW_START_BUFFER_MINUTES = 30;
-    private static final int WINDOW_END_BUFFER_MINUTES = 120;
-    /** 일정에 파싱 가능한 scheduledTime이 하나도 없을 때의 폴백 활성 시간창 */
-    private static final LocalTime FALLBACK_WINDOW_START = LocalTime.of(8, 30);
-    private static final LocalTime FALLBACK_WINDOW_END = LocalTime.of(20, 0);
+    static final int START_LEAD_MINUTES = 30;
+    /** 마지막 일정 종료 후 이 안에 들어오면 마무리 알림. 넘으면 발송 없이 마킹만(캐치업 스팸 방지). */
+    static final int DAY_END_GRACE_MINUTES = 120;
 
     private final ItineraryRepository itineraryRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
@@ -63,8 +62,7 @@ public class NotificationSchedulerService {
         runTick(KoreaClock.now());
     }
 
-    /** 실제 처리 본문 - KoreaClock을 목킹하지 않고 명시적 now로 테스트하기 위해 분리
-     *  (BusinessHoursEvaluatorTest가 명시적 날짜를 넘기는 방식과 동일). */
+    /** 실제 처리 본문 - KoreaClock을 목킹하지 않고 명시적 now로 테스트하기 위해 분리. */
     void runTick(LocalDateTime now) {
         List<Itinerary> active = itineraryRepository.findActiveTodayForNotification(now.toLocalDate());
         for (Itinerary itinerary : active) {
@@ -79,7 +77,7 @@ public class NotificationSchedulerService {
     private void processItinerary(Itinerary itinerary, LocalDateTime now) {
         List<PushSubscription> subs = resolveSubscriptions(itinerary);
         if (subs.isEmpty()) {
-            return; // 구독자 없으면 트리거 계산 자체를 생략 - 비용 절감
+            return;
         }
 
         TriggerResult result = triggerDetectionService.detectForItinerary(itinerary)
@@ -88,15 +86,14 @@ public class NotificationSchedulerService {
             return;
         }
 
-        handleStatusDegradation(itinerary, subs, result, now); // Type3 - 독립, 항상
-        handlePeriodicAndSlots(itinerary, subs, result, now);  // Type1 + Type2 - 필요 시 병합
+        handleUrgentStatus(itinerary, subs, result, now);
+        handleDayBookends(itinerary, subs, result, now);
 
-        itineraryRepository.save(itinerary); // items는 cascade ALL이라 slotNotified도 함께 저장
+        itineraryRepository.save(itinerary);
     }
 
     /**
      * 일정에 묶인 구독 + 같은 세션의 공통 구독(설정에서만 켠 경우 itineraryId=null)을 토큰 기준으로 합친다.
-     * 설정 화면은 일정 ID 없이 등록하므로, 일정 ID만 조회하면 여행 당일 알림이 전부 빠진다.
      */
     List<PushSubscription> resolveSubscriptions(Itinerary itinerary) {
         Map<String, PushSubscription> byToken = new LinkedHashMap<>();
@@ -127,132 +124,174 @@ public class NotificationSchedulerService {
         byToken.putIfAbsent(sub.getFcmToken(), sub);
     }
 
-    private void handleStatusDegradation(Itinerary itinerary, List<PushSubscription> subs,
-                                          TriggerResult result, LocalDateTime now) {
+    /**
+     * 주황·빨강은 처음 감지되는 즉시 보낸다(구독 직후 첫 틱이어도). 같은 원인 유지 중이면 침묵하고,
+     * 비·폭염·혼잡·동선 등 새 깃발이 생기거나 단계가 나빠지면 다시 보낸다.
+     */
+    private void handleUrgentStatus(Itinerary itinerary, List<PushSubscription> subs,
+                                    TriggerResult result, LocalDateTime now) {
         TriggerLevel oldLevel = itinerary.getLastKnownTriggerLevel();
         TriggerLevel newLevel = result.getLevel();
-        itinerary.setLastKnownTriggerLevel(newLevel); // 발송 여부와 무관하게 항상 갱신
+        String oldSig = itinerary.getLastKnownTriggerSignature() == null
+                ? "" : itinerary.getLastKnownTriggerSignature();
+        String newSig = triggerSignature(result);
+        if (newSig.isEmpty() && isUrgent(newLevel)) {
+            newSig = "LEVEL:" + newLevel;
+        }
 
-        // oldLevel == null(최초 관측)이면 기준선만 세우고 알림은 보내지 않는다 - 구독 직후 첫 틱에
-        // 이미 WARNING/DANGER인 상태를 "방금 악화됐다"고 오판하지 않기 위함.
-        boolean worsened = oldLevel != null && newLevel != null && newLevel.ordinal() > oldLevel.ordinal();
-        if (!worsened) {
+        itinerary.setLastKnownTriggerLevel(newLevel);
+        itinerary.setLastKnownTriggerSignature(newSig);
+
+        if (!isUrgent(newLevel)) {
             return;
         }
 
-        String nudgeId = "STATUS:" + oldLevel + "->" + newLevel + "@" + minuteKey(now);
+        boolean fromNormalOrUnknown = oldLevel == null || oldLevel == TriggerLevel.NORMAL;
+        boolean worsened = oldLevel != null && newLevel.ordinal() > oldLevel.ordinal();
+        boolean newProblem = !addedFlags(oldSig, newSig).isEmpty();
+        if (!fromNormalOrUnknown && !worsened && !newProblem) {
+            return;
+        }
+
+        String nudgeId = "STATUS:" + newSig + "@" + minuteKey(now);
         String title = composer.statusTitle(newLevel);
         String body = composer.statusBody(result);
         recordAlertEvent(itinerary, "STATUS", result, title, body);
-        dispatch(itinerary, subs, title, body, nudgeId, now);
+        dispatch(itinerary, subs, title, body, nudgeId, now, false);
     }
 
-    private void handlePeriodicAndSlots(Itinerary itinerary, List<PushSubscription> subs,
-                                         TriggerResult result, LocalDateTime now) {
-        markStaleSlotsWithoutSending(itinerary, now);
-
-        TripWindow window = resolveWindow(itinerary);
-        if (!window.contains(now.toLocalTime())) {
+    private void handleDayBookends(Itinerary itinerary, List<PushSubscription> subs,
+                                   TriggerResult result, LocalDateTime now) {
+        TripBounds bounds = resolveBounds(itinerary, now.toLocalDate());
+        if (bounds == null) {
             return;
         }
-
-        boolean periodicDue = itinerary.getLastPeriodicNotifiedAt() == null
-                || Duration.between(itinerary.getLastPeriodicNotifiedAt(), now).toMinutes() >= PERIODIC_INTERVAL_MINUTES;
-        List<ItineraryItem> justReached = findJustReachedSlots(itinerary, now);
-
-        if (!periodicDue && justReached.isEmpty()) {
-            return;
-        }
-
-        String nudgeId;
-        String title;
-        String body;
-        String kind;
-        if (periodicDue && !justReached.isEmpty()) {
-            nudgeId = "PERIODIC+SLOT:" + idsOf(justReached) + "@" + minuteKey(now);
-            title = composer.mergedTitle();
-            body = composer.mergedBody(result, justReached);
-            kind = "PERIODIC+SLOT";
-        } else if (periodicDue) {
-            nudgeId = "PERIODIC@" + minuteKey(now);
-            title = composer.periodicTitle();
-            body = composer.periodicBody(result);
-            kind = "PERIODIC";
-        } else {
-            nudgeId = "SLOT:" + idsOf(justReached) + "@" + minuteKey(now);
-            title = composer.slotTitle(justReached);
-            body = composer.slotBody(justReached);
-            kind = "SLOT";
-        }
-
-        recordAlertEvent(itinerary, kind, result, title, body);
-        dispatch(itinerary, subs, title, body, nudgeId, now);
-
-        if (periodicDue) {
-            itinerary.setLastPeriodicNotifiedAt(now);
-        }
-        justReached.forEach(item -> item.setSlotNotified(true));
-    }
-
-    /** [now-유예창, now] 구간에 막 들어온 미통보 슬롯들 - 여러 항목이 같은 시각에 몰려도 한 번에 병합해 보낸다 */
-    private List<ItineraryItem> findJustReachedSlots(Itinerary itinerary, LocalDateTime now) {
         LocalTime nowTime = now.toLocalTime();
-        List<ItineraryItem> result = new ArrayList<>();
-        for (ItineraryItem item : itinerary.getItems()) {
-            if (item.isSlotNotified()) {
-                continue;
+
+        if (!itinerary.isDayStartNotified()) {
+            LocalTime dueAt = bounds.firstStart().minusMinutes(START_LEAD_MINUTES);
+            if (dueAt.isAfter(bounds.firstStart())) {
+                dueAt = LocalTime.of(0, 0); // 자정 넘김 clamp (당일치기)
             }
-            LocalTime slotTime = parseTime(item.getScheduledTime());
-            if (slotTime == null) {
-                continue;
-            }
-            long minutesSince = Duration.between(slotTime, nowTime).toMinutes();
-            if (minutesSince >= 0 && minutesSince <= SLOT_DUE_GRACE_MINUTES) {
-                result.add(item);
+            boolean inLeadWindow = !nowTime.isBefore(dueAt) && nowTime.isBefore(bounds.firstStart());
+            if (inLeadWindow && result.getLevel() == TriggerLevel.NORMAL) {
+                String title = composer.dayStartTitle();
+                String body = composer.dayStartBody();
+                recordBookend(itinerary, "DAY_START", title, body);
+                dispatch(itinerary, subs, title, body, "DAY_START@" + minuteKey(now), now, false);
+                itinerary.setDayStartNotified(true);
+            } else if (!nowTime.isBefore(bounds.firstStart())) {
+                itinerary.setDayStartNotified(true); // 창을 놓침 - 발송 없이 마킹
             }
         }
-        return result;
-    }
 
-    /** 유예창보다 더 과거에 이미 지났고 아직 미통보인 슬롯 - 발송 없이 notified만 마킹(배포 재시작 등으로
-     *  인한 캐치업 스팸 방지). 미래 슬롯은 그대로 둔다(아직 도달 전). */
-    private void markStaleSlotsWithoutSending(Itinerary itinerary, LocalDateTime now) {
-        LocalTime nowTime = now.toLocalTime();
-        for (ItineraryItem item : itinerary.getItems()) {
-            if (item.isSlotNotified()) {
-                continue;
-            }
-            LocalTime slotTime = parseTime(item.getScheduledTime());
-            if (slotTime == null) {
-                continue;
-            }
-            long minutesSince = Duration.between(slotTime, nowTime).toMinutes();
-            if (minutesSince > SLOT_DUE_GRACE_MINUTES) {
-                item.setSlotNotified(true);
+        if (!itinerary.isDayEndNotified()) {
+            long minutesSinceEnd = Duration.between(bounds.lastEnd(), nowTime).toMinutes();
+            if (minutesSinceEnd > DAY_END_GRACE_MINUTES) {
+                itinerary.setDayEndNotified(true);
+            } else if (minutesSinceEnd >= 0 && result.getLevel() == TriggerLevel.NORMAL) {
+                String title = composer.dayEndTitle();
+                String body = composer.dayEndBody();
+                recordBookend(itinerary, "DAY_END", title, body);
+                dispatch(itinerary, subs, title, body, "DAY_END@" + minuteKey(now), now, true);
+                itinerary.setDayEndNotified(true);
             }
         }
     }
 
-    /** 일정 항목들의 scheduledTime min/max ± 버퍼. 파싱 가능한 시각이 하나도 없으면 폴백 시간창 */
-    private TripWindow resolveWindow(Itinerary itinerary) {
-        List<LocalTime> times = itinerary.getItems().stream()
-                .map(item -> parseTime(item.getScheduledTime()))
-                .filter(Objects::nonNull)
-                .toList();
-        if (times.isEmpty()) {
-            return new TripWindow(FALLBACK_WINDOW_START, FALLBACK_WINDOW_END);
+    /** 오늘 항목 중 가장 이른 시작 ~ 가장 늦은 점유 종료. 시각이 하나도 없으면 null. */
+    TripBounds resolveBounds(Itinerary itinerary, LocalDate today) {
+        LocalTime firstStart = null;
+        LocalTime lastEnd = null;
+        for (ItineraryItem item : itinerary.getItems()) {
+            LocalDate visit = item.getVisitDate() != null ? item.getVisitDate() : itinerary.getStartDate();
+            if (visit != null && !visit.equals(today)) {
+                continue;
+            }
+            LocalTime start = ClosingTimeGate.parseHhMm(item.getScheduledTime());
+            if (start == null) {
+                continue;
+            }
+            if (firstStart == null || start.isBefore(firstStart)) {
+                firstStart = start;
+            }
+            LocalTime end = VisitTiming.occupancyEnd(item);
+            if (end == null) {
+                end = start;
+            }
+            if (lastEnd == null || end.isAfter(lastEnd)) {
+                lastEnd = end;
+            }
         }
-        LocalTime min = Collections.min(times);
-        LocalTime max = Collections.max(times);
-        return new TripWindow(subtractBuffer(min, WINDOW_START_BUFFER_MINUTES), addBuffer(max, WINDOW_END_BUFFER_MINUTES));
+        if (firstStart == null || lastEnd == null) {
+            return null;
+        }
+        return new TripBounds(firstStart, lastEnd);
+    }
+
+    static String triggerSignature(TriggerResult result) {
+        if (result == null) {
+            return "";
+        }
+        List<String> parts = new ArrayList<>();
+        if (result.isWeatherTrigger()) {
+            parts.add("RAIN");
+        }
+        if (result.isHeatUrgent()) {
+            parts.add("HEAT_URGENT");
+        } else if (result.isHeatTrigger()) {
+            parts.add("HEAT");
+        }
+        if (result.isCrowdUrgent()) {
+            parts.add("CROWD_URGENT");
+        } else if (result.isCrowdTrigger()) {
+            parts.add("CROWD");
+        }
+        if (result.isRouteTangleTrigger()) {
+            parts.add("ROUTE");
+        }
+        if (result.isTravelTimeTrigger()) {
+            parts.add("TRAVEL");
+        }
+        if (result.isClosedDayTrigger()) {
+            parts.add("CLOSED");
+        }
+        if (result.isHoursEndedTrigger()) {
+            parts.add("HOURS");
+        }
+        return String.join(",", parts);
+    }
+
+    private static Set<String> addedFlags(String oldSig, String newSig) {
+        Set<String> added = parseFlags(newSig);
+        added.removeAll(parseFlags(oldSig));
+        return added;
+    }
+
+    private static Set<String> parseFlags(String signature) {
+        Set<String> flags = new LinkedHashSet<>();
+        if (signature == null || signature.isBlank()) {
+            return flags;
+        }
+        for (String part : signature.split(",")) {
+            if (!part.isBlank()) {
+                flags.add(part.trim());
+            }
+        }
+        return flags;
+    }
+
+    private static boolean isUrgent(TriggerLevel level) {
+        return level == TriggerLevel.WARNING || level == TriggerLevel.DANGER;
     }
 
     private void dispatch(Itinerary itinerary, List<PushSubscription> subs, String title, String body,
-                           String nudgeId, LocalDateTime now) {
+                          String nudgeId, LocalDateTime now, boolean finish) {
         String todayKey = now.toLocalDate() + ":" + nudgeId;
+        String url = "/?open=" + itinerary.getId() + (finish ? "&finish=1" : "");
         Map<String, String> data = Map.of(
                 "itineraryId", String.valueOf(itinerary.getId()),
-                "url", "/?open=" + itinerary.getId());
+                "url", url);
         for (PushSubscription sub : subs) {
             if (todayKey.equals(sub.getLastSentKey())) {
                 log.info("[Notification] 중복 스킵 itinerary={} nudgeId={}", itinerary.getId(), nudgeId);
@@ -265,7 +304,6 @@ public class NotificationSchedulerService {
         }
     }
 
-    /** 구독자별 dispatch 루프 밖에서 일정당 한 번만 - 실제로 발송을 시도한 알림만 이력에 남긴다 */
     private void recordAlertEvent(Itinerary itinerary, String kind, TriggerResult result, String title, String body) {
         alertEventRepository.save(AlertEvent.builder()
                 .itineraryId(itinerary.getId())
@@ -277,40 +315,21 @@ public class NotificationSchedulerService {
                 .build());
     }
 
-    private static LocalTime parseTime(String scheduledTime) {
-        if (scheduledTime == null || scheduledTime.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalTime.parse(scheduledTime);
-        } catch (DateTimeParseException e) {
-            return null;
-        }
-    }
-
-    /** 자정을 넘어가는 예외 케이스는 당일 끝/시작으로 clamp한다(당일치기라 다음날로 안 넘김) */
-    private static LocalTime addBuffer(LocalTime t, int minutes) {
-        LocalTime result = t.plusMinutes(minutes);
-        return result.isBefore(t) ? LocalTime.of(23, 59) : result;
-    }
-
-    private static LocalTime subtractBuffer(LocalTime t, int minutes) {
-        LocalTime result = t.minusMinutes(minutes);
-        return result.isAfter(t) ? LocalTime.of(0, 0) : result;
-    }
-
-    private static String idsOf(List<ItineraryItem> items) {
-        return items.stream().map(ItineraryItem::getId).filter(Objects::nonNull)
-                .sorted().map(String::valueOf).collect(Collectors.joining(","));
+    private void recordBookend(Itinerary itinerary, String kind, String title, String body) {
+        alertEventRepository.save(AlertEvent.builder()
+                .itineraryId(itinerary.getId())
+                .kind(kind)
+                .level(TriggerLevel.NORMAL)
+                .icon("🟢")
+                .headline(title)
+                .detail(body)
+                .build());
     }
 
     private static String minuteKey(LocalDateTime now) {
         return now.truncatedTo(ChronoUnit.MINUTES).toString();
     }
 
-    private record TripWindow(LocalTime start, LocalTime end) {
-        boolean contains(LocalTime t) {
-            return !t.isBefore(start) && !t.isAfter(end);
-        }
+    record TripBounds(LocalTime firstStart, LocalTime lastEnd) {
     }
 }

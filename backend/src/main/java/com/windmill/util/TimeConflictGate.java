@@ -6,7 +6,8 @@ import java.util.List;
 /**
  * 같은 날 이미 예정된 다른 일정과 시간대가 겹치는지 검사(마감시간 게이트와 독립적인 원인).
  *
- * <p>비교는 같은 날짜 슬롯끼리만. 점유 구간은 scheduledTime ~ occupancyEnd(체류, 마감으로 캡).
+ * <p>비교는 같은 날짜 슬롯끼리만. 점유 구간은 scheduledTime ~ 최소 체류(packing) 종료.
+ * 계획 체류(카페 25분, 관광 45분)만큼 비워 두지 않아도, 같은 시각만 아니면 담을 수 있게 한다.
  * 겹침 공식: {@code (A.시작 < B.종료) AND (A.종료 > B.시작)}. 이동시간은 포함하지 않는다.
  *
  * <p>시각은 KST 벽시계 {@link LocalTime}. UTC Instant와 비교하지 않는다(폐점일 UTC 버그와 동일 패턴).
@@ -26,7 +27,7 @@ public final class TimeConflictGate {
         }
         LocalTime end = candidateEnd != null
                 ? candidateEnd
-                : candidateStart.plusMinutes(VisitTiming.ATTRACTION_STAY_MINUTES);
+                : candidateStart.plusMinutes(VisitTiming.defaultPackingStayMinutes());
         for (Occupant o : occupants) {
             if (o.start() == null) {
                 continue;
@@ -36,7 +37,7 @@ public final class TimeConflictGate {
             }
             LocalTime occupantEnd = o.end() != null
                     ? o.end()
-                    : o.start().plusMinutes(VisitTiming.ATTRACTION_STAY_MINUTES);
+                    : o.start().plusMinutes(VisitTiming.defaultPackingStayMinutes());
             if (VisitTiming.overlaps(candidateStart, end, o.start(), occupantEnd)) {
                 String message = String.format("%s에 이미 다른 일정(%s)이 있어요.",
                         ClosingTimeGate.formatFriendly(o.start()), o.placeName());
@@ -52,7 +53,7 @@ public final class TimeConflictGate {
 
     public record Occupant(Long itemId, String placeName, LocalTime start, LocalTime end) {
         public Occupant(Long itemId, String placeName, LocalTime start) {
-            this(itemId, placeName, start, start == null ? null : start.plusMinutes(STAY_MINUTES));
+            this(itemId, placeName, start, start == null ? null : start.plusMinutes(VisitTiming.defaultPackingStayMinutes()));
         }
     }
 

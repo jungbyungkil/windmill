@@ -19,20 +19,26 @@ import java.util.regex.Pattern;
  * 마감은 TourAPI usetime/playtime에서 가장 늦은 끝 시각을 쓰고, 없으면 유형별 상식 기본값
  * (박물관 17시, 유료 전시 20시, 공연·축제 22시, 식사 21시 등)을 쓴다.
  *
- * <p>이동시간 버퍼는 겹침 판단에 넣지 않는다(카카오 모빌리티 비용 트레이드오프와 같은 축 — 점유는
- * "한 사람이 같은 시각에 두 장소에 있을 수 없다"만 본다).
+ * <p>계획 체류는 "보통 이렇게 머문다" 값이고, 겹침 검사에는 더 짧은 최소 체류를 쓴다.
+ * 카페 테이크아웃·짧은 이동·간단 식사를 앞뒤 일정 사이에 넣을 수 있게 하기 위함.
+ * 이동시간은 점유 구간에 넣지 않는다({@link GeoUtils#estimateTravelMinutes}는 다음 슬롯 배치용).
  *
  * <p>시각은 전부 KST 벽시계 {@link LocalTime}(HH:mm). Instant/UTC와 비교하지 않는다.
  */
 public final class VisitTiming {
 
-    /** 관광/문화 기본 체류. TourAPI에 평균 체류 필드가 없어 하드코딩. spendtime이 있으면 그걸 우선. */
-    public static final int ATTRACTION_STAY_MINUTES = 75;
-    public static final int MEAL_STAY_MINUTES = 60;
-    /** 유료 전시·기획전 — 관람이 박물관보다 긴 편 */
-    public static final int EXHIBITION_STAY_MINUTES = 90;
-    /** 공연·축제 — 앵커 플랜과 같은 2시간 가정 */
-    public static final int PERFORMANCE_STAY_MINUTES = 120;
+    /** 관광 기본 체류. 포토스팟·짧은 둘러보기가 흔해 75분은 앞뒤 일정을 너무 밀어낸다. */
+    public static final int ATTRACTION_STAY_MINUTES = 45;
+    /** 가족 일정 관광 체류(스마트 동선). */
+    public static final int FAMILY_ATTRACTION_STAY_MINUTES = 60;
+    /** 카페·디저트. 테이크아웃·커피 한 잔을 전제로 짧게. */
+    public static final int CAFE_STAY_MINUTES = 25;
+    /** 간단 식사. 코스 만찬이 아니라 당일치기 점심/저녁. */
+    public static final int MEAL_STAY_MINUTES = 40;
+    /** 유료 전시·기획전 */
+    public static final int EXHIBITION_STAY_MINUTES = 60;
+    /** 공연·축제 — 실제 관람 시간이 있어 다른 유형보다 길게 */
+    public static final int PERFORMANCE_STAY_MINUTES = 90;
     /** 박물관·기념관·도서관 등 마감 미상일 때 (한국 문화시설 흔한 폐관) */
     public static final LocalTime DEFAULT_CLOSE_MUSEUM = LocalTime.of(17, 0);
     /** 미술관·일반 문화시설 마감 미상일 때 */
@@ -66,8 +72,10 @@ public final class VisitTiming {
     private static final Pattern STAY_HOUR_MIN = Pattern.compile("(\\d+)\\s*시간\\s*(\\d+)\\s*분");
     private static final Pattern STAY_HOUR = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*시간");
     private static final Pattern STAY_MIN = Pattern.compile("(\\d+)\\s*분");
-    private static final int MIN_STAY = 30;
+    private static final int MIN_STAY = 20;
     private static final int MAX_STAY = 180;
+    private static final int PACKING_FLOOR_MINUTES = 15;
+    private static final int PERFORMANCE_PACKING_FLOOR_MINUTES = 40;
 
     private VisitTiming() {
     }
@@ -175,7 +183,10 @@ public final class VisitTiming {
         if (fromApi != null) {
             return fromApi;
         }
-        if (isMeal(contentTypeId, placeName, category, tags) || isCafe(placeName, category, tags)) {
+        if (isCafe(placeName, category, tags)) {
+            return CAFE_STAY_MINUTES;
+        }
+        if (isMeal(contentTypeId, placeName, category, tags)) {
             return MEAL_STAY_MINUTES;
         }
         if (isPerformance(contentTypeId, placeName, category, tags, cat3)) {
@@ -187,6 +198,39 @@ public final class VisitTiming {
             return EXHIBITION_STAY_MINUTES;
         }
         return ATTRACTION_STAY_MINUTES;
+    }
+
+    /**
+     * 겹침 검사용 최소 체류. 계획 체류보다 짧게 잡아, 같은 시각만 아니면 카페·짧은 관광을
+     * 기존 일정 사이에 넣을 수 있게 한다. 공연은 실제 관람이라 절반만 줄인다.
+     */
+    public static int packingStayMinutes(Integer contentTypeId, String placeName, String category, List<String> tags,
+                                         String cat3, List<DetailFact> detailFacts) {
+        int stay = stayMinutes(contentTypeId, placeName, category, tags, cat3, detailFacts);
+        if (isPerformance(contentTypeId, placeName, category, tags, cat3)) {
+            return Math.max(PERFORMANCE_PACKING_FLOOR_MINUTES, stay * 2 / 3);
+        }
+        return Math.max(PACKING_FLOOR_MINUTES, stay / 2);
+    }
+
+    public static int defaultPackingStayMinutes() {
+        return Math.max(PACKING_FLOOR_MINUTES, ATTRACTION_STAY_MINUTES / 2);
+    }
+
+    public static int packingStayMinutes(ItineraryItem item) {
+        if (item == null) {
+            return defaultPackingStayMinutes();
+        }
+        return packingStayMinutes(item.getContentTypeId(), item.getPlaceName(), item.getCategory(), item.getTags(),
+                null, item.getDetailFacts());
+    }
+
+    public static int packingStayMinutes(AddItineraryItemRequest request) {
+        if (request == null) {
+            return Math.max(PACKING_FLOOR_MINUTES, ATTRACTION_STAY_MINUTES / 2);
+        }
+        return packingStayMinutes(request.getContentTypeId(), request.getPlaceName(), request.getCategory(),
+                request.getTags(), request.getCat3(), request.getDetailFacts());
     }
 
     public static int stayMinutes(ItineraryItem item) {
@@ -231,6 +275,15 @@ public final class VisitTiming {
         }
         LocalTime start = ClosingTimeGate.parseHhMm(item.getScheduledTime());
         return occupancyEnd(start, stayMinutes(item), resolveCloseTime(item));
+    }
+
+    /** 겹침 검사용 점유 종료 — {@link #packingStayMinutes(ItineraryItem)} 기준. */
+    public static LocalTime occupancyEndPacking(ItineraryItem item) {
+        if (item == null) {
+            return null;
+        }
+        LocalTime start = ClosingTimeGate.parseHhMm(item.getScheduledTime());
+        return occupancyEnd(start, packingStayMinutes(item), resolveCloseTime(item));
     }
 
     /** 표준 구간 겹침: (A.시작 &lt; B.종료) AND (A.종료 &gt; B.시작). 끝점만 맞닿으면 겹치지 않음. */

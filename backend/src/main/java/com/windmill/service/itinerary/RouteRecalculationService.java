@@ -5,6 +5,7 @@ import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.MapRouteRequest;
 import com.windmill.service.recommendation.BusinessHoursEvaluator;
 import com.windmill.util.ClosingTimeGate;
+import com.windmill.util.GeoUtils;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.VisitOrderOptimizer;
 import com.windmill.util.VisitTiming;
@@ -220,7 +221,7 @@ public class RouteRecalculationService {
                 return minutes[a][b];
             }
         }
-        return 20;
+        return GeoUtils.DEFAULT_TRAVEL_MINUTES;
     }
 
     /**

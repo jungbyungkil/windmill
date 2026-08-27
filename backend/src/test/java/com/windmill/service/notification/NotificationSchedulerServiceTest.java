@@ -12,13 +12,16 @@ import com.windmill.service.push.PushSenderService;
 import com.windmill.service.trigger.TriggerDetectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -32,13 +35,16 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * NotificationSchedulerService의 판단 로직(정기/슬롯/상태악화 + 병합/우선순위/중복방지) 검증.
- * Firebase 미설정 상태에서도 "발송을 시도했는가"만 검증하면 되므로 PushSenderService는 목킹한다
- * (send()는 미설정 시 안전하게 false를 반환할 뿐 예외를 던지지 않음 - 실제 코드도 이 계약에 의존).
+ * 순풍 북엔드(첫 일정 30분 전 / 마지막 종료)와 주황·빨강 즉시 알림 판정 검증.
  */
 class NotificationSchedulerServiceTest {
 
-    private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 20, 10, 5);
+    private static final LocalDateTime DAY = LocalDateTime.of(2026, 8, 20, 0, 0);
+    /** 첫 일정 10:00 기준 30분 전 창 */
+    private static final LocalDateTime LEAD_NOW = LocalDateTime.of(2026, 8, 20, 9, 32);
+    /** 관광 기본 체류 75분 → 10:00 시작이면 점유 종료 11:15 */
+    private static final LocalDateTime AFTER_END = LocalDateTime.of(2026, 8, 20, 11, 16);
+    private static final LocalDateTime MID_TRIP = LocalDateTime.of(2026, 8, 20, 10, 5);
 
     private ItineraryRepository itineraryRepository;
     private PushSubscriptionRepository pushSubscriptionRepository;
@@ -66,23 +72,31 @@ class NotificationSchedulerServiceTest {
                 .sessionUuid("session-1")
                 .signguFullCode("51210")
                 .regionDisplayName("강원특별자치도 속초시")
-                .startDate(NOW.toLocalDate())
-                .endDate(NOW.toLocalDate())
+                .startDate(DAY.toLocalDate())
+                .endDate(DAY.toLocalDate())
                 .items(new ArrayList<>(List.of(items)))
                 .build();
     }
 
-    private void stubActive(Itinerary itinerary) {
-        when(itineraryRepository.findActiveTodayForNotification(NOW.toLocalDate())).thenReturn(List.of(itinerary));
+    private ItineraryItem placeAt(String time) {
+        return ItineraryItem.builder().id(10L).placeName("속초등대전망대")
+                .category("관광지").scheduledTime(time).visitDate(DAY.toLocalDate()).build();
+    }
+
+    private void stubActive(Itinerary itinerary, LocalDateTime at) {
+        when(itineraryRepository.findActiveTodayForNotification(at.toLocalDate())).thenReturn(List.of(itinerary));
     }
 
     private void stubSubscriptions(PushSubscription... subs) {
         when(pushSubscriptionRepository.findByItineraryId(1L)).thenReturn(List.of(subs));
     }
 
-    private void stubTrigger(TriggerLevel level, String... details) {
-        TriggerResult result = TriggerResult.builder().level(level).triggerDetails(List.of(details)).build();
+    private void stubTrigger(TriggerResult result) {
         when(triggerDetectionService.detectForItinerary(any(Itinerary.class))).thenReturn(Mono.just(result));
+    }
+
+    private void stubTrigger(TriggerLevel level, String... details) {
+        stubTrigger(TriggerResult.builder().level(level).triggerDetails(List.of(details)).build());
     }
 
     private PushSubscription sub(String token) {
@@ -90,201 +104,312 @@ class NotificationSchedulerServiceTest {
     }
 
     @Test
-    void statusDegradation_sendsType3StandaloneAndUpdatesLevel() {
-        Itinerary itinerary = itineraryWithItems();
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(NOW.minusMinutes(5)); // 정기 알림은 아직 안 겹치게
-        stubActive(itinerary);
+    void firstObservationWarning_sendsImmediately() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, MID_TRIP);
         stubSubscriptions(sub("token-1"));
-        stubTrigger(TriggerLevel.WARNING, "비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요.");
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .weatherTrigger(true)
+                .triggerDetails(List.of("비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요."))
+                .build());
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(MID_TRIP);
 
-        verify(pushSenderService, times(1)).send(eq("token-1"), anyString(), anyString(), anyMap());
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🟠 여행에 변수가 생겼어요"), anyString(), anyMap());
         assertEquals(TriggerLevel.WARNING, itinerary.getLastKnownTriggerLevel());
+        assertEquals("RAIN", itinerary.getLastKnownTriggerSignature());
     }
 
     @Test
-    void levelUnchanged_noType3Send() {
-        Itinerary itinerary = itineraryWithItems();
+    void firstObservationWarning_usesWeatherFlagInSignature() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.DANGER)
+                .weatherTrigger(true)
+                .triggerDetails(List.of("비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요."))
+                .build());
+
+        scheduler.runTick(MID_TRIP);
+
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🔴 지금 코스를 바꿔야 해요"), anyString(), anyMap());
+        assertEquals("RAIN", itinerary.getLastKnownTriggerSignature());
+    }
+
+    @Test
+    void sameWarningSignature_doesNotResend() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
         itinerary.setLastKnownTriggerLevel(TriggerLevel.WARNING);
-        itinerary.setLastPeriodicNotifiedAt(NOW.minusMinutes(5));
-        stubActive(itinerary);
+        itinerary.setLastKnownTriggerSignature("RAIN");
+        stubActive(itinerary, MID_TRIP);
         stubSubscriptions(sub("token-1"));
-        stubTrigger(TriggerLevel.WARNING, "혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?");
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .weatherTrigger(true)
+                .triggerDetails(List.of("비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요."))
+                .build());
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(MID_TRIP);
 
         verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
     }
 
     @Test
-    void firstObservation_setsBaselineWithoutSending() {
-        Itinerary itinerary = itineraryWithItems();
-        itinerary.setLastKnownTriggerLevel(null);
-        itinerary.setLastPeriodicNotifiedAt(NOW.minusMinutes(5));
-        stubActive(itinerary);
+    void newCrowdOnTopOfRain_sendsAgain() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.WARNING);
+        itinerary.setLastKnownTriggerSignature("RAIN");
+        stubActive(itinerary, MID_TRIP);
         stubSubscriptions(sub("token-1"));
-        stubTrigger(TriggerLevel.WARNING, "혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?");
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.DANGER)
+                .weatherTrigger(true)
+                .crowdTrigger(true)
+                .triggerDetails(List.of(
+                        "비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요.",
+                        "혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?"))
+                .build());
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(MID_TRIP);
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🔴 지금 코스를 바꿔야 해요"), body.capture(), anyMap());
+        assertTrue(body.getValue().contains("비 소식이 있어요."));
+        assertTrue(body.getValue().contains("혼잡도가 높아요."));
+        assertEquals("RAIN,CROWD", itinerary.getLastKnownTriggerSignature());
+    }
+
+    @Test
+    void warningToDangerSameFlags_sendsBecauseLevelWorsened() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.WARNING);
+        itinerary.setLastKnownTriggerSignature("HEAT");
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.DANGER)
+                .heatTrigger(true)
+                .heatUrgent(true)
+                .triggerDetails(List.of("최고기온 35℃ 이상(폭염경보 수준)이에요. 야외는 짧게, 실내 코스로 바꿔 보세요."))
+                .build());
+
+        scheduler.runTick(MID_TRIP);
+
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🔴 지금 코스를 바꿔야 해요"), anyString(), anyMap());
+        assertEquals("HEAT_URGENT", itinerary.getLastKnownTriggerSignature());
+    }
+
+    @Test
+    void firstObservationNormal_setsBaselineWithoutSending() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerLevel.NORMAL);
+
+        scheduler.runTick(MID_TRIP);
 
         verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
-        assertEquals(TriggerLevel.WARNING, itinerary.getLastKnownTriggerLevel());
+        assertEquals(TriggerLevel.NORMAL, itinerary.getLastKnownTriggerLevel());
+        assertFalse(itinerary.isDayStartNotified());
+        assertFalse(itinerary.isDayEndNotified());
     }
 
     @Test
-    void periodicDue_sendsAndUpdatesTimestamp() {
-        Itinerary itinerary = itineraryWithItems();
+    void dayStart_thirtyMinutesBeforeFirstSchedule_sendsFairWindCopy() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
         itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(null);
-        stubActive(itinerary);
+        stubActive(itinerary, LEAD_NOW);
         stubSubscriptions(sub("token-1"));
         stubTrigger(TriggerLevel.NORMAL);
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(LEAD_NOW);
 
-        verify(pushSenderService, times(1)).send(eq("token-1"), anyString(), anyString(), anyMap());
-        assertEquals(NOW, itinerary.getLastPeriodicNotifiedAt());
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🟢 오늘 일정 시작 30분 전입니다"),
+                eq("오늘 일정 시작 30분 전입니다. 순풍이 부니 바람따라 여행해주세요."),
+                anyMap());
+        assertTrue(itinerary.isDayStartNotified());
     }
 
     @Test
-    void periodicNotDue_noSend() {
-        Itinerary itinerary = itineraryWithItems();
+    void dayStart_tooEarly_doesNotSend() {
+        LocalDateTime tooEarly = LocalDateTime.of(2026, 8, 20, 9, 0);
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
         itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(NOW.minusMinutes(10));
-        stubActive(itinerary);
+        stubActive(itinerary, tooEarly);
         stubSubscriptions(sub("token-1"));
         stubTrigger(TriggerLevel.NORMAL);
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(tooEarly);
 
         verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
+        assertFalse(itinerary.isDayStartNotified());
     }
 
     @Test
-    void slotReached_sendsAloneAndMarksNotified() {
-        ItineraryItem item = ItineraryItem.builder().id(10L).placeName("속초등대전망대")
-                .category("관광지").scheduledTime("10:00").slotNotified(false).build();
-        Itinerary itinerary = itineraryWithItems(item);
+    void dayStart_afterFirstSchedule_marksWithoutSending() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
         itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(NOW.minusMinutes(5)); // 정기는 아직 안 겹치게
-        stubActive(itinerary);
+        stubActive(itinerary, MID_TRIP);
         stubSubscriptions(sub("token-1"));
         stubTrigger(TriggerLevel.NORMAL);
 
-        scheduler.runTick(NOW);
-
-        verify(pushSenderService, times(1)).send(eq("token-1"), anyString(), anyString(), anyMap());
-        assertTrue(item.isSlotNotified());
-    }
-
-    @Test
-    void periodicAndSlotSameTick_mergeIntoOneSend() {
-        ItineraryItem item = ItineraryItem.builder().id(10L).placeName("속초등대전망대")
-                .category("관광지").scheduledTime("10:00").slotNotified(false).build();
-        Itinerary itinerary = itineraryWithItems(item);
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(null); // 정기도 도달
-        stubActive(itinerary);
-        stubSubscriptions(sub("token-1"));
-        stubTrigger(TriggerLevel.NORMAL);
-
-        scheduler.runTick(NOW);
-
-        verify(pushSenderService, times(1)).send(eq("token-1"), anyString(), anyString(), anyMap());
-        assertTrue(item.isSlotNotified());
-        assertEquals(NOW, itinerary.getLastPeriodicNotifiedAt());
-    }
-
-    @Test
-    void statusDegradationIndependentFromPeriodicSlot_twoSeparateSends() {
-        ItineraryItem item = ItineraryItem.builder().id(10L).placeName("속초등대전망대")
-                .category("관광지").scheduledTime("10:00").slotNotified(false).build();
-        Itinerary itinerary = itineraryWithItems(item);
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(null); // 정기도 도달
-        stubActive(itinerary);
-        stubSubscriptions(sub("token-1"));
-        stubTrigger(TriggerLevel.WARNING, "혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?"); // 악화 트리거
-
-        scheduler.runTick(NOW);
-
-        // Type3(상태악화) 1건 + Type1+2(정기+슬롯 병합) 1건 = 총 2건, 서로 병합되지 않는다
-        verify(pushSenderService, times(2)).send(eq("token-1"), anyString(), anyString(), anyMap());
-    }
-
-    @Test
-    void staleSlot_markedButNotSent() {
-        ItineraryItem item = ItineraryItem.builder().id(10L).placeName("속초등대전망대")
-                .category("관광지").scheduledTime("09:00").slotNotified(false).build(); // 65분 전 - 유예창 밖
-        Itinerary itinerary = itineraryWithItems(item);
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(NOW.minusMinutes(5));
-        stubActive(itinerary);
-        stubSubscriptions(sub("token-1"));
-        stubTrigger(TriggerLevel.NORMAL);
-
-        scheduler.runTick(NOW);
+        scheduler.runTick(MID_TRIP);
 
         verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
-        assertTrue(item.isSlotNotified());
+        assertTrue(itinerary.isDayStartNotified());
+    }
+
+    @Test
+    void dayStart_skippedWhenWindIsOrange() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, LEAD_NOW);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .crowdTrigger(true)
+                .triggerDetails(List.of("혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?"))
+                .build());
+
+        scheduler.runTick(LEAD_NOW);
+
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🟠 여행에 변수가 생겼어요"), anyString(), anyMap());
+        assertFalse(itinerary.isDayStartNotified());
+    }
+
+    @Test
+    void dayEnd_afterLastOccupancy_sendsWrapUpAndFinishLink() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        itinerary.setDayStartNotified(true);
+        stubActive(itinerary, AFTER_END);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerLevel.NORMAL);
+
+        scheduler.runTick(AFTER_END);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> data = ArgumentCaptor.forClass(Map.class);
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🟢 오늘 모든 일정을 마칩니다"),
+                eq("오늘 모든 일정을 마칩니다. 여행 마무리를 남겨주세요."),
+                data.capture());
+        assertTrue(data.getValue().get("url").contains("finish=1"));
+        assertTrue(itinerary.isDayEndNotified());
+    }
+
+    @Test
+    void dayEnd_beforeLastOccupancy_doesNotSend() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        itinerary.setDayStartNotified(true);
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerLevel.NORMAL);
+
+        scheduler.runTick(MID_TRIP);
+
+        verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
+        assertFalse(itinerary.isDayEndNotified());
+    }
+
+    @Test
+    void dayEnd_orangeWind_doesNotSendWrapUpYet() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.WARNING);
+        itinerary.setLastKnownTriggerSignature("RAIN");
+        itinerary.setDayStartNotified(true);
+        stubActive(itinerary, AFTER_END);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .weatherTrigger(true)
+                .triggerDetails(List.of("비 소식이 있어요. 야외 일정을 실내 코스로 바꿔보세요."))
+                .build());
+
+        scheduler.runTick(AFTER_END);
+
+        verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
+        assertFalse(itinerary.isDayEndNotified());
+    }
+
+    @Test
+    void dayEnd_usesLatestOccupancyAmongItems() {
+        ItineraryItem first = placeAt("10:00");
+        ItineraryItem last = ItineraryItem.builder().id(11L).placeName("속초해변")
+                .category("관광지").scheduledTime("14:00").visitDate(DAY.toLocalDate()).build();
+        Itinerary itinerary = itineraryWithItems(first, last);
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        itinerary.setDayStartNotified(true);
+        LocalDateTime tooSoon = LocalDateTime.of(2026, 8, 20, 12, 0); // 첫 슬롯은 끝났지만 마지막(15:15) 전
+        stubActive(itinerary, tooSoon);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerLevel.NORMAL);
+
+        scheduler.runTick(tooSoon);
+
+        verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
+        assertFalse(itinerary.isDayEndNotified());
+    }
+
+    @Test
+    void dayStart_usesEarliestRegisteredTime() {
+        ItineraryItem later = ItineraryItem.builder().id(11L).placeName("점심")
+                .category("맛집").scheduledTime("12:00").visitDate(DAY.toLocalDate()).build();
+        Itinerary itinerary = itineraryWithItems(later, placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        stubActive(itinerary, LEAD_NOW);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerLevel.NORMAL);
+
+        scheduler.runTick(LEAD_NOW);
+
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🟢 오늘 일정 시작 30분 전입니다"), anyString(), anyMap());
     }
 
     @Test
     void noSubscriptions_skipsTriggerDetectionEntirely() {
-        Itinerary itinerary = itineraryWithItems();
-        stubActive(itinerary);
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, LEAD_NOW);
         when(pushSubscriptionRepository.findByItineraryId(1L)).thenReturn(List.of());
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(LEAD_NOW);
 
         verifyNoInteractions(triggerDetectionService);
         verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
     }
 
     @Test
-    void dedup_alreadySentSubscriptionSkippedOthersStillSent() {
-        Itinerary itinerary = itineraryWithItems();
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(null); // 정기 도달
-        stubActive(itinerary);
-        stubTrigger(TriggerLevel.NORMAL);
-
-        PushSubscription alreadySent = sub("token-already-sent");
-        alreadySent.setLastSentKey("2026-08-20:PERIODIC@2026-08-20T10:05");
-        PushSubscription fresh = sub("token-fresh");
-        stubSubscriptions(alreadySent, fresh);
-
-        scheduler.runTick(NOW);
-
-        verify(pushSenderService, never()).send(eq("token-already-sent"), anyString(), anyString(), anyMap());
-        verify(pushSenderService, times(1)).send(eq("token-fresh"), anyString(), anyString(), anyMap());
-    }
-
-    @Test
-    void sessionOnlySubscription_withoutItineraryId_stillSends() {
-        Itinerary itinerary = itineraryWithItems();
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(null);
-        stubActive(itinerary);
-        stubTrigger(TriggerLevel.NORMAL);
+    void sessionOnlySubscription_withoutItineraryId_stillSendsUrgent() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, MID_TRIP);
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .routeTangleTrigger(true)
+                .triggerDetails(List.of("동선이 꼬였어요. 자동 재배치로 이동을 줄여 보세요."))
+                .build());
         when(pushSubscriptionRepository.findByItineraryId(1L)).thenReturn(List.of());
         PushSubscription sessionSub = PushSubscription.builder()
                 .id(2L).sessionUuid("session-1").fcmToken("token-session").itineraryId(null).build();
         when(pushSubscriptionRepository.findBySessionUuid("session-1")).thenReturn(List.of(sessionSub));
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(MID_TRIP);
 
         verify(pushSenderService, times(1)).send(eq("token-session"), anyString(), anyString(), anyMap());
     }
 
     @Test
     void sameTokenOnItineraryAndSession_sendsOnce() {
-        Itinerary itinerary = itineraryWithItems();
-        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
-        itinerary.setLastPeriodicNotifiedAt(null);
-        stubActive(itinerary);
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, LEAD_NOW);
         stubTrigger(TriggerLevel.NORMAL);
         PushSubscription itinerarySub = sub("token-shared");
         PushSubscription sessionSub = PushSubscription.builder()
@@ -292,8 +417,46 @@ class NotificationSchedulerServiceTest {
         when(pushSubscriptionRepository.findByItineraryId(1L)).thenReturn(List.of(itinerarySub));
         when(pushSubscriptionRepository.findBySessionUuid("session-1")).thenReturn(List.of(sessionSub));
 
-        scheduler.runTick(NOW);
+        scheduler.runTick(LEAD_NOW);
 
         verify(pushSenderService, times(1)).send(eq("token-shared"), anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void dedup_alreadySentSubscriptionSkippedOthersStillSent() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        stubActive(itinerary, LEAD_NOW);
+        stubTrigger(TriggerLevel.NORMAL);
+
+        PushSubscription alreadySent = sub("token-already-sent");
+        alreadySent.setLastSentKey("2026-08-20:DAY_START@2026-08-20T09:32");
+        PushSubscription fresh = sub("token-fresh");
+        stubSubscriptions(alreadySent, fresh);
+
+        scheduler.runTick(LEAD_NOW);
+
+        verify(pushSenderService, never()).send(eq("token-already-sent"), anyString(), anyString(), anyMap());
+        verify(pushSenderService, times(1)).send(eq("token-fresh"), anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void recoveredToNormalThenWarningAgain_sendsAgain() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setLastKnownTriggerLevel(TriggerLevel.NORMAL);
+        itinerary.setLastKnownTriggerSignature("");
+        itinerary.setDayStartNotified(true);
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .crowdTrigger(true)
+                .triggerDetails(List.of("혼잡도가 높아요. 여유로운 곳으로 바꿔볼까요?"))
+                .build());
+
+        scheduler.runTick(MID_TRIP);
+
+        verify(pushSenderService, times(1)).send(eq("token-1"),
+                eq("🟠 여행에 변수가 생겼어요"), anyString(), anyMap());
     }
 }

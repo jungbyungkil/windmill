@@ -138,6 +138,7 @@ export default function App() {
   const [docentLang, setDocentLang] = useState('ko');
 
   const [tripRecordOpen, setTripRecordOpen] = useState(false);
+  const [pendingFinishOpen, setPendingFinishOpen] = useState(false);
   const [tripSubmitting, setTripSubmitting] = useState(false);
   const [rerouteCount, setRerouteCount] = useState(0);
 
@@ -164,11 +165,14 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // 알림 탭으로 새 탭이 열린 경우 - sw.js가 붙여준 "?open={itineraryId}"를 읽어 그 일정으로 바로 진입
+  // 알림 탭으로 새 탭이 열린 경우 - sw.js가 붙여준 "?open={itineraryId}"를 읽어 그 일정으로 바로 진입.
+  // 마무리 알림은 "&finish=1"이 붙어 있어, 일정이 로드된 뒤 여행 마무리 모달을 연다.
   useEffect(() => {
-    const openId = new URLSearchParams(window.location.search).get('open');
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get('open');
     if (!openId) return;
     resumeDraftItinerary(openId);
+    if (params.get('finish') === '1') setPendingFinishOpen(true);
     navigate('/trip');
     // 새로고침/재진입 시 같은 파라미터로 반복 리다이렉트되지 않도록 정리
     window.history.replaceState({}, '', window.location.pathname);
@@ -180,14 +184,23 @@ export default function App() {
   useEffect(() => {
     function onMessage(event) {
       if (event.data?.type !== 'windtrail:notification-click') return;
-      const openId = new URLSearchParams(new URL(event.data.url, window.location.origin).search).get('open');
+      const url = new URL(event.data.url, window.location.origin);
+      const openId = url.searchParams.get('open');
       if (!openId) return;
       resumeDraftItinerary(openId);
+      if (url.searchParams.get('finish') === '1') setPendingFinishOpen(true);
       navigate('/trip');
     }
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, [resumeDraftItinerary, navigate]);
+
+  useEffect(() => {
+    if (!pendingFinishOpen || !itinerary) return;
+    navigate('/trip');
+    setTripRecordOpen(true);
+    setPendingFinishOpen(false);
+  }, [pendingFinishOpen, itinerary, navigate]);
 
   // 알림 권한이 이미 있으면 FCM 토큰을 서버에 등록(팝업 없음). 여행이 생기면 itineraryId도 보강.
   useEffect(() => {

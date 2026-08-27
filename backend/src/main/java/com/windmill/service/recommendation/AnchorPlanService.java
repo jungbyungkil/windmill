@@ -9,6 +9,7 @@ import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.PlaceTagSanitizer;
+import com.windmill.util.VisitTiming;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,10 +41,10 @@ public class AnchorPlanService {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final LocalTime LUNCH_TIME = LocalTime.of(12, 0);
     private static final LocalTime EVENING_FLOOR = LocalTime.of(18, 0);
-    private static final int LUNCH_MINUTES = 60;
-    private static final int WALK_MINUTES = 60;
+    private static final int LUNCH_MINUTES = VisitTiming.MEAL_STAY_MINUTES;
+    private static final int WALK_MINUTES = VisitTiming.ATTRACTION_STAY_MINUTES;
     /** 공연/전시 평균 관람시간 가정치 - 사용자가 종료 시각까지 입력하진 않아 "공연 후" 슬롯 기준점 계산용 */
-    private static final int ASSUMED_EVENT_MINUTES = 120;
+    private static final int ASSUMED_EVENT_MINUTES = VisitTiming.PERFORMANCE_STAY_MINUTES;
 
     private final RecommendationPipeline recommendationPipeline;
     private final CategoryRecommendationService categoryRecommendationService;
@@ -112,7 +113,7 @@ public class AnchorPlanService {
                     List<RecommendationCandidate> out = new ArrayList<>();
                     out.add(anchor);
 
-                    // 공연 전: 점심(공연보다 최소 100분 전이어야 자연스러움) → 여유 있으면 가벼운 도보 관광지
+                    // 공연 전: 점심(공연보다 최소 식사+이동만큼 전이어야 자연스러움) → 여유 있으면 가벼운 도보 관광지
                     if (anchorTime.isAfter(LUNCH_TIME.plusMinutes(LUNCH_MINUTES + 40))) {
                         RecommendationCandidate lunch = takeNearest(foodPool, used);
                         if (lunch != null) {

@@ -53,11 +53,10 @@ public class SmartPlanService {
     private static final LocalTime LUNCH_ANCHOR = LocalTime.of(12, 0);
     private static final LocalTime DINNER_ANCHOR = LocalTime.of(18, 0);
     private static final int TODAY_LEAD_MINUTES = 30;
-    private static final int ATTRACTION_STAY = 75;
-    private static final int FAMILY_ATTRACTION_STAY = 90;
-    private static final int MEAL_STAY = 60;
-    private static final int DEFAULT_TRAVEL_MINUTES = 20;
-    private static final int MINUTES_PER_KM = 12;
+    private static final int ATTRACTION_STAY = VisitTiming.ATTRACTION_STAY_MINUTES;
+    private static final int FAMILY_ATTRACTION_STAY = VisitTiming.FAMILY_ATTRACTION_STAY_MINUTES;
+    private static final int MEAL_STAY = VisitTiming.MEAL_STAY_MINUTES;
+    private static final int DEFAULT_TRAVEL_MINUTES = GeoUtils.DEFAULT_TRAVEL_MINUTES;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     /** 슬롯 확장(오전2/오후2/저녁후) 판단용 근접 기준 - ProximityRanking.NEAR_KM/AnchorPlanService와 동일값 */
     private static final double SLOT_EXPANSION_NEAR_KM = 1.5;
@@ -861,12 +860,8 @@ public class SmartPlanService {
         if (from == null || to == null) {
             return DEFAULT_TRAVEL_MINUTES;
         }
-        Double km = GeoUtils.distanceKmSafe(from.getMapX(), from.getMapY(), to.getMapX(), to.getMapY());
-        if (km == null) {
-            return DEFAULT_TRAVEL_MINUTES;
-        }
-        int travel = (int) Math.ceil(km * MINUTES_PER_KM);
-        return Math.max(10, Math.min(travel, 90));
+        return GeoUtils.estimateTravelMinutes(
+                from.getMapX(), from.getMapY(), to.getMapX(), to.getMapY());
     }
 
     private void fillDistances(List<RecommendationCandidate> routed) {

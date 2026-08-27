@@ -135,6 +135,20 @@ class ItineraryServiceTimeConflictTest {
     }
 
     @Test
+    void addItem_cafeThirtyMinutesAfterAttraction_isAllowed() {
+        itineraryWith(existing(1, 0, "경복궁", "11:30"));
+
+        AddItineraryItemRequest cafe = candidate("스타벅스 광화문점", "12:00", "21:00");
+        cafe.setCategory("카페");
+        cafe.setTags(List.of("#카페"));
+
+        Itinerary result = service.addItem(ITINERARY_ID, cafe);
+
+        assertEquals(2, result.getItems().size());
+        assertTrue(result.getItems().stream().anyMatch(i -> "스타벅스 광화문점".equals(i.getPlaceName())));
+    }
+
+    @Test
     void addItem_explicitTimeDoesNotOverlap_succeeds() {
         itineraryWith(existing(1, 0, "경복궁", "17:00"));
 

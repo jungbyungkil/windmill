@@ -7,6 +7,11 @@ package com.windmill.util;
 public final class GeoUtils {
 
     private static final double EARTH_RADIUS_KM = 6371.0;
+    public static final int DEFAULT_TRAVEL_MINUTES = 10;
+    public static final int MIN_TRAVEL_MINUTES = 5;
+    public static final int MAX_TRAVEL_MINUTES = 50;
+    /** 시내 택시·버스 혼합. 도보(약 12분/km)보다 짧게 잡아 가까운 장소를 이어서 담기 쉽게 한다. */
+    public static final double TRAVEL_MINUTES_PER_KM = 5.0;
 
     private GeoUtils() {
     }
@@ -21,7 +26,18 @@ public final class GeoUtils {
         return EARTH_RADIUS_KM * c;
     }
 
-    /** mapx/mapy 문자열 파싱 실패(빈 값/비정상 포맷)에 안전한 버전 - 실패 시 null */
+    /**
+     * 시내 당일치기 이동시간 추정. 좌표가 없으면 기본값.
+     */
+    public static int estimateTravelMinutes(String lon1, String lat1, String lon2, String lat2) {
+        Double km = distanceKmSafe(lon1, lat1, lon2, lat2);
+        if (km == null) {
+            return DEFAULT_TRAVEL_MINUTES;
+        }
+        int travel = (int) Math.ceil(km * TRAVEL_MINUTES_PER_KM);
+        return Math.max(MIN_TRAVEL_MINUTES, Math.min(travel, MAX_TRAVEL_MINUTES));
+    }
+
     public static Double distanceKmSafe(String lon1, String lat1, String lon2, String lat2) {
         try {
             if (lon1 == null || lat1 == null || lon2 == null || lat2 == null) {

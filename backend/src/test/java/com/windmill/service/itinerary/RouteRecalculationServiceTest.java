@@ -69,7 +69,7 @@ class RouteRecalculationServiceTest {
     @Test
     void assignSchedule_futureDate_withoutDeclump_stillSqueezesIntoEvening() {
         // 회귀 재현: declump 없이 TSP가 준 원래 순서(맛집→맛집→관광→관광) 그대로 시간표를 잡으면
-        // 두 관광 일정이 전부 저녁 시간대(18:20 이후)로 밀린다 - declump가 필요한 이유를 문서화.
+        // 두 관광 일정이 저녁 시간대로 밀린다 - declump가 필요한 이유를 문서화.
         List<ItineraryItem> clumped = List.of(
                 place(1, "새봄떡국국수", true),
                 place(2, "한암동 정동점", true),
@@ -80,8 +80,8 @@ class RouteRecalculationServiceTest {
 
         assertEquals("11:00", clumped.get(0).getScheduledTime());
         assertEquals("17:00", clumped.get(1).getScheduledTime());
-        assertEquals("18:20", clumped.get(2).getScheduledTime());
-        assertEquals("19:55", clumped.get(3).getScheduledTime());
+        assertEquals("17:50", clumped.get(2).getScheduledTime());
+        assertEquals("18:45", clumped.get(3).getScheduledTime());
     }
 
     @Test
@@ -96,9 +96,9 @@ class RouteRecalculationServiceTest {
         service.assignSchedule(declumped, null, null, null);
 
         assertEquals("11:00", declumped.get(0).getScheduledTime()); // 새봄떡국국수 (점심)
-        assertEquals("12:20", declumped.get(1).getScheduledTime()); // 농업박물관 (오후)
+        assertEquals("11:50", declumped.get(1).getScheduledTime()); // 농업박물관 (오후)
         assertEquals("17:00", declumped.get(2).getScheduledTime()); // 한암동 정동점 (저녁)
-        assertEquals("18:20", declumped.get(3).getScheduledTime()); // 국도발전전시관
+        assertEquals("17:50", declumped.get(3).getScheduledTime()); // 국도발전전시관
     }
 
     @Test
@@ -112,9 +112,9 @@ class RouteRecalculationServiceTest {
         service.assignSchedule(List.of(attr1, attr2, food), null, null, null);
 
         assertEquals("09:00", attr1.getScheduledTime());
-        assertEquals("10:35", attr2.getScheduledTime());
-        // 10:35 + 75 + 20 = 12:10 - 점심 창(11:00~14:00) 안이라 자연스러운 도착 시각 그대로 유지
-        assertEquals("12:10", food.getScheduledTime());
+        assertEquals("09:55", attr2.getScheduledTime());
+        // 09:55 + 45 + 10 = 10:50 → 점심 창(11:00)보다 이르러 11:00으로만 당긴다
+        assertEquals("11:00", food.getScheduledTime());
     }
 
     @Test
@@ -135,10 +135,10 @@ class RouteRecalculationServiceTest {
 
         service.assignSchedule(repaired, null, null, null);
         assertEquals("11:00", food1.getScheduledTime());
-        assertEquals("12:20", attr1.getScheduledTime());
-        assertEquals("13:55", stampMuseum.getScheduledTime()); // 마감(16:50-60=15:50) 안에 도착
+        assertEquals("11:50", attr1.getScheduledTime());
+        assertEquals("12:45", stampMuseum.getScheduledTime()); // 마감(16:50-60=15:50) 안에 도착
         assertEquals("17:00", food2.getScheduledTime());
-        assertEquals("18:20", attr2.getScheduledTime());
+        assertEquals("17:50", attr2.getScheduledTime());
     }
 
     @Test
@@ -162,8 +162,8 @@ class RouteRecalculationServiceTest {
         service.assignSchedule(List.of(attr1, attr2), null, null, null, LocalTime.of(17, 0));
 
         assertEquals("17:00", attr1.getScheduledTime());
-        // 17:00 + 75(체류) + 20(이동) = 18:35
-        assertEquals("18:35", attr2.getScheduledTime());
+        // 17:00 + 45(체류) + 10(이동) = 17:55
+        assertEquals("17:55", attr2.getScheduledTime());
     }
 
     @Test
