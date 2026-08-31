@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CustomOverlayMap, Map, Polyline, useKakaoLoader } from 'react-kakao-maps-sdk';
-import { getMapRoute, getPublicConfig } from '../api/windmillApi';
+import { getMapRoute, getPublicConfig, searchNearbyPlaces } from '../api/windmillApi';
+import { TOUR_FOOD_CONTENT_TYPE_ID } from '../constants';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
 import { canOpenInKakaoMap, geocodePlaceWithKakaoServices, openInKakaoMap } from '../utils/kakaoMap';
+import { hoursPhaseForPlace, HOURS_PHASE_LABEL } from '../utils/hoursPhase';
+import MapPlaceCard from './MapPlaceCard';
 
 const BUILD_TIME_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
+const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 };
+const SEARCH_PIN = '#2563eb';
+const SEARCH_IN_ITINERARY_PIN = '#0f766e';
 
 const MARKER_COLOR = {
   NORMAL: '#2f9e6a',
@@ -22,6 +28,10 @@ function parseCoord(item) {
 
 function canGeocode(item) {
   return Boolean((item?.addr1 || '').trim() || (item?.placeName || '').trim());
+}
+
+function contentKey(value) {
+  return value == null ? '' : String(value);
 }
 
 function statusText(item, weather, closedDay, hoursEnded, crowd) {
@@ -62,23 +72,93 @@ function buildStopMeta(item, index, weather, closedDay, hoursEnded, crowd) {
   };
 }
 
-function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
+function readMapCenter(map) {
+  if (!map?.getCenter) return null;
+  const c = map.getCenter();
+  const lat = Number(c.getLat());
+  const lng = Number(c.getLng());
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function DayRouteMapCanvas({
+  draftStops,
+  jsKey,
+  mode,
+  itineraryItems = [],
+  onAddPlace,
+  onRemovePlace,
+  busyContentId,
+}) {
   const [loading, error] = useKakaoLoader({
     appkey: jsKey,
     libraries: ['services'],
   });
+  const mapRef = useRef(null);
+  const userMovedRef = useRef(false);
   const [stops, setStops] = useState([]);
   const [resolving, setResolving] = useState(true);
   const [failedNames, setFailedNames] = useState([]);
   const [geocodedCount, setGeocodedCount] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedStopId, setSelectedStopId] = useState(null);
+  const [selectedPlaceId, setSelectedPlaceId] = useState(null);
   const [route, setRoute] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
+  const [center, setCenter] = useState(DEFAULT_CENTER);
+  const [radius, setRadius] = useState(1000);
+  const [foodOnly, setFoodOnly] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [nearby, setNearby] = useState([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [movedSinceSearch, setMovedSinceSearch] = useState(false);
+  const [optimisticAdded, setOptimisticAdded] = useState(() => new Set());
+  const [optimisticRemoved, setOptimisticRemoved] = useState(() => new Set());
 
   const draftKey = draftStops
     .map((s) => `${s.id}:${s.item.mapX}:${s.item.mapY}:${s.item.addr1 || ''}`)
     .join('|');
+
+  const itineraryContentIds = useMemo(() => {
+    const ids = new Set();
+    (itineraryItems || []).forEach((item) => {
+      if (item?.contentId) ids.add(contentKey(item.contentId));
+    });
+    return ids;
+  }, [itineraryItems]);
+
+  useEffect(() => {
+    setOptimisticAdded((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      prev.forEach((id) => {
+        if (itineraryContentIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setOptimisticRemoved((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      prev.forEach((id) => {
+        if (!itineraryContentIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [itineraryContentIds]);
+
+  function isInItinerary(contentId) {
+    const id = contentKey(contentId);
+    if (!id) return false;
+    const saved = itineraryContentIds.has(id);
+    return (saved || optimisticAdded.has(id)) && !optimisticRemoved.has(id);
+  }
 
   useEffect(() => {
     if (loading || error) return undefined;
@@ -111,6 +191,11 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
       setFailedNames(failed);
       setGeocodedCount(fromAddress);
       setResolving(false);
+      if (!userMovedRef.current && resolved.length > 0) {
+        const lat = resolved.reduce((s, p) => s + p.lat, 0) / resolved.length;
+        const lng = resolved.reduce((s, p) => s + p.lng, 0) / resolved.length;
+        setCenter({ lat, lng });
+      }
     }
 
     resolveStops();
@@ -120,6 +205,29 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
     // draftKey encodes identity + address/coord changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, error, draftKey]);
+
+  useEffect(() => {
+    if (loading || error || draftStops.length > 0) return undefined;
+    if (!navigator.geolocation) {
+      setResolving(false);
+      return undefined;
+    }
+    let cancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (cancelled || userMovedRef.current) return;
+        setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setResolving(false);
+      },
+      () => {
+        if (!cancelled) setResolving(false);
+      },
+      { enableHighAccuracy: false, timeout: 4000, maximumAge: 2 * 60 * 1000 },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, error, draftStops.length]);
 
   const stopKey = stops.map((s) => `${s.id}:${s.lat}:${s.lng}`).join('|');
 
@@ -153,17 +261,97 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopKey, resolving, mode]);
 
-  const center = useMemo(() => {
-    if (!stops.length) return { lat: 37.5665, lng: 126.978 };
-    const lat = stops.reduce((s, p) => s + p.lat, 0) / stops.length;
-    const lng = stops.reduce((s, p) => s + p.lng, 0) / stops.length;
-    return { lat, lng };
+  const itineraryContentOnMap = useMemo(() => {
+    const ids = new Set();
+    stops.forEach((s) => {
+      if (s.item?.contentId) ids.add(contentKey(s.item.contentId));
+    });
+    return ids;
   }, [stops]);
 
-  const path = (route?.path || []).map((p) => ({ lat: p.lat, lng: p.lng }));
-  const selected = stops.find((s) => s.id === selectedId);
+  const searchMarkers = useMemo(() => {
+    return (nearby || []).flatMap((place) => {
+      const coord = parseCoord(place);
+      if (!coord) return [];
+      const id = contentKey(place.contentId);
+      if (itineraryContentOnMap.has(id) && isInItinerary(id)) return [];
+      return [{ ...place, ...coord, contentKey: id, inItinerary: isInItinerary(id) }];
+    });
+    // optimistic sets change inItinerary without nearby identity changing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearby, itineraryContentOnMap, optimisticAdded, optimisticRemoved, itineraryContentIds]);
 
-  if (loading || resolving) {
+  const selectedStop = stops.find((s) => s.id === selectedStopId);
+  const selectedPlace = (nearby || []).find((p) => contentKey(p.contentId) === selectedPlaceId)
+    || searchMarkers.find((p) => p.contentKey === selectedPlaceId);
+
+  function markUserMoved() {
+    userMovedRef.current = true;
+    if (hasSearched) setMovedSinceSearch(true);
+  }
+
+  async function handleResearch() {
+    const fromMap = readMapCenter(mapRef.current);
+    const target = fromMap || center;
+    if (!target) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const results = await searchNearbyPlaces({
+        mapX: target.lng,
+        mapY: target.lat,
+        radius,
+        contentTypeId: foodOnly ? TOUR_FOOD_CONTENT_TYPE_ID : undefined,
+      });
+      setNearby(Array.isArray(results) ? results : []);
+      setHasSearched(true);
+      setMovedSinceSearch(false);
+      userMovedRef.current = true;
+      setSelectedStopId(null);
+      setSelectedPlaceId(null);
+    } catch (e) {
+      setSearchError(e.message || '주변 장소를 불러오지 못했어요');
+      setNearby([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleAdd(place) {
+    const id = contentKey(place.contentId);
+    setOptimisticAdded((prev) => new Set(prev).add(id));
+    setOptimisticRemoved((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    try {
+      await onAddPlace?.(place);
+    } catch {
+      setOptimisticAdded((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function handleRemove(place) {
+    const id = contentKey(place.contentId);
+    setOptimisticRemoved((prev) => new Set(prev).add(id));
+    try {
+      await onRemovePlace?.(id);
+    } catch {
+      setOptimisticRemoved((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  if (loading || (resolving && draftStops.length > 0 && stops.length === 0)) {
     return <p className="day-route-map-hint">지도를 불러오는 중…</p>;
   }
   if (error) {
@@ -182,14 +370,11 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
     );
   }
 
-  if (stops.length === 0) {
-    return (
-      <p className="day-route-map-hint">
-        주소로도 위치를 찾지 못했어요. 장소명·주소를 확인해 주세요.
-        {failedNames.length > 0 ? ` (${failedNames.join(', ')})` : ''}
-      </p>
-    );
-  }
+  const path = (route?.path || []).map((p) => ({ lat: p.lat, lng: p.lng }));
+  const selectedPlaceInItinerary = selectedPlace ? isInItinerary(selectedPlace.contentId) : false;
+  const selectedHours = selectedPlace
+    ? hoursPhaseForPlace(selectedPlace, { inItinerary: selectedPlaceInItinerary })
+    : 'UNKNOWN';
 
   return (
     <>
@@ -203,78 +388,166 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
           위치를 찾지 못한 곳: {failedNames.join(', ')}
         </p>
       )}
-      <Map
-        center={center}
-        level={7}
-        className="day-route-map-canvas"
-        onClick={() => setSelectedId(null)}
-      >
-        {path.length >= 2 && (
-          <Polyline
-            path={path}
-            strokeWeight={5}
-            strokeColor={route?.estimated ? '#8a8f98' : '#1d6b8a'}
-            strokeOpacity={0.85}
-            strokeStyle={route?.estimated ? 'shortdash' : 'solid'}
-          />
-        )}
-        {stops.map((stop) => (
-          <CustomOverlayMap
-            key={stop.id}
-            position={{ lat: stop.lat, lng: stop.lng }}
-            yAnchor={1}
-            zIndex={selectedId === stop.id ? 3 : 1}
-          >
+      <div className="day-route-map-stage">
+        <Map
+          center={center}
+          isPanto
+          level={7}
+          className="day-route-map-canvas"
+          onCreate={(map) => {
+            mapRef.current = map;
+          }}
+          onDragEnd={(map) => {
+            mapRef.current = map;
+            markUserMoved();
+          }}
+          onZoomChanged={(map) => {
+            mapRef.current = map;
+            markUserMoved();
+          }}
+          onClick={() => {
+            setSelectedStopId(null);
+            setSelectedPlaceId(null);
+          }}
+        >
+          {path.length >= 2 && (
+            <Polyline
+              path={path}
+              strokeWeight={5}
+              strokeColor={route?.estimated ? '#8a8f98' : '#1d6b8a'}
+              strokeOpacity={0.85}
+              strokeStyle={route?.estimated ? 'shortdash' : 'solid'}
+            />
+          )}
+          {stops.map((stop) => (
+            <CustomOverlayMap
+              key={`stop-${stop.id}`}
+              position={{ lat: stop.lat, lng: stop.lng }}
+              yAnchor={1}
+              zIndex={selectedStopId === stop.id ? 4 : 2}
+            >
+              <button
+                type="button"
+                className={`day-route-map-pin level-${stop.level.toLowerCase()}`}
+                style={{ '--pin-color': MARKER_COLOR[stop.level] || MARKER_COLOR.NORMAL }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPlaceId(null);
+                  setSelectedStopId(stop.id === selectedStopId ? null : stop.id);
+                }}
+                title={stop.item.placeName}
+              >
+                <span className="day-route-map-pin-num">{stop.index + 1}</span>
+              </button>
+            </CustomOverlayMap>
+          ))}
+          {searchMarkers.map((place) => (
+            <CustomOverlayMap
+              key={`search-${place.contentKey}`}
+              position={{ lat: place.lat, lng: place.lng }}
+              yAnchor={1}
+              zIndex={selectedPlaceId === place.contentKey ? 5 : 1}
+            >
+              <button
+                type="button"
+                className={`day-route-map-pin search-pin${place.inItinerary ? ' in-itinerary' : ''}`}
+                style={{ '--pin-color': place.inItinerary ? SEARCH_IN_ITINERARY_PIN : SEARCH_PIN }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedStopId(null);
+                  setSelectedPlaceId(place.contentKey === selectedPlaceId ? null : place.contentKey);
+                }}
+                title={place.placeName}
+              >
+                <span className="day-route-map-pin-num">{place.inItinerary ? '✓' : '+'}</span>
+              </button>
+            </CustomOverlayMap>
+          ))}
+          {selectedStop && (
+            <CustomOverlayMap
+              position={{ lat: selectedStop.lat, lng: selectedStop.lng }}
+              yAnchor={1.35}
+              zIndex={10}
+            >
+              <div className="day-route-map-info">
+                <strong>{selectedStop.item.placeName}</strong>
+                <p>{statusText(selectedStop.item, selectedStop.weather, selectedStop.closedDay, selectedStop.hoursEnded, selectedStop.crowd)}</p>
+                {selectedStop.fromAddress && <em>주소 기준 위치</em>}
+                {selectedStop.item.category && !selectedStop.fromAddress && <em>{selectedStop.item.category}</em>}
+                {canOpenInKakaoMap(selectedStop.item) && (
+                  <button
+                    type="button"
+                    className="day-route-map-open"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInKakaoMap({
+                        ...selectedStop.item,
+                        mapX: String(selectedStop.lng),
+                        mapY: String(selectedStop.lat),
+                      });
+                    }}
+                  >
+                    카카오맵에서 보기
+                  </button>
+                )}
+              </div>
+            </CustomOverlayMap>
+          )}
+        </Map>
+        <div className="day-route-map-toolbar">
+          <div className="day-route-map-filters" role="group" aria-label="검색 옵션">
             <button
               type="button"
-              className={`day-route-map-pin level-${stop.level.toLowerCase()}`}
-              style={{ '--pin-color': MARKER_COLOR[stop.level] || MARKER_COLOR.NORMAL }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedId(stop.id === selectedId ? null : stop.id);
-              }}
-              title={stop.item.placeName}
+              className={`map-filter-chip${radius === 500 ? ' on' : ''}`}
+              onClick={() => setRadius(500)}
             >
-              <span className="day-route-map-pin-num">{stop.index + 1}</span>
+              500m
             </button>
-          </CustomOverlayMap>
-        ))}
-        {selected && (
-          <CustomOverlayMap
-            position={{ lat: selected.lat, lng: selected.lng }}
-            yAnchor={1.35}
-            zIndex={10}
+            <button
+              type="button"
+              className={`map-filter-chip${radius === 1000 ? ' on' : ''}`}
+              onClick={() => setRadius(1000)}
+            >
+              1km
+            </button>
+            <button
+              type="button"
+              className={`map-filter-chip${foodOnly ? ' on' : ''}`}
+              onClick={() => setFoodOnly((v) => !v)}
+              aria-pressed={foodOnly}
+            >
+              음식점만
+            </button>
+          </div>
+          <button
+            type="button"
+            className={`map-research-btn${movedSinceSearch ? ' emphasize' : ''}`}
+            onClick={handleResearch}
+            disabled={searching}
           >
-            <div className="day-route-map-info">
-              <strong>{selected.item.placeName}</strong>
-              <p>{statusText(selected.item, selected.weather, selected.closedDay, selected.hoursEnded, selected.crowd)}</p>
-              {selected.fromAddress && <em>주소 기준 위치</em>}
-              {selected.item.category && !selected.fromAddress && <em>{selected.item.category}</em>}
-              {canOpenInKakaoMap(selected.item) && (
-                <button
-                  type="button"
-                  className="day-route-map-open"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInKakaoMap({
-                      ...selected.item,
-                      mapX: String(selected.lng),
-                      mapY: String(selected.lat),
-                    });
-                  }}
-                >
-                  카카오맵에서 보기
-                </button>
-              )}
-            </div>
-          </CustomOverlayMap>
+            {searching ? '검색 중…' : '이 지역 재검색'}
+          </button>
+        </div>
+        {selectedPlace && (
+          <div className="map-place-sheet">
+            <MapPlaceCard
+              place={selectedPlace}
+              inItinerary={selectedPlaceInItinerary}
+              hoursPhase={selectedHours}
+              busy={busyContentId != null && contentKey(busyContentId) === contentKey(selectedPlace.contentId)}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+              onClose={() => setSelectedPlaceId(null)}
+            />
+          </div>
         )}
-      </Map>
+      </div>
       <p className="day-route-map-caption">
-        {loadingRoute && '경로 계산 중…'}
+        지도를 옮긴 뒤 <strong>이 지역 재검색</strong>을 눌러야 주변 장소가 갱신돼요.
+        {loadingRoute && ' 경로 계산 중…'}
         {!loadingRoute && route?.roadBased && route.distanceMeters != null && (
           <>
-            도로 기준 약 {(route.distanceMeters / 1000).toFixed(1)}km
+            {' '}도로 기준 약 {(route.distanceMeters / 1000).toFixed(1)}km
             {route.durationSeconds != null && (
               <> · 약 {Math.max(1, Math.round(route.durationSeconds / 60))}분</>
             )}
@@ -282,21 +555,64 @@ function DayRouteMapCanvas({ draftStops, jsKey, mode }) {
         )}
         {!loadingRoute && route?.estimated && route.distanceMeters != null && (
           <>
-            직선거리 약 {(route.distanceMeters / 1000).toFixed(1)}km 기준 추정
+            {' '}직선거리 약 {(route.distanceMeters / 1000).toFixed(1)}km 기준 추정
             {route.durationSeconds != null && (
               <> · 약 {Math.max(1, Math.round(route.durationSeconds / 60))}분(추정)</>
             )}
           </>
         )}
-        {!loadingRoute && route && !route.roadBased && !route.estimated && (route.message || routeError || '직선 연결')}
+        {!loadingRoute && route && !route.roadBased && !route.estimated && (route.message || routeError || '')}
       </p>
+      {searchError && <p className="day-route-map-hint">{searchError}</p>}
+      {hasSearched && nearby.length === 0 && !searching && !searchError && (
+        <p className="day-route-map-hint">이 반경에서 장소를 찾지 못했어요. 지도를 옮기거나 반경을 넓혀 보세요.</p>
+      )}
+      {nearby.length > 0 && (
+        <div className="map-nearby-list" aria-label="검색된 장소">
+          <p className="map-nearby-list-label">
+            주변 {nearby.length}곳
+            {nearby.length >= 8 ? ' · 겹치면 목록에서 고르세요' : ''}
+          </p>
+          <ul>
+            {nearby.map((place) => {
+              const id = contentKey(place.contentId);
+              const added = isInItinerary(id);
+              const phase = hoursPhaseForPlace(place, { inItinerary: added });
+              return (
+                <li key={id || place.placeName}>
+                  <button
+                    type="button"
+                    className={`map-nearby-row${selectedPlaceId === id ? ' on' : ''}${added ? ' added' : ''}`}
+                    onClick={() => {
+                      setSelectedStopId(null);
+                      setSelectedPlaceId(id);
+                      const coord = parseCoord(place);
+                      if (coord) setCenter(coord);
+                    }}
+                  >
+                    <span className="map-nearby-row-name">{place.placeName}</span>
+                    <span className="map-nearby-row-meta">
+                      {place.category || '장소'}
+                      {place.dist != null ? ` · ${place.dist}m` : ''}
+                      {added ? ' · 담김' : ''}
+                    </span>
+                    <span className={`map-nearby-row-hours phase-${String(phase).toLowerCase().replace('_', '-')}`}>
+                      {phase === 'UNKNOWN' ? '' : HOURS_PHASE_LABEL[phase]}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </>
   );
 }
 
 /**
- * 오늘 동선 카카오맵 — 일정 화면의 지도 구간. 순서 마커 + 도로 폴리라인 + 상태 색.
- * TourAPI 좌표가 없어도 주소/장소명으로 카카오 지오코딩해 표시한다.
+ * 오늘 동선 카카오맵 — 일정 화면의 지도 구간.
+ * 순서 마커 + 도로 폴리라인 + "이 지역 재검색"으로 주변 장소를 일정에 담기.
  */
 export default function DayRouteMap({
   items = [],
@@ -304,6 +620,9 @@ export default function DayRouteMap({
   closedDayAffectedItemIds = [],
   hoursEndedAffectedItemIds = [],
   crowdAffectedItemIds = [],
+  onAddPlace,
+  onRemovePlace,
+  busyContentId,
 }) {
   const [jsKey, setJsKey] = useState(BUILD_TIME_JS_KEY);
   const [keyChecked, setKeyChecked] = useState(Boolean(BUILD_TIME_JS_KEY));
@@ -351,11 +670,16 @@ export default function DayRouteMap({
             확인하고, 카카오 개발자 콘솔 Web 도메인에 배포 주소를 등록해 주세요.
           </p>
         )}
-        {jsKey && draftStops.length === 0 && (
-          <p className="day-route-map-hint">좌표·주소가 있는 장소가 아직 없어요.</p>
-        )}
-        {jsKey && draftStops.length > 0 && (
-          <DayRouteMapCanvas draftStops={draftStops} jsKey={jsKey} mode={mode} />
+        {jsKey && (
+          <DayRouteMapCanvas
+            draftStops={draftStops}
+            jsKey={jsKey}
+            mode={mode}
+            itineraryItems={items}
+            onAddPlace={onAddPlace}
+            onRemovePlace={onRemovePlace}
+            busyContentId={busyContentId}
+          />
         )}
       </div>
     </section>

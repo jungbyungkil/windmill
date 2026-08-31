@@ -2,6 +2,7 @@ package com.windmill.service.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.windmill.dto.BusinessStatus;
+import com.windmill.dto.HoursPhase;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.SentryBreadcrumbs;
 
@@ -104,6 +105,37 @@ public final class BusinessHoursEvaluator {
             return BusinessStatus.OPEN;
         }
         return statusAt(field -> introFields.getOrDefault(field, ""), KoreaClock.now());
+    }
+
+    /**
+     * 장소 카드 3단계(영업 전/영업 중/영업 종료). 소개정보가 없으면 UNKNOWN —
+     * 검색 목록만으로는 영업시간을 알 수 없어 허위 "영업중"을 붙이지 않는다.
+     */
+    public static HoursPhase currentPhase(Map<String, String> introFields) {
+        return phaseAt(introFields, KoreaClock.now());
+    }
+
+    public static HoursPhase phaseAt(Map<String, String> introFields, LocalDateTime at) {
+        if (introFields == null || introFields.isEmpty()) {
+            return HoursPhase.UNKNOWN;
+        }
+        LocalDateTime resolved = at == null ? KoreaClock.now() : at;
+        Function<String, String> fields = field -> introFields.getOrDefault(field, "");
+        BusinessStatus status = statusAt(fields, resolved);
+        if (status == BusinessStatus.OPEN) {
+            return HoursPhase.OPEN;
+        }
+        if (status == BusinessStatus.CLOSED_DAY) {
+            return HoursPhase.CLOSED;
+        }
+        if (status == BusinessStatus.HOURS_ENDED) {
+            LocalTime earliest = earliestStart(fields);
+            if (earliest != null && resolved.toLocalTime().isBefore(earliest)) {
+                return HoursPhase.BEFORE_OPEN;
+            }
+            return HoursPhase.CLOSED;
+        }
+        return HoursPhase.UNKNOWN;
     }
 
     /** 방문 예정일·시각 기준 영업 여부 (일정 트리거용) */
@@ -375,6 +407,19 @@ public final class BusinessHoursEvaluator {
             }
         }
         return ranges;
+    }
+
+    private static LocalTime earliestStart(Function<String, String> fieldAccessor) {
+        LocalTime earliest = null;
+        for (String field : USETIME_FIELDS) {
+            for (int[] range : parseAllTimeRanges(fieldAccessor.apply(field))) {
+                LocalTime start = LocalTime.of(range[0], range[1]);
+                if (earliest == null || start.isBefore(earliest)) {
+                    earliest = start;
+                }
+            }
+        }
+        return earliest;
     }
 
     /** 첫 구간만 — 시작 시각 추출용 */

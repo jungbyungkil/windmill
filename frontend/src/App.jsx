@@ -628,9 +628,11 @@ export default function App() {
         setTimeout(() => setAutoReplaceNotice(null), 5000);
       }
       setItinerary(result);
+      return true;
     } catch (e) {
       setAutoReplaceNotice(`삭제하지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
       setTimeout(() => setAutoReplaceNotice(null), 5000);
+      return false;
     }
   }
 
@@ -731,6 +733,40 @@ export default function App() {
       await addCandidateToItinerary(candidate);
     } catch {
       /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
+    } finally {
+      setAddingContentId(null);
+    }
+  }
+
+  async function handleMapAddPlace(place) {
+    setAddingContentId(place.contentId);
+    try {
+      await addCandidateToItinerary({
+        contentId: place.contentId,
+        contentTypeId: Number.isFinite(Number(place.contentTypeId)) ? Number(place.contentTypeId) : undefined,
+        placeName: place.placeName,
+        thumbnailUrl: place.thumbnailUrl,
+        addr1: place.addr1,
+        tel: place.tel,
+        mapX: place.mapX,
+        mapY: place.mapY,
+        category: place.category,
+        cat3: place.cat3,
+      });
+    } finally {
+      setAddingContentId(null);
+    }
+  }
+
+  async function handleMapRemovePlace(contentId) {
+    const item = visibleItems.find((i) => String(i.contentId) === String(contentId));
+    if (!item) return;
+    setAddingContentId(contentId);
+    try {
+      const ok = await handleDeleteItem(item.itemId);
+      if (!ok) {
+        throw new Error('remove failed');
+      }
     } finally {
       setAddingContentId(null);
     }
@@ -1430,7 +1466,7 @@ export default function App() {
                   <header className="trip-section-head">
                     <p className="trip-section-kicker">2 · 동선 확인</p>
                     <h2>지도</h2>
-                    <p>오늘 가는 순서를 지도에서 이어 보고, 상태 색으로 주의할 곳을 확인해요.</p>
+                    <p>오늘 가는 순서를 지도에서 보고, 이 지역을 재검색해 주변 장소를 일정에 담아요.</p>
                   </header>
                   <DayRouteMap
                     items={visibleItems}
@@ -1438,6 +1474,9 @@ export default function App() {
                     closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
                     hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
                     crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
+                    onAddPlace={handleMapAddPlace}
+                    onRemovePlace={handleMapRemovePlace}
+                    busyContentId={addingContentId}
                   />
                 </section>
 

@@ -181,6 +181,15 @@ export function getMapRoute(points, mode) {
   });
 }
 
+/**
+ * 지도 중심 기준 주변 장소 (locationBasedList2 프록시).
+ * 프론트의 "이 지역 재검색"에서만 호출할 것 — 지도 이동으로 자동 호출하면 안 됨.
+ * contentTypeId=39 이면 음식점만.
+ */
+export function searchNearbyPlaces({ mapX, mapY, radius, contentTypeId, pageNo, numOfRows } = {}) {
+  return request(`/map/nearby${qs({ mapX, mapY, radius, contentTypeId, pageNo, numOfRows })}`);
+}
+
 /** 동선 최단 재배치 (optional GPS originLon/Lat = WGS84). startTime("HH:mm")을 주면 첫 장소
  *  도착 시각을 그 시각으로 고정하고 나머지는 그 뒤로 자연스럽게 이어 붙인다. */
 export function optimizeRoute(itineraryId, date, origin, startTime) {

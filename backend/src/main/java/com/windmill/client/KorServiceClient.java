@@ -89,6 +89,38 @@ public class KorServiceClient {
                 .onErrorReturn(List.of());
     }
 
+    /**
+     * 위치기반 관광정보 목록 조회 (locationBasedList2).
+     * mapX=경도(WGS84), mapY=위도(WGS84), radius=미터(최대 20000). arrange=E(거리순).
+     * 지도 "이 지역 재검색" 전용 — 상세조회(detailIntro2)는 호출하지 않는다.
+     */
+    public Mono<List<JsonNode>> locationBasedList(String mapX, String mapY, int radius,
+                                                   Integer contentTypeId, int numOfRows, int pageNo) {
+        return webClient.get()
+                .uri(uriBuilder -> {
+                    uriBuilder.path("/locationBasedList2")
+                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("numOfRows", numOfRows)
+                            .queryParam("pageNo", pageNo)
+                            .queryParam("MobileOS", "ETC")
+                            .queryParam("MobileApp", MOBILE_APP)
+                            .queryParam("_type", "json")
+                            .queryParam("mapX", mapX)
+                            .queryParam("mapY", mapY)
+                            .queryParam("radius", radius)
+                            .queryParam("arrange", "E");
+                    if (contentTypeId != null) {
+                        uriBuilder.queryParam("contentTypeId", contentTypeId);
+                    }
+                    return uriBuilder.build();
+                })
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(KtoApiResponseParser::parseItems)
+                .doOnError(e -> log.error("locationBasedList2 호출 실패: {}", e.getMessage()))
+                .onErrorReturn(List.of());
+    }
+
     /** 키워드 검색 조회 (searchKeyword2) */
     public Mono<List<JsonNode>> searchKeyword(String keyword, Integer contentTypeId,
                                                String lDongRegnCd, String lDongSignguCd,

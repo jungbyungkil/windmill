@@ -53,6 +53,14 @@ public class TourAttractionService {
                 .map(this::toSummaries);
     }
 
+    /** 이미 캐시된 상세만 반환. 없으면 null — 위치기반 검색 카드에 영업상태를 붙일 때 추가 API를 쓰지 않기 위함 */
+    public TourAttractionDetail peekCachedDetail(String contentId) {
+        if (contentId == null || contentId.isBlank()) {
+            return null;
+        }
+        return detailCache.get(contentId);
+    }
+
     /** 공통정보 + 소개정보(영업시간 등) + 이미지를 조합한 상세 정보 */
     public Mono<TourAttractionDetail> getDetail(String contentId, int contentTypeId) {
         TourAttractionDetail cached = detailCache.get(contentId);

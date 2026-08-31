@@ -1,10 +1,12 @@
 package com.windmill.service.recommendation;
 
+import com.windmill.dto.HoursPhase;
 import com.windmill.util.ClosingTimeGate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Map;
 import java.util.Set;
@@ -179,6 +181,30 @@ class BusinessHoursEvaluatorTest {
         LocalTime close = BusinessHoursEvaluator.extractCloseTime(
                 Map.of("usetimeculture", "10:00 ~ 18:00 (입장마감 17:00)"));
         assertEquals(LocalTime.of(18, 0), close);
+    }
+
+    @Test
+    void hoursPhase_beforeOpenOpenAndClosedFromUseTime() {
+        Map<String, String> intro = Map.of("usetime", "10:00~18:00");
+        assertEquals(HoursPhase.BEFORE_OPEN,
+                BusinessHoursEvaluator.phaseAt(intro, LocalDateTime.of(2026, 8, 31, 8, 0)));
+        assertEquals(HoursPhase.OPEN,
+                BusinessHoursEvaluator.phaseAt(intro, LocalDateTime.of(2026, 8, 31, 12, 0)));
+        assertEquals(HoursPhase.CLOSED,
+                BusinessHoursEvaluator.phaseAt(intro, LocalDateTime.of(2026, 8, 31, 20, 0)));
+    }
+
+    @Test
+    void hoursPhase_unknownWithoutIntro() {
+        assertEquals(HoursPhase.UNKNOWN, BusinessHoursEvaluator.phaseAt(Map.of(), LocalDateTime.of(2026, 8, 31, 12, 0)));
+        assertEquals(HoursPhase.UNKNOWN, BusinessHoursEvaluator.phaseAt(null, LocalDateTime.of(2026, 8, 31, 12, 0)));
+    }
+
+    @Test
+    void hoursPhase_restDayIsClosed() {
+        Map<String, String> intro = Map.of("restdate", "매주 월요일", "usetime", "10:00~18:00");
+        assertEquals(HoursPhase.CLOSED,
+                BusinessHoursEvaluator.phaseAt(intro, LocalDateTime.of(2026, 8, 31, 12, 0)));
     }
 
     @Test
