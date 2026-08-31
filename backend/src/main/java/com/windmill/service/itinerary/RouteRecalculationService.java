@@ -38,7 +38,7 @@ public class RouteRecalculationService {
     private static final LocalTime LUNCH_WINDOW_START = VisitTiming.LUNCH_WINDOW_START;
     private static final LocalTime LUNCH_WINDOW_END = VisitTiming.LUNCH_WINDOW_END;
     private static final LocalTime DINNER_WINDOW_START = VisitTiming.DINNER_WINDOW_START;
-    private static final LocalTime DINNER_WINDOW_END = VisitTiming.DINNER_WINDOW_END
+    private static final LocalTime DINNER_WINDOW_END = VisitTiming.DINNER_WINDOW_END;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final KakaoDirectionsClient kakaoDirectionsClient;
