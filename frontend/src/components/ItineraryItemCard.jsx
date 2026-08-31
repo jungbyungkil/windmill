@@ -53,6 +53,8 @@ export default function ItineraryItemCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
   const isWeather = (weatherAlerted || alerted) && !isIndoorPlace(item);
   const businessAlerted = closedDayAlerted || hoursEndedAlerted;
@@ -110,22 +112,26 @@ export default function ItineraryItemCard({
   }
 
   const mapAvailable = canOpenInKakaoMap(item);
+  const showDetail = expanded || editing;
 
   function handleOpenMap() {
     openInKakaoMap(item);
   }
 
+  function summaryStatusLabel() {
+    if (closedDayAlerted) return '휴무';
+    if (hoursEndedAlerted) return '영업종료';
+    if (isWeather) return '야외';
+    if (crowdAlerted) return '혼잡';
+    return STATUS_LABEL[status];
+  }
+
   return (
     <div
-      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''}`}
+      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''} ${showDetail ? 'is-expanded' : 'is-collapsed'}`}
       data-status={status}
     >
       <span className={`item-status-rail ${statusClass}`} title={STATUS_LABEL[status]} aria-hidden="true" />
-      {item.thumbnailUrl ? (
-        <img className="item-thumb" src={item.thumbnailUrl} alt={item.placeName} loading="lazy" />
-      ) : (
-        <div className="item-thumb item-thumb-placeholder">🌬️</div>
-      )}
 
       {!editing ? (
         <VisitTimePicker
@@ -145,41 +151,34 @@ export default function ItineraryItemCard({
         />
       )}
 
+      <button
+        type="button"
+        className="item-card-summary"
+        onClick={() => {
+          if (editing) return;
+          setExpanded((open) => !open);
+          setMoreOpen(false);
+        }}
+        disabled={editing}
+        aria-expanded={showDetail}
+      >
+        <span className="item-name">{item.placeName}</span>
+        <span className={`item-status-chip ${statusClass}`}>{summaryStatusLabel()}</span>
+        {!editing && (
+          <span className="item-card-chevron" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+        )}
+      </button>
+
+      {showDetail && (
+      <div className="item-detail">
+      {item.thumbnailUrl ? (
+        <img className="item-thumb" src={item.thumbnailUrl} alt="" loading="lazy" />
+      ) : null}
+
       <div className="item-body">
         {!editing ? (
           <>
-            <div className="item-head">
-              {mapAvailable ? (
-                <button
-                  type="button"
-                  className="item-name item-name-map"
-                  onClick={handleOpenMap}
-                  title="카카오맵에서 보기"
-                >
-                  {item.placeName}
-                </button>
-              ) : (
-                <span className="item-name">{item.placeName}</span>
-              )}
-              <span className={`item-status-chip ${statusClass}`}>{STATUS_LABEL[status]}</span>
-              {item.isAlternate && <span className="alt-badge" title="추천으로 담은 장소">추천</span>}
-              {isWeather && <span className="weather-affected-badge" title="비·폭염 영향 야외 일정">⚠️ 야외</span>}
-              {closedDayAlerted && <span className="business-affected-badge" title="방문일이 정기휴무 요일">🚫 휴무</span>}
-              {hoursEndedAlerted && !closedDayAlerted && (
-                <span className="business-affected-badge" title="지금 영업시간이 끝났어요">🕐 영업종료</span>
-              )}
-              {crowdAlerted && !isWeather && !businessAlerted && (
-                <span className="crowd-affected-badge" title="혼잡 주의">👥 혼잡</span>
-              )}
-              {item.pinned && (
-                <span
-                  className="pin-badge"
-                  title={item.pinnedReason || '고정됨 - 새 장소 추천에서 이 장소 근처를 우선 보여드려요'}
-                >
-                  📌
-                </span>
-              )}
-            </div>
+            {item.isAlternate && <span className="alt-badge">추천으로 담은 장소</span>}
 
             {item.tags?.length > 0 && (
               <div className="item-tags">
@@ -200,21 +199,21 @@ export default function ItineraryItemCard({
               {item.addr1 && (
                 mapAvailable ? (
                   <button type="button" className="reco-info-row reco-info-link" onClick={handleOpenMap}>
-                    📍 {item.addr1}
+                    {item.addr1}
                   </button>
                 ) : (
-                  <div className="reco-info-row">📍 {item.addr1}</div>
+                  <div className="reco-info-row">{item.addr1}</div>
                 )
               )}
               {(item.isFree || item.useFeeText) && (
-                <div className="reco-info-row">🎫 {item.isFree ? '무료' : item.useFeeText}</div>
+                <div className="reco-info-row">{item.isFree ? '무료' : item.useFeeText}</div>
               )}
               {item.tel && (
-                <a className="reco-info-row reco-info-link" href={`tel:${item.tel}`}>☎️ {item.tel}</a>
+                <a className="reco-info-row reco-info-link" href={`tel:${item.tel}`}>{item.tel}</a>
               )}
-              {item.strollerFriendly === true && <div className="reco-info-row">🍼 유모차 이용 가능</div>}
-              {item.accessibleFriendly && <div className="reco-info-row">♿ 무장애 시설</div>}
-              {item.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {item.restDateText}</div>}
+              {item.strollerFriendly === true && <div className="reco-info-row">유모차 이용 가능</div>}
+              {item.accessibleFriendly && <div className="reco-info-row">무장애 시설</div>}
+              {item.restDateText && <div className="reco-info-row reco-restdate">정기휴무: {item.restDateText}</div>}
               {item.homepageUrl && (
                 <button
                   type="button"
@@ -224,7 +223,7 @@ export default function ItineraryItemCard({
                     openExternalLink(item.homepageUrl);
                   }}
                 >
-                  🔗 홈페이지
+                  홈페이지
                 </button>
               )}
               <PlaceDetailFacts facts={item.detailFacts} />
@@ -232,6 +231,64 @@ export default function ItineraryItemCard({
 
             {item.crowdRate !== null && item.crowdRate !== undefined && (
               <div className={`item-crowd ${statusClass}`}>혼잡도 {Math.round(item.crowdRate)}%</div>
+            )}
+
+            {item.pinned && (
+              <p className="item-pin-hint">이 장소를 근처 추천 기준으로 쓰고 있어요.</p>
+            )}
+
+            <div className="item-text-actions">
+              <button
+                type="button"
+                className="item-text-btn"
+                onClick={handleOpenMap}
+                disabled={!mapAvailable}
+              >
+                지도
+              </button>
+              <button
+                type="button"
+                className="item-text-btn"
+                onClick={() => setEditing(true)}
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                className="item-text-btn"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                더보기
+              </button>
+            </div>
+            {moreOpen && (
+              <div className="item-text-actions">
+                <button
+                  type="button"
+                  className="item-text-btn"
+                  onClick={() => onTogglePin(item.itemId, !item.pinned)}
+                >
+                  {item.pinned ? '고정 해제' : '고정'}
+                </button>
+                <button
+                  type="button"
+                  className="item-text-btn"
+                  onClick={() => onOpenDocent(item)}
+                >
+                  도슨트
+                </button>
+                <button
+                  type="button"
+                  className="item-text-btn danger"
+                  onClick={() => onDelete(item.itemId)}
+                >
+                  삭제
+                </button>
+              </div>
+            )}
+            {moreOpen && !item.pinned && (
+              <p className="item-pin-hint">고정하면 새 장소 추천이 이 곳 근처를 우선해요.</p>
             )}
           </>
         ) : (
@@ -352,45 +409,8 @@ export default function ItineraryItemCard({
           </div>
         )}
       </div>
-
-      <div className="item-actions">
-        {!editing && (
-          <button
-            className="icon-btn"
-            title="수정"
-            onClick={() => setEditing(true)}
-          >
-            ✏️
-          </button>
-        )}
-        <button
-          className="icon-btn"
-          title={
-            item.pinned
-              ? '고정 해제 - 지금은 이 장소 근처로 추천 중이에요'
-              : '고정하기 - 고정하면 아래 새로운 장소 추천에서 이 장소 근처를 우선 보여드려요'
-          }
-          onClick={() => onTogglePin(item.itemId, !item.pinned)}
-          disabled={editing}
-        >
-          {item.pinned ? '📌' : '📍'}
-        </button>
-        <button
-          className="icon-btn"
-          title="카카오맵에서 보기"
-          onClick={handleOpenMap}
-          disabled={editing || !mapAvailable}
-        >
-          🗺️
-        </button>
-        <button className="icon-btn" title="AI 도슨트 듣기" onClick={() => onOpenDocent(item)} disabled={editing}>🎧</button>
-        <button
-          className="icon-btn danger"
-          title={item.backupPlaceName ? `삭제 (자동으로 "${item.backupPlaceName}"로 교체돼요)` : '삭제'}
-          onClick={() => onDelete(item.itemId)}
-          disabled={editing}
-        >🗑️</button>
       </div>
+      )}
     </div>
   );
 }

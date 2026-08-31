@@ -31,7 +31,7 @@ const PUSH_STATUS_LABEL = {
 };
 
 /** 전체 메뉴 > 설정 - 글씨 크기(어르신 접근성), 알림(웹 푸시) */
-export default function SettingsScreen({ sessionId, itineraryId }) {
+export default function SettingsScreen({ sessionId, itineraryId, onFinishTrip }) {
   const navigate = useNavigate();
   const [textScale, setTextScale] = useTextScale();
   const [pushStatus, setPushStatus] = useState(() => (isPushOptedOut() ? 'disabled' : 'idle'));
@@ -158,6 +158,15 @@ export default function SettingsScreen({ sessionId, itineraryId }) {
           </>
         )}
       </section>
+
+      {onFinishTrip && (
+        <section className="settings-section">
+          <h2 className="settings-section-title">오늘 여행</h2>
+          <button type="button" className="btn-primary settings-push-btn" onClick={onFinishTrip}>
+            여행 마무리
+          </button>
+        </section>
+      )}
 
       <nav className="settings-menu-list" aria-label="바로가기">
         <button type="button" className="settings-menu-item" onClick={() => navigate('/my-trips')}>

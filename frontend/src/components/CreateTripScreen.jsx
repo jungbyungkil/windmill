@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import PinwheelHero from './PinwheelHero';
 import PinwheelLoader from './PinwheelLoader';
 import TripStoryFeed from './TripStoryFeed';
 import RecommendationCard from './RecommendationCard';
@@ -81,6 +80,8 @@ export default function CreateTripScreen({
   const [anchorResolvingKey, setAnchorResolvingKey] = useState(null);
   const [anchorResolveError, setAnchorResolveError] = useState(null);
   const [storyFeedAvailable, setStoryFeedAvailable] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [otherWaysOpen, setOtherWaysOpen] = useState(false);
 
   useEffect(() => {
     api.getRegions()
@@ -169,6 +170,18 @@ export default function CreateTripScreen({
   }, [maxChildren]);
 
   const canSubmit = Boolean(signguFullCode && tripDate && !dateBeforeToday && !partySizeError);
+
+  const detailsSummary = useMemo(() => {
+    const companion = COMPANION_LABEL[companionType] || '';
+    const age = AGE_GROUP_OPTIONS.find((o) => o.value === adultAgeGroup)?.label || '';
+    const extras = [
+      withPet ? '반려동물' : null,
+      strollerFriendly ? '유모차' : null,
+      accessibleFriendly ? '무장애' : null,
+      childAges.length > 0 ? `자녀 ${childAges.length}명` : null,
+    ].filter(Boolean);
+    return [companion, age, ...extras].filter(Boolean).join(' · ');
+  }, [companionType, adultAgeGroup, withPet, strollerFriendly, accessibleFriendly, childAges.length]);
 
   function handleCompanionTypeChange(value) {
     setCompanionType(value);
@@ -308,6 +321,75 @@ export default function CreateTripScreen({
     onStartFromStory(story, tripDate);
   }
 
+  const resumeBlock = ongoingLoading ? (
+    <div className="draft-resume-banner draft-resume-loading">
+      <p>진행 중인 당일치기를 확인하는 중…</p>
+    </div>
+  ) : ongoingTrips.length > 0 ? (
+    <div className="draft-resume-panel">
+      <div className="draft-resume-panel-head">
+        <strong>진행 중인 여행이 있어요</strong>
+        <p>이어서 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
+      </div>
+      <ul className="draft-resume-list">
+        {ongoingTrips.map((trip, index) => {
+          const isToday = isTodayDate(trip.startDate);
+          return (
+            <li
+              key={trip.itineraryId}
+              className={`draft-resume-row${isToday ? ' draft-resume-row--today' : ''}`}
+            >
+              <div className="draft-resume-row-main">
+                <span className="draft-resume-day">당일치기 {index + 1}</span>
+                <span className="draft-resume-date-group">
+                  <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
+                  {isToday && <span className="draft-resume-today-tag">오늘</span>}
+                </span>
+                {trip.regionDisplayName && (
+                  <span className="draft-resume-region">{trip.regionDisplayName}</span>
+                )}
+                <span className="draft-resume-meta">
+                  {trip.placeCount ?? 0}곳
+                  {trip.companionType && COMPANION_LABEL[trip.companionType]
+                    ? ` · ${COMPANION_LABEL[trip.companionType]}`
+                    : ''}
+                </span>
+              </div>
+              <div className="draft-resume-row-actions">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => onResumeDraft?.(trip.itineraryId)}
+                >
+                  이어하기
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn danger draft-resume-delete"
+                  aria-label="일정 삭제"
+                  disabled={deletingDraftId === trip.itineraryId}
+                  onClick={() => handleDeleteDraft(trip)}
+                >
+                  {deletingDraftId === trip.itineraryId ? '…' : '삭제'}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ) : draftItineraryId && onResumeDraft ? (
+    <div className="draft-resume-banner">
+      <div>
+        <strong>진행 중인 여행이 있어요</strong>
+        <p>이어서 일정을 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
+      </div>
+      <button type="button" className="btn-primary" onClick={() => onResumeDraft(draftItineraryId)}>
+        이어하기
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="create-trip-screen">
       {loading && (
@@ -320,9 +402,21 @@ export default function CreateTripScreen({
           }
         />
       )}
-      <PinwheelHero />
       <h1 className="brand-title">바람따라</h1>
-      <p className="brand-tagline">당일치기 여행의 날씨·혼잡·동선 변수를 미리 알려주고, 대안을 쌓아 모두가 참고하는 가이드</p>
+      <p className="brand-tagline">당일치기 날씨·혼잡·동선을 미리 알려주고, 바로 바꿔 드려요</p>
+
+      {resumeBlock}
+
+      {!situationDismissed && (
+        <NudgeCard
+          situation={situation}
+          loading={situationLoading}
+          onDismiss={() => setSituationDismissed(true)}
+          onAction={() => {
+            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      )}
 
       <form id="trip-form" className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">
@@ -344,9 +438,9 @@ export default function CreateTripScreen({
 
         <div className="trip-form-row">
           <label className="trip-form-label" htmlFor="trip-date">
-            여행 날짜 <span className="trip-form-hint-inline">하루만 선택</span>
+            여행 날짜
           </label>
-          <p className="trip-form-date-help">당일치기만 지원해요. 추천 기록으로 시작할 때도 이 날짜가 적용돼요.</p>
+          <p className="trip-form-date-help">당일치기만 지원해요.</p>
           <input
             id="trip-date"
             type="date"
@@ -368,6 +462,19 @@ export default function CreateTripScreen({
           )}
         </div>
 
+        <div className="trip-form-disclose">
+          <button
+            type="button"
+            className="trip-form-disclose-btn"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+          >
+            <span className="trip-form-disclose-title">동반 · 접근성</span>
+            <span className="trip-form-disclose-meta">{detailsSummary}</span>
+            <span className="trip-form-disclose-chevron" aria-hidden="true">{detailsOpen ? '▾' : '▸'}</span>
+          </button>
+          {detailsOpen && (
+            <div className="trip-form-disclose-body">
         <div className="trip-form-row">
           <label className="trip-form-label">누구와 함께하나요?</label>
           <div className="reco-tag-row">
@@ -479,25 +586,29 @@ export default function CreateTripScreen({
             ))}
           </div>
         </div>
+            </div>
+          )}
+        </div>
 
+        <button className="btn-primary btn-start" type="submit" disabled={loading || !canSubmit}>
+          {loading ? '일정 준비 중...' : '스마트 동선으로 시작'}
+        </button>
+
+        <div className="trip-form-disclose">
+          <button
+            type="button"
+            className="trip-form-disclose-btn"
+            aria-expanded={otherWaysOpen}
+            onClick={() => setOtherWaysOpen((open) => !open)}
+          >
+            <span className="trip-form-disclose-title">다른 방법으로 시작</span>
+            <span className="trip-form-disclose-meta">여행자 일정 · 꼭 가고 싶은 곳</span>
+            <span className="trip-form-disclose-chevron" aria-hidden="true">{otherWaysOpen ? '▾' : '▸'}</span>
+          </button>
+          {otherWaysOpen && (
+            <div className="trip-form-disclose-body">
         <div className="plan-mode-section">
-          <h2 className="plan-mode-heading">일정은 이렇게 짜요</h2>
-          <p className="plan-mode-lead">세 가지 중 하나만 고르면 바로 시작해요.</p>
-
-          <article className="plan-mode-card">
-            <span className="plan-mode-badge">1</span>
-            <h3 className="plan-mode-title">스마트 동선 자동</h3>
-            <p className="plan-mode-desc">
-              지금 시각과 상관없이 <strong>식당 2곳 · 카페 1곳 · 일정 4곳</strong>을 채워 드려요.
-              제일 인기 있는 곳을 먼저 담고, 붐비는 명소는 비교적 한산한 오전에 배치해요.
-            </p>
-            <button className="btn-primary btn-start" type="button" onClick={handleSmartStart} disabled={loading || !canSubmit}>
-              {loading ? '일정 준비 중...' : '🌬️ 스마트 동선으로 시작'}
-            </button>
-          </article>
-
           <article className="plan-mode-card" hidden={!storyFeedAvailable}>
-            <span className="plan-mode-badge">2</span>
             <h3 className="plan-mode-title">다른 여행자 일정 참고</h3>
             <p className="plan-mode-desc">
               다녀온 사람이 남긴 당일치기를 그대로 복제해 시작할 수 있어요.
@@ -514,7 +625,6 @@ export default function CreateTripScreen({
           </article>
 
           <article className="plan-mode-card">
-            <span className="plan-mode-badge">{storyFeedAvailable ? '3' : '2'}</span>
             <h3 className="plan-mode-title">꼭 가고 싶은 곳 중심</h3>
             <p className="plan-mode-desc">
               공연·예약처럼 시각이 정해진 장소를 등록하면, 앞뒤 빈 시간을 자동으로 채워 드려요.
@@ -593,93 +703,12 @@ export default function CreateTripScreen({
             )}
           </article>
         </div>
+            </div>
+          )}
+        </div>
 
         {error && <div className="error-msg">❌ {error}</div>}
       </form>
-
-      <p className="create-trip-hint">
-        당일치기 중심으로, 날씨·혼잡·동선 변수를 미리 알려주고 대안을 고르면 그 기록이 다른 여행자 참고가 됩니다.
-      </p>
-
-      {ongoingLoading ? (
-        <div className="draft-resume-banner draft-resume-loading">
-          <p>진행 중인 당일치기를 확인하는 중…</p>
-        </div>
-      ) : ongoingTrips.length > 0 ? (
-        <div className="draft-resume-panel">
-          <div className="draft-resume-panel-head">
-            <strong>진행 중인 여행이 있어요</strong>
-            <p>날짜별 당일치기를 이어 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
-          </div>
-          <ul className="draft-resume-list">
-            {ongoingTrips.map((trip, index) => {
-              const isToday = isTodayDate(trip.startDate);
-              return (
-                <li
-                  key={trip.itineraryId}
-                  className={`draft-resume-row${isToday ? ' draft-resume-row--today' : ''}`}
-                >
-                  <div className="draft-resume-row-main">
-                    <span className="draft-resume-day">당일치기 {index + 1}</span>
-                    <span className="draft-resume-date-group">
-                      <span className="draft-resume-date">{formatDraftDate(trip.startDate)}</span>
-                      {isToday && <span className="draft-resume-today-tag">오늘</span>}
-                    </span>
-                    {trip.regionDisplayName && (
-                      <span className="draft-resume-region">{trip.regionDisplayName}</span>
-                    )}
-                    <span className="draft-resume-meta">
-                      {trip.placeCount ?? 0}곳
-                      {trip.companionType && COMPANION_LABEL[trip.companionType]
-                        ? ` · ${COMPANION_LABEL[trip.companionType]}`
-                        : ''}
-                    </span>
-                  </div>
-                  <div className="draft-resume-row-actions">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => onResumeDraft?.(trip.itineraryId)}
-                    >
-                      이어하기
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn danger draft-resume-delete"
-                      aria-label="일정 삭제"
-                      disabled={deletingDraftId === trip.itineraryId}
-                      onClick={() => handleDeleteDraft(trip)}
-                    >
-                      {deletingDraftId === trip.itineraryId ? '…' : '🗑️'}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : draftItineraryId && onResumeDraft ? (
-        <div className="draft-resume-banner">
-          <div>
-            <strong>진행 중인 여행이 있어요</strong>
-            <p>이어서 일정을 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => onResumeDraft(draftItineraryId)}>
-            이어하기
-          </button>
-        </div>
-      ) : null}
-
-      {!situationDismissed && (
-        <NudgeCard
-          situation={situation}
-          loading={situationLoading}
-          onDismiss={() => setSituationDismissed(true)}
-          onAction={() => {
-            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
-      )}
     </div>
   );
 }

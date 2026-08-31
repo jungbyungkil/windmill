@@ -41,7 +41,7 @@ export default function AlertFeedScreen({ itineraryId, showTitle = true }) {
         <ul className="alert-feed-list">
           {alerts.map((a) => (
             <li key={a.id} className={`alert-feed-card tone-${LEVEL_TONE[a.level] || 'normal'}`}>
-              <span className="alert-feed-icon" aria-hidden="true">{a.icon}</span>
+              <span className="alert-feed-pip" aria-hidden="true" />
               <div className="alert-feed-body">
                 <strong className="alert-feed-headline">{a.headline}</strong>
                 {a.detail && <p className="alert-feed-detail">{a.detail}</p>}

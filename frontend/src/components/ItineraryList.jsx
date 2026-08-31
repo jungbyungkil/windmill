@@ -1,8 +1,6 @@
 import ItineraryItemCard from './ItineraryItemCard';
 import DayRouteStrip from './DayRouteStrip';
-import TravelTipsCard from './TravelTipsCard';
-import BaramiBubble from './BaramiBubble';
-import { tipsFromTrigger, baramiCommentFromTrigger, triggerStatusLevel, isIndoorPlace } from '../utils/statusLevel';
+import { isIndoorPlace } from '../utils/statusLevel';
 
 function toIdSet(ids) {
   return new Set((ids || []).map(Number));
@@ -61,8 +59,6 @@ export default function ItineraryList({
   sortByTimeLoading = false,
   onOptimizeFromGps,
   gpsOptimizing = false,
-  onSuggestRoute,
-  suggestLoading = false,
 }) {
   const weatherIdList = resolveWeatherIds(
     weatherAffectedItemIds,
@@ -78,9 +74,7 @@ export default function ItineraryList({
   const closedDayIds = toIdSet(closedDayAffectedItemIds);
   const hoursEndedIds = toIdSet(hoursEndedAffectedItemIds);
   const crowdIds = toIdSet(crowdAffectedItemIds);
-  const tips = tipsFromTrigger(trigger);
-  const tipLevel = triggerStatusLevel(trigger);
-  const baramiComment = baramiCommentFromTrigger(trigger);
+  const heroHasCta = Boolean(trigger && trigger.level && trigger.level !== 'NORMAL');
 
   return (
     <div className="itinerary-list">
@@ -103,10 +97,6 @@ export default function ItineraryList({
         </div>
       </div>
 
-      {tips.length > 0 && (
-        <TravelTipsCard tips={tips} level={tipLevel} />
-      )}
-
       {items.length > 0 && (
         <DayRouteStrip
           items={items}
@@ -115,31 +105,14 @@ export default function ItineraryList({
           crowdAffectedItemIds={[...crowdIds]}
           onOptimizeFromGps={onOptimizeFromGps}
           gpsOptimizing={gpsOptimizing}
-          onSuggestRoute={onSuggestRoute}
-          suggestLoading={suggestLoading}
-          suggestHighlight={hoursEndedIds.size > 0}
+          showRouteActions={!heroHasCta}
         />
       )}
 
-      {weatherIds.size > 0 && (
-        <p className="itinerary-weather-hint">
-          빨간 <strong>야외</strong> 표시는 비·폭염 영향 일정이에요. 바람개비에서 실내로 바꿔보세요.
-        </p>
-      )}
-      {closedDayIds.size > 0 && (
-        <p className="itinerary-business-hint">
-          <strong>휴무</strong> 표시는 방문일이 정기휴무일이라는 뜻이에요. 대체 장소를 골라보세요.
-        </p>
-      )}
-      {hoursEndedIds.size > 0 && (
-        <p className="itinerary-business-hint">
-          <strong>영업종료</strong> 표시는 지금 영업시간이 끝났다는 뜻이에요. 순서를 바꿔 오늘 일정을 살려 보세요.
-        </p>
-      )}
       {items.length === 0 ? (
         <div className="itinerary-empty">
           <p className="empty-state">아직 담은 장소가 없어요.</p>
-          <p className="itinerary-empty-hint">아래에서 장소를 검색해 직접 담을 수도 있어요.</p>
+          <p className="itinerary-empty-hint">검색 탭에서 장소를 찾아 담을 수 있어요.</p>
         </div>
       ) : (
         <div className="item-cards">
@@ -164,8 +137,6 @@ export default function ItineraryList({
           })}
         </div>
       )}
-
-      {items.length > 0 && <BaramiBubble comment={baramiComment} />}
     </div>
   );
 }

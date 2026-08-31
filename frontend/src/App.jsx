@@ -9,7 +9,6 @@ import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
-import VariableActionCards from './components/VariableActionCards';
 import PinwheelLoader from './components/PinwheelLoader';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
@@ -18,7 +17,6 @@ import ItineraryList from './components/ItineraryList';
 import DayRouteMap from './components/DayRouteMap';
 import RecommendationSearch from './components/RecommendationSearch';
 import BottomTabBar from './components/BottomTabBar';
-import TripFlowRail from './components/TripFlowRail';
 import AlternativesPanel from './components/AlternativesPanel';
 import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
@@ -156,9 +154,6 @@ export default function App() {
   const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const autoOptimizedRef = useRef(false);
-  const skipSectionObserveRef = useRef(false);
-  const ignoreHashScrollRef = useRef(false);
-
   const [activeDate, setActiveDate] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tripSection, setTripSection] = useState('home');
@@ -286,64 +281,18 @@ export default function App() {
 
   function selectTripSection(key) {
     if (!TRIP_SECTIONS.includes(key)) return;
-    skipSectionObserveRef.current = true;
     setTripSection(key);
     const next = tripSectionPath(key);
     if (`${location.pathname}${location.hash}` !== next) {
       navigate(next, { replace: true });
     }
-    window.requestAnimationFrame(() => {
-      document.getElementById(`trip-section-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    window.setTimeout(() => {
-      skipSectionObserveRef.current = false;
-    }, 800);
   }
 
   useEffect(() => {
-    if (!itinerary || location.pathname !== '/trip') return undefined;
-    const key = tripSectionFromHash(location.hash);
-    setTripSection(key);
-
-    if (ignoreHashScrollRef.current) {
-      ignoreHashScrollRef.current = false;
-      return undefined;
-    }
-
-    // 해시 없이 /trip 진입(새 일정·이어하기·알림)은 맨 위가 홈이므로 강제 스크롤하지 않는다
-    if (key === 'home' && !location.hash) {
-      return undefined;
-    }
-
-    skipSectionObserveRef.current = true;
-    const timer = window.setTimeout(() => {
-      document.getElementById(`trip-section-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      skipSectionObserveRef.current = false;
-    }, 80);
-    return () => window.clearTimeout(timer);
+    if (!itinerary || location.pathname !== '/trip') return;
+    setTripSection(tripSectionFromHash(location.hash));
+    window.scrollTo(0, 0);
   }, [itinerary, location.pathname, location.hash]);
-
-  useEffect(() => {
-    if (!itinerary || location.pathname !== '/trip') return undefined;
-    const observer = new IntersectionObserver((entries) => {
-      if (skipSectionObserveRef.current) return;
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-      const id = visible[0]?.target?.id?.replace('trip-section-', '');
-      if (!id || !TRIP_SECTIONS.includes(id)) return;
-      setTripSection(id);
-      const next = tripSectionPath(id);
-      if (`${window.location.pathname}${window.location.hash}` === next) return;
-      ignoreHashScrollRef.current = true;
-      navigate(next, { replace: true });
-    }, { rootMargin: '-18% 0px -62% 0px', threshold: [0.12, 0.35] });
-    TRIP_SECTIONS.forEach((key) => {
-      const el = document.getElementById(`trip-section-${key}`);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [itinerary, location.pathname, navigate]);
 
   const refreshTrigger = useCallback(async () => {
     if (!itineraryId) return;
@@ -1306,7 +1255,7 @@ export default function App() {
   }
 
   if (restoring) {
-    return <div className="app-loading">🌬️ 불러오는 중...</div>;
+    return <div className="app-loading">불러오는 중...</div>;
   }
 
   return (
@@ -1428,55 +1377,41 @@ export default function App() {
               {creating && (
                 <PinwheelLoader message={creatingStage || '지금 일정을 스마트하게 고르고 있어요...'} />
               )}
-              <BackHeader title="바람따라" showBack={false} />
               <header className="app-header">
                 <div className="header-inner">
-                  <button type="button" className="logo logo-btn" onClick={handleGoHome} title="메인으로">
-                    🌬️ 바람따라
+                  <button
+                    type="button"
+                    className="icon-btn header-menu-btn"
+                    aria-label="전체 메뉴"
+                    onClick={() => setMenuOpen(true)}
+                  >
+                    ☰
                   </button>
-                  <div className="header-actions">
-                    <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
-                      {shareBusy ? '링크 준비 중...' : '🔗 일정 공유'}
-                    </button>
-                    <button className="btn-finish" type="button" onClick={() => setTripRecordOpen(true)}>🏁 여행 마무리</button>
-                  </div>
+                  <button type="button" className="header-trip-meta" onClick={handleGoHome} title="메인으로">
+                    <span className="header-trip-region">{itinerary.regionDisplayName || '바람따라'}</span>
+                    {tripDate && <span className="header-trip-date">{formatTripDate(tripDate)}</span>}
+                  </button>
+                  <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
+                    {shareBusy ? '준비 중...' : '공유'}
+                  </button>
                 </div>
               </header>
 
               <main className="app-main">
-                <TripFlowRail active={tripSection} onSelect={selectTripSection} />
-
-                <section id="trip-section-home" className="trip-page-section">
-                <header className="trip-section-head">
-                  <p className="trip-section-kicker">1 · 오늘 일정</p>
-                  <h2>홈</h2>
-                  <p>실시간 변수를 보고 오늘 일정을 다듬어요. 아래 지도·검색·알림·설정도 이 페이지에서 이어서 볼 수 있어요.</p>
-                </header>
+                {tripSection === 'home' && (
+                <section className="trip-page-section">
                 <PinwheelHero
+                  compactWhenIdle
                   trigger={trigger}
                   onRequestAlternatives={handleRequestAlternatives}
                   loading={altLoading}
-                  onAutoReplace={handleAutoReplace}
-                  autoLoading={autoReplacing}
                   onRerouteSchedule={handleRerouteSchedule}
                   rerouteLoading={rerouteLoading}
-                  onOptimizeRoute={() => handleOptimizeRoute()}
+                  onOptimizeRoute={() => handleOptimizeFromGps()}
                   optimizeLoading={optimizeLoading}
                 />
 
-                <VariableActionCards
-                  trigger={trigger}
-                  onWeather={() => handleRerouteSchedule(trigger?.heatTrigger ? 'HEAT' : 'WEATHER')}
-                  onCrowd={() => handleRerouteSchedule('CROWD')}
-                  onRoute={() => handleOptimizeRoute()}
-                  weatherLoading={rerouteLoading}
-                  crowdLoading={rerouteLoading}
-                  routeLoading={optimizeLoading}
-                />
-
                 {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
-
-                <WeatherBanner items={weatherItems} />
 
                 <div className="daytrip-chip-row">
                   <span className="daytrip-chip">당일치기</span>
@@ -1504,9 +1439,9 @@ export default function App() {
                   sortByTimeLoading={sortByTimeLoading}
                   onOptimizeFromGps={handleOptimizeFromGps}
                   gpsOptimizing={optimizeLoading}
-                  onSuggestRoute={handleSuggestRoute}
-                  suggestLoading={suggestLoading}
                 />
+
+                <WeatherBanner items={weatherItems} />
 
                 <FestivalBanner
                   festivals={trigger?.festivalSuggestions}
@@ -1516,12 +1451,12 @@ export default function App() {
 
                 <MidWeatherBanner forecast={midWeather} />
                 </section>
+                )}
 
-                <section id="trip-section-map" className="trip-page-section">
+                {tripSection === 'map' && (
+                <section className="trip-page-section">
                   <header className="trip-section-head">
-                    <p className="trip-section-kicker">2 · 동선 확인</p>
                     <h2>지도</h2>
-                    <p>오늘 가는 순서를 지도에서 보고, 이 지역을 재검색해 주변 장소를 일정에 담아요.</p>
                   </header>
                   <DayRouteMap
                     items={visibleItems}
@@ -1534,12 +1469,12 @@ export default function App() {
                     busyContentId={addingContentId}
                   />
                 </section>
+                )}
 
-                <section id="trip-section-search" className="trip-page-section">
+                {tripSection === 'search' && (
+                <section className="trip-page-section">
                   <header className="trip-section-head">
-                    <p className="trip-section-kicker">3 · 장소 더 찾기</p>
                     <h2>검색</h2>
-                    <p>태그나 이름으로 장소를 찾아 오늘 일정에 보태요.</p>
                   </header>
                   <RecommendationSearch
                     onSearch={handleSearch}
@@ -1550,29 +1485,30 @@ export default function App() {
                     pinnedPlaceName={pinnedOrigin?.placeName}
                   />
                 </section>
+                )}
 
-                <section id="trip-section-alerts" className="trip-page-section">
+                {tripSection === 'alerts' && (
+                <section className="trip-page-section">
                   <header className="trip-section-head">
-                    <p className="trip-section-kicker">4 · 실시간 변수</p>
                     <h2>알림</h2>
-                    <p>비·폭염·혼잡처럼 이미 알려 드린 내용을 시간 순으로 모아 봐요.</p>
                   </header>
                   <AlertFeedScreen itineraryId={itineraryId} showTitle={false} />
                 </section>
+                )}
 
-                <section id="trip-section-profile" className="trip-page-section">
+                {tripSection === 'profile' && (
+                <section className="trip-page-section">
                   <header className="trip-section-head">
-                    <p className="trip-section-kicker">5 · 내 설정</p>
                     <h2>프로필</h2>
-                    <p>글씨 크기와 알림을 맞추고, 내 여행·이용 가이드로 이어가요.</p>
                   </header>
-                  <SettingsScreen sessionId={sessionId} itineraryId={itineraryId} />
+                  <SettingsScreen
+                    sessionId={sessionId}
+                    itineraryId={itineraryId}
+                    onFinishTrip={() => setTripRecordOpen(true)}
+                  />
                 </section>
+                )}
               </main>
-
-              <footer className="app-footer">
-                <p>바람따라 · 바람이 알려주는 실시간 여행</p>
-              </footer>
 
               <BottomTabBar active={tripSection} onSelect={selectTripSection} />
 

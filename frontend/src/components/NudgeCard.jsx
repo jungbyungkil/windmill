@@ -4,10 +4,10 @@ import { isPushOptedOut } from '../utils/webPush';
 const DISMISS_KEY = 'windtrail:dismissedNudgeIds';
 
 const NUDGE_STYLE = {
-  WEATHER_RAIN: { icon: '🌧️', tone: 'urgent' },
-  CROWD: { icon: '👥', tone: 'crowd' },
-  WEATHER_HEAT: { icon: '🌡️', tone: 'heat' },
-  CRUISE: { icon: '🌬️', tone: 'ok' },
+  WEATHER_RAIN: { label: '비', tone: 'urgent' },
+  CROWD: { label: '혼잡', tone: 'crowd' },
+  WEATHER_HEAT: { label: '폭염', tone: 'heat' },
+  CRUISE: { label: '순풍', tone: 'ok' },
 };
 
 function readDismissedIds() {
@@ -65,7 +65,7 @@ export default function NudgeCard({ situation, loading, onDismiss, onAction }) {
         onClick={onAction ? () => onAction(situation) : undefined}
       >
         <div className="nudge-card-head">
-          <span className="nudge-card-icon" aria-hidden="true">{style.icon}</span>
+          <span className="nudge-card-tag">{style.label}</span>
           <strong className="nudge-card-headline">{situation.headline}</strong>
         </div>
         <span className="nudge-card-detail">{situation.detail}</span>
