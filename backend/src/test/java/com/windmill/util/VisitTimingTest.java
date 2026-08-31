@@ -88,6 +88,21 @@ class VisitTimingTest {
     }
 
     @Test
+    void mealWindows_matchRouteRecalculationSharedValues() {
+        assertTrue(VisitTiming.inLunchWindow(LocalTime.of(11, 0)));
+        assertTrue(VisitTiming.inLunchWindow(LocalTime.of(14, 0)));
+        assertFalse(VisitTiming.inLunchWindow(LocalTime.of(10, 59)));
+        assertTrue(VisitTiming.inDinnerWindow(LocalTime.of(17, 0)));
+        assertTrue(VisitTiming.inDinnerWindow(LocalTime.of(19, 30)));
+        assertFalse(VisitTiming.inDinnerWindow(LocalTime.of(19, 31)));
+        assertEquals(-VisitTiming.MEAL_IN_WINDOW_BONUS_MINUTES,
+                VisitTiming.mealTravelScoreAdjustment(true, LocalTime.of(12, 0)));
+        assertEquals(VisitTiming.MEAL_OUTSIDE_WINDOW_PENALTY_MINUTES,
+                VisitTiming.mealTravelScoreAdjustment(true, LocalTime.of(15, 0)));
+        assertEquals(0, VisitTiming.mealTravelScoreAdjustment(false, LocalTime.of(12, 0)));
+    }
+
+    @Test
     void occupancyEnd_capsStayAtClose() {
         LocalTime end = VisitTiming.occupancyEnd(LocalTime.of(16, 0), 75, LocalTime.of(17, 0));
         assertEquals(LocalTime.of(17, 0), end);

@@ -57,6 +57,18 @@ public final class VisitTiming {
     public static final LocalTime DAY_START = LocalTime.of(9, 0);
     /** 제안·동선 재계산의 시작 상한. 전시/공연 저녁 슬롯(20시대)이 잘리지 않게 21시까지. */
     public static final LocalTime LATEST_START = LocalTime.of(21, 0);
+    /**
+     * 점심·저녁 창. 동선 재계산({@code RouteRecalculationService})과 그리디 제안이 같은 값을 쓴다.
+     * 창 안에 이미 도착하면 정각으로 밀지 않고, 창보다 이르면 창 시작으로만 당긴다.
+     */
+    public static final LocalTime LUNCH_WINDOW_START = LocalTime.of(11, 0);
+    public static final LocalTime LUNCH_WINDOW_END = LocalTime.of(14, 0);
+    public static final LocalTime DINNER_WINDOW_START = LocalTime.of(17, 0);
+    public static final LocalTime DINNER_WINDOW_END = LocalTime.of(19, 30);
+    /** 그리디: 식사가 창 안에 도착하면 이동시간 점수에서 뺌 */
+    public static final int MEAL_IN_WINDOW_BONUS_MINUTES = 15;
+    /** 그리디: 식사가 창 밖에 도착하면 이동시간 점수에 더함 */
+    public static final int MEAL_OUTSIDE_WINDOW_PENALTY_MINUTES = 40;
     public static final int SUGGEST_STEP_MINUTES = 15;
     public static final int MAX_SUGGESTIONS = 3;
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
@@ -100,6 +112,36 @@ public final class VisitTiming {
             return false;
         }
         return isMeal(item.getContentTypeId(), item.getPlaceName(), item.getCategory(), item.getTags());
+    }
+
+    public static boolean inLunchWindow(LocalTime time) {
+        return inInclusiveWindow(time, LUNCH_WINDOW_START, LUNCH_WINDOW_END);
+    }
+
+    public static boolean inDinnerWindow(LocalTime time) {
+        return inInclusiveWindow(time, DINNER_WINDOW_START, DINNER_WINDOW_END);
+    }
+
+    public static boolean inMealWindow(LocalTime time) {
+        return inLunchWindow(time) || inDinnerWindow(time);
+    }
+
+    /**
+     * 그리디 다음 장소 점수에 더할 값(분). 비식사는 0.
+     * 창 안 도착은 보너스(음수), 창 밖은 페널티(양수)라 식사 시간대에 식당이 골라지기 쉽다.
+     */
+    public static int mealTravelScoreAdjustment(boolean meal, LocalTime arrival) {
+        if (!meal) {
+            return 0;
+        }
+        if (inMealWindow(arrival)) {
+            return -MEAL_IN_WINDOW_BONUS_MINUTES;
+        }
+        return MEAL_OUTSIDE_WINDOW_PENALTY_MINUTES;
+    }
+
+    private static boolean inInclusiveWindow(LocalTime time, LocalTime start, LocalTime end) {
+        return time != null && !time.isBefore(start) && !time.isAfter(end);
     }
 
     public static boolean isMuseumOrGallery(Integer contentTypeId, String placeName, String category,

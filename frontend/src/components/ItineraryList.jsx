@@ -61,6 +61,8 @@ export default function ItineraryList({
   sortByTimeLoading = false,
   onOptimizeFromGps,
   gpsOptimizing = false,
+  onSuggestRoute,
+  suggestLoading = false,
 }) {
   const weatherIdList = resolveWeatherIds(
     weatherAffectedItemIds,
@@ -113,6 +115,9 @@ export default function ItineraryList({
           crowdAffectedItemIds={[...crowdIds]}
           onOptimizeFromGps={onOptimizeFromGps}
           gpsOptimizing={gpsOptimizing}
+          onSuggestRoute={onSuggestRoute}
+          suggestLoading={suggestLoading}
+          suggestHighlight={hoursEndedIds.size > 0}
         />
       )}
 
@@ -128,7 +133,7 @@ export default function ItineraryList({
       )}
       {hoursEndedIds.size > 0 && (
         <p className="itinerary-business-hint">
-          <strong>영업종료</strong> 표시는 지금 영업시간이 끝났다는 뜻이에요. 대체 장소를 골라보세요.
+          <strong>영업종료</strong> 표시는 지금 영업시간이 끝났다는 뜻이에요. 순서를 바꿔 오늘 일정을 살려 보세요.
         </p>
       )}
       {items.length === 0 ? (

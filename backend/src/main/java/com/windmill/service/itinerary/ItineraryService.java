@@ -5,6 +5,7 @@ import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.PlaceSituationalTags;
 import com.windmill.domain.TripRecord;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.ApplySuggestedRouteRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryItemResponse;
 import com.windmill.dto.ItineraryListItemResponse;
@@ -849,6 +850,58 @@ public class ItineraryService {
                 oLon, oLat,
                 ItineraryItem::getMapX, ItineraryItem::getMapY);
         return new OptimizeRouteResult(saved, recalc.message(), km);
+    }
+
+    /**
+     * 그리디 제안 순서를 사용자가 확인한 뒤에만 displayOrder·scheduledTime을 반영한다.
+     * 알고리즘을 다시 돌리지 않는다.
+     */
+    @Transactional
+    public Itinerary applySuggestedRoute(Long itineraryId, LocalDate date,
+                                         ApplySuggestedRouteRequest request) {
+        Itinerary itinerary = get(itineraryId);
+        List<ItineraryItem> targets = itemsOnDate(itinerary, date);
+        if (request == null || request.getStops() == null || request.getStops().isEmpty()) {
+            throw new IllegalArgumentException("반영할 순서가 없어요.");
+        }
+        if (request.getStops().size() != targets.size()) {
+            throw new IllegalArgumentException("제안 장소 수가 오늘 일정과 달라요.");
+        }
+        Map<Long, ItineraryItem> byId = targets.stream()
+                .collect(Collectors.toMap(ItineraryItem::getId, i -> i));
+        List<Long> seen = new ArrayList<>();
+        for (ApplySuggestedRouteRequest.Stop stop : request.getStops()) {
+            if (stop.getItemId() == null || !byId.containsKey(stop.getItemId())) {
+                throw new IllegalArgumentException("오늘 일정에 없는 장소가 포함돼 있어요.");
+            }
+            if (seen.contains(stop.getItemId())) {
+                throw new IllegalArgumentException("같은 장소가 순서에 두 번 들어 있어요.");
+            }
+            seen.add(stop.getItemId());
+        }
+
+        int orderBase = itinerary.getItems().stream()
+                .filter(i -> targets.stream().noneMatch(t -> t.getId().equals(i.getId())))
+                .mapToInt(ItineraryItem::getDisplayOrder)
+                .max()
+                .orElse(-1) + 1;
+        for (int i = 0; i < request.getStops().size(); i++) {
+            ApplySuggestedRouteRequest.Stop stop = request.getStops().get(i);
+            ItineraryItem item = byId.get(stop.getItemId());
+            item.setDisplayOrder(orderBase + i);
+            if (stop.getScheduledTime() != null && !stop.getScheduledTime().isBlank()) {
+                item.setScheduledTime(stop.getScheduledTime().trim());
+            }
+        }
+        return itineraryRepository.save(itinerary);
+    }
+
+    private List<ItineraryItem> itemsOnDate(Itinerary itinerary, LocalDate date) {
+        return itinerary.getItems().stream()
+                .filter(i -> date == null
+                        || date.equals(i.getVisitDate())
+                        || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
+                .collect(Collectors.toList());
     }
 
     /** 하위 호환 */

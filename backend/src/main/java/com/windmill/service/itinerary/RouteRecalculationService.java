@@ -35,10 +35,10 @@ public class RouteRecalculationService {
     // 창 안이면 건드리지 않고, 창보다 이르면 창 시작으로만 최소한 당긴다(옛날엔 무조건 12:00/18:00
     // 정각으로 점프시켜 미래 일정(하루 전체 09:00부터 사용 가능)에서도 식사 앞뒤로 몇 시간씩 빈
     // 채로 건너뛰고 나머지 일정이 저녁으로 몰리는 문제가 있었음).
-    private static final LocalTime LUNCH_WINDOW_START = LocalTime.of(11, 0);
-    private static final LocalTime LUNCH_WINDOW_END = LocalTime.of(14, 0);
-    private static final LocalTime DINNER_WINDOW_START = LocalTime.of(17, 0);
-    private static final LocalTime DINNER_WINDOW_END = LocalTime.of(19, 30);
+    private static final LocalTime LUNCH_WINDOW_START = VisitTiming.LUNCH_WINDOW_START;
+    private static final LocalTime LUNCH_WINDOW_END = VisitTiming.LUNCH_WINDOW_END;
+    private static final LocalTime DINNER_WINDOW_START = VisitTiming.DINNER_WINDOW_START;
+    private static final LocalTime DINNER_WINDOW_END = VisitTiming.DINNER_WINDOW_END
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final KakaoDirectionsClient kakaoDirectionsClient;

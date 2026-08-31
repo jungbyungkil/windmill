@@ -204,6 +204,24 @@ export function optimizeRoute(itineraryId, date, origin, startTime) {
   return request(`/itineraries/${itineraryId}/optimize-route${qs(params)}`, { method: 'POST' });
 }
 
+/** 현재 위치·시각 기준 그리디 재배열 제안. 일정에는 쓰지 않음. */
+export function suggestRoute(itineraryId, date, origin) {
+  const params = { date };
+  if (origin?.lon != null && origin?.lat != null) {
+    params.originLon = origin.lon;
+    params.originLat = origin.lat;
+  }
+  return request(`/itineraries/${itineraryId}/suggest-route${qs(params)}`);
+}
+
+/** 사용자가 확인한 제안 순서를 오늘 일정에 반영 */
+export function applySuggestedRoute(itineraryId, date, stops) {
+  return request(`/itineraries/${itineraryId}/apply-suggested-route${qs({ date })}`, {
+    method: 'POST',
+    body: { stops },
+  });
+}
+
 /** 방문 시각 순으로 일정 재정렬 (시각 값은 유지) */
 export function sortItineraryByTime(itineraryId, date) {
   return request(`/itineraries/${itineraryId}/sort-by-time${qs({ date })}`, { method: 'POST' });

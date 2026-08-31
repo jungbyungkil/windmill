@@ -24,6 +24,7 @@ import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
 import SharedItineraryScreen from './components/SharedItineraryScreen';
 import ClosingGateModal from './components/ClosingGateModal';
+import SuggestRouteCompare from './components/SuggestRouteCompare';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
 import AlertFeedScreen from './components/AlertFeedScreen';
@@ -147,6 +148,11 @@ export default function App() {
   const [closingGate, setClosingGate] = useState(null);
   const [rerouteLoading, setRerouteLoading] = useState(false);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestApplying, setSuggestApplying] = useState(false);
+  const [suggestResult, setSuggestResult] = useState(null);
+  const [suggestError, setSuggestError] = useState(null);
   const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const autoOptimizedRef = useRef(false);
@@ -1166,6 +1172,53 @@ export default function App() {
     );
   }
 
+  /** 「이 순서 어때요?」 — GPS 기준 그리디 제안. 확인 전까지 일정에 쓰지 않는다. */
+  function handleSuggestRoute() {
+    if (!itineraryId || suggestLoading || optimizeLoading) return;
+    setSuggestOpen(true);
+    setSuggestLoading(true);
+    setSuggestError(null);
+    setSuggestResult(null);
+    const run = (origin) => {
+      api.suggestRoute(itineraryId, activeDate, origin)
+        .then((result) => setSuggestResult(result))
+        .catch((e) => setSuggestError(e.message || '순서를 제안하지 못했어요'))
+        .finally(() => setSuggestLoading(false));
+    };
+    if (!navigator.geolocation) {
+      run(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => run({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
+      () => run(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  }
+
+  async function handleApplySuggestedRoute() {
+    if (!itineraryId || !suggestResult?.suggestedStops?.length || suggestApplying) return;
+    setSuggestApplying(true);
+    setSuggestError(null);
+    try {
+      const stops = suggestResult.suggestedStops.map((s) => ({
+        itemId: s.itemId,
+        scheduledTime: s.scheduledTime,
+      }));
+      const result = await api.applySuggestedRoute(itineraryId, activeDate, stops);
+      setItinerary(result);
+      setSuggestOpen(false);
+      setSuggestResult(null);
+      setAutoReplaceNotice(suggestResult.message || '제안한 순서로 오늘 일정을 바꿨어요.');
+      refreshTrigger();
+      setTimeout(() => setAutoReplaceNotice(null), 6000);
+    } catch (e) {
+      setSuggestError(e.message || '순서를 반영하지 못했어요');
+    } finally {
+      setSuggestApplying(false);
+    }
+  }
+
   /** 오늘 일정을 방문 시각 순으로 재정렬 (시각은 유지) */
   async function handleSortByTime() {
     if (!itineraryId || sortByTimeLoading) return;
@@ -1451,6 +1504,8 @@ export default function App() {
                   sortByTimeLoading={sortByTimeLoading}
                   onOptimizeFromGps={handleOptimizeFromGps}
                   gpsOptimizing={optimizeLoading}
+                  onSuggestRoute={handleSuggestRoute}
+                  suggestLoading={suggestLoading}
                 />
 
                 <FestivalBanner
@@ -1567,6 +1622,21 @@ export default function App() {
                   }
                 }}
                 onClose={() => setClosingGate(null)}
+              />
+
+              <SuggestRouteCompare
+                open={suggestOpen}
+                loading={suggestLoading}
+                applying={suggestApplying}
+                error={suggestError}
+                result={suggestResult}
+                onApply={handleApplySuggestedRoute}
+                onClose={() => {
+                  if (suggestApplying) return;
+                  setSuggestOpen(false);
+                  setSuggestResult(null);
+                  setSuggestError(null);
+                }}
               />
 
               <TripRecordModal

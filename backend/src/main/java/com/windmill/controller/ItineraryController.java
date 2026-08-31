@@ -6,6 +6,7 @@ import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.AlertEventResponse;
 import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.AnchorPlanRequest;
+import com.windmill.dto.ApplySuggestedRouteRequest;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
 import com.windmill.dto.ItineraryListItemResponse;
@@ -15,8 +16,10 @@ import com.windmill.dto.OngoingItineraryResponse;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.SmartPlanResponse;
+import com.windmill.dto.SuggestedRouteResponse;
 import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
+import com.windmill.service.itinerary.GreedyRouteSuggestService;
 import com.windmill.service.itinerary.ItineraryService;
 import com.windmill.service.notification.AlertFeedService;
 import com.windmill.service.recommendation.AnchorPlanService;
@@ -43,6 +46,7 @@ import java.util.stream.Collectors;
 public class ItineraryController {
 
     private final ItineraryService itineraryService;
+    private final GreedyRouteSuggestService greedyRouteSuggestService;
     private final TriggerDetectionService triggerDetectionService;
     private final RecommendationPipeline recommendationPipeline;
     private final InitialPlanService initialPlanService;
@@ -234,6 +238,42 @@ public class ItineraryController {
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * "이 순서 어때요?" 미리보기. 현재 위치·시각 기준 그리디 재배열만 계산하고 일정에는 쓰지 않는다.
+     */
+    @GetMapping("/{id}/suggest-route")
+    public Mono<ResponseEntity<SuggestedRouteResponse>> suggestRoute(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) Double originLon,
+            @RequestParam(required = false) Double originLat) {
+        return Mono.fromCallable(() -> {
+                    Itinerary itinerary = itineraryService.get(id);
+                    List<ItineraryItem> targets = itinerary.getItems().stream()
+                            .filter(i -> date == null
+                                    || date.equals(i.getVisitDate())
+                                    || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
+                            .collect(Collectors.toList());
+                    return greedyRouteSuggestService.suggest(targets, originLon, originLat);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 제안 순서를 오늘 일정에 반영. 그리디를 다시 돌리지 않고 클라이언트가 확인한 순서·시각만 저장한다.
+     */
+    @PostMapping("/{id}/apply-suggested-route")
+    public Mono<ResponseEntity<ItineraryResponse>> applySuggestedRoute(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date,
+            @Valid @RequestBody ApplySuggestedRouteRequest request) {
+        return Mono.fromCallable(() -> itineraryService.applySuggestedRoute(id, date, request))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(this::toResponse)
                 .map(ResponseEntity::ok);
     }
 
