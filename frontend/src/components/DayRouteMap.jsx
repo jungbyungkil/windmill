@@ -5,6 +5,7 @@ import { TOUR_FOOD_CONTENT_TYPE_ID } from '../constants';
 import { itemStatusLevel, isIndoorPlace, STATUS_LABEL } from '../utils/statusLevel';
 import { canOpenInKakaoMap, geocodePlaceWithKakaoServices, openInKakaoMap } from '../utils/kakaoMap';
 import { hoursPhaseForPlace, HOURS_PHASE_LABEL } from '../utils/hoursPhase';
+import { isPlaceInItinerary, readContentId } from '../utils/itineraryMembership';
 import MapPlaceCard from './MapPlaceCard';
 
 const BUILD_TIME_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY || '';
@@ -28,10 +29,6 @@ function parseCoord(item) {
 
 function canGeocode(item) {
   return Boolean((item?.addr1 || '').trim() || (item?.placeName || '').trim());
-}
-
-function contentKey(value) {
-  return value == null ? '' : String(value);
 }
 
 function statusText(item, weather, closedDay, hoursEnded, crowd) {
@@ -123,7 +120,8 @@ function DayRouteMapCanvas({
   const itineraryContentIds = useMemo(() => {
     const ids = new Set();
     (itineraryItems || []).forEach((item) => {
-      if (item?.contentId) ids.add(contentKey(item.contentId));
+      const id = readContentId(item);
+      if (id) ids.add(id);
     });
     return ids;
   }, [itineraryItems]);
@@ -153,11 +151,15 @@ function DayRouteMapCanvas({
     });
   }, [itineraryContentIds]);
 
-  function isInItinerary(contentId) {
-    const id = contentKey(contentId);
+  function isInItinerary(placeOrId) {
+    if (placeOrId != null && typeof placeOrId === 'object') {
+      return isPlaceInItinerary(placeOrId, itineraryItems, optimisticAdded, optimisticRemoved);
+    }
+    const id = readContentId(placeOrId);
     if (!id) return false;
-    const saved = itineraryContentIds.has(id);
-    return (saved || optimisticAdded.has(id)) && !optimisticRemoved.has(id);
+    if (optimisticRemoved.has(id)) return false;
+    if (optimisticAdded.has(id)) return true;
+    return itineraryContentIds.has(id);
   }
 
   useEffect(() => {
@@ -264,7 +266,8 @@ function DayRouteMapCanvas({
   const itineraryContentOnMap = useMemo(() => {
     const ids = new Set();
     stops.forEach((s) => {
-      if (s.item?.contentId) ids.add(contentKey(s.item.contentId));
+      const id = readContentId(s.item);
+      if (id) ids.add(id);
     });
     return ids;
   }, [stops]);
@@ -273,16 +276,17 @@ function DayRouteMapCanvas({
     return (nearby || []).flatMap((place) => {
       const coord = parseCoord(place);
       if (!coord) return [];
-      const id = contentKey(place.contentId);
-      if (itineraryContentOnMap.has(id) && isInItinerary(id)) return [];
-      return [{ ...place, ...coord, contentKey: id, inItinerary: isInItinerary(id) }];
+      const id = readContentId(place);
+      const added = isInItinerary(place);
+      if (id && itineraryContentOnMap.has(id) && added) return [];
+      return [{ ...place, ...coord, contentKey: id, inItinerary: added }];
     });
     // optimistic sets change inItinerary without nearby identity changing
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearby, itineraryContentOnMap, optimisticAdded, optimisticRemoved, itineraryContentIds]);
 
   const selectedStop = stops.find((s) => s.id === selectedStopId);
-  const selectedPlace = (nearby || []).find((p) => contentKey(p.contentId) === selectedPlaceId)
+  const selectedPlace = (nearby || []).find((p) => readContentId(p) === selectedPlaceId)
     || searchMarkers.find((p) => p.contentKey === selectedPlaceId);
 
   function markUserMoved() {
@@ -317,8 +321,17 @@ function DayRouteMapCanvas({
     }
   }
 
+  function handleClearSearch() {
+    setNearby([]);
+    setHasSearched(false);
+    setSearchError(null);
+    setSelectedPlaceId(null);
+    setMovedSinceSearch(false);
+  }
+
   async function handleAdd(place) {
-    const id = contentKey(place.contentId);
+    const id = readContentId(place);
+    if (!id) return;
     setOptimisticAdded((prev) => new Set(prev).add(id));
     setOptimisticRemoved((prev) => {
       if (!prev.has(id)) return prev;
@@ -338,7 +351,8 @@ function DayRouteMapCanvas({
   }
 
   async function handleRemove(place) {
-    const id = contentKey(place.contentId);
+    const id = readContentId(place);
+    if (!id) return;
     setOptimisticRemoved((prev) => new Set(prev).add(id));
     try {
       await onRemovePlace?.(id);
@@ -371,10 +385,8 @@ function DayRouteMapCanvas({
   }
 
   const path = (route?.path || []).map((p) => ({ lat: p.lat, lng: p.lng }));
-  const selectedPlaceInItinerary = selectedPlace ? isInItinerary(selectedPlace.contentId) : false;
-  const selectedHours = selectedPlace
-    ? hoursPhaseForPlace(selectedPlace, { inItinerary: selectedPlaceInItinerary })
-    : 'UNKNOWN';
+  const selectedHours = selectedPlace ? hoursPhaseForPlace(selectedPlace) : 'UNKNOWN';
+  const showClearSearch = hasSearched || nearby.length > 0;
 
   return (
     <>
@@ -519,22 +531,35 @@ function DayRouteMapCanvas({
               음식점만
             </button>
           </div>
-          <button
-            type="button"
-            className={`map-research-btn${movedSinceSearch ? ' emphasize' : ''}`}
-            onClick={handleResearch}
-            disabled={searching}
-          >
-            {searching ? '검색 중…' : '이 지역 재검색'}
-          </button>
+          <div className="day-route-map-actions">
+            {showClearSearch && (
+              <button
+                type="button"
+                className="map-clear-btn"
+                onClick={handleClearSearch}
+              >
+                마커 지우기
+              </button>
+            )}
+            <button
+              type="button"
+              className={`map-research-btn${movedSinceSearch ? ' emphasize' : ''}`}
+              onClick={handleResearch}
+              disabled={searching}
+            >
+              {searching ? '검색 중…' : '이 지역 재검색'}
+            </button>
+          </div>
         </div>
         {selectedPlace && (
           <div className="map-place-sheet">
             <MapPlaceCard
               place={selectedPlace}
-              inItinerary={selectedPlaceInItinerary}
+              itineraryItems={itineraryItems}
+              pendingAddedIds={optimisticAdded}
+              pendingRemovedIds={optimisticRemoved}
               hoursPhase={selectedHours}
-              busy={busyContentId != null && contentKey(busyContentId) === contentKey(selectedPlace.contentId)}
+              busy={busyContentId != null && readContentId(busyContentId) === readContentId(selectedPlace)}
               onAdd={handleAdd}
               onRemove={handleRemove}
               onClose={() => setSelectedPlaceId(null)}
@@ -544,6 +569,7 @@ function DayRouteMapCanvas({
       </div>
       <p className="day-route-map-caption">
         지도를 옮긴 뒤 <strong>이 지역 재검색</strong>을 눌러야 주변 장소가 갱신돼요.
+        파란 마커는 <strong>마커 지우기</strong>로 없애고 오늘 동선만 볼 수 있어요.
         {loadingRoute && ' 경로 계산 중…'}
         {!loadingRoute && route?.roadBased && route.distanceMeters != null && (
           <>
@@ -575,8 +601,8 @@ function DayRouteMapCanvas({
           </p>
           <ul>
             {nearby.map((place) => {
-              const id = contentKey(place.contentId);
-              const added = isInItinerary(id);
+              const id = readContentId(place);
+              const added = isInItinerary(place);
               const phase = hoursPhaseForPlace(place, { inItinerary: added });
               return (
                 <li key={id || place.placeName}>

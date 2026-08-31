@@ -1,13 +1,16 @@
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import { HOURS_PHASE_LABEL } from '../utils/hoursPhase';
+import { isPlaceInItinerary } from '../utils/itineraryMembership';
 
 /**
  * 지도 마커/리스트에서 고른 장소 카드.
- * 검색 결과 필드만 쓰고, 이미 일정에 있으면 "제거"로 전환한다.
+ * 포함 여부는 일정 항목 목록으로 이 안에서 계산한다(호출부가 boolean을 잘못 넘기지 못하게).
  */
 export default function MapPlaceCard({
   place,
-  inItinerary = false,
+  itineraryItems = [],
+  pendingAddedIds,
+  pendingRemovedIds,
   hoursPhase = 'UNKNOWN',
   busy = false,
   onAdd,
@@ -15,10 +18,11 @@ export default function MapPlaceCard({
   onClose,
 }) {
   if (!place) return null;
+  const inItinerary = isPlaceInItinerary(place, itineraryItems, pendingAddedIds, pendingRemovedIds) === true;
   const name = place.placeName || place.title || '이름 없음';
   const dist = place.dist != null ? `${place.dist}m` : null;
   const label = HOURS_PHASE_LABEL[hoursPhase] || HOURS_PHASE_LABEL.UNKNOWN;
-  const phaseClass = String(hoursPhase || 'UNKNOWN').toLowerCase().replace('_', '-');
+  const phaseClass = String(hoursPhase || 'UNKNOWN').toLowerCase().replaceAll('_', '-');
 
   return (
     <article className="map-place-card">
@@ -40,6 +44,7 @@ export default function MapPlaceCard({
           {place.category && <span className="map-place-chip">{place.category}</span>}
           <span className={`map-place-hours phase-${phaseClass}`}>{label}</span>
           {dist && <span className="map-place-chip muted">{dist}</span>}
+          {inItinerary && <span className="map-place-chip added">담김</span>}
         </div>
         {place.addr1 && <p className="map-place-card-addr">{place.addr1}</p>}
         <div className="map-place-card-actions">

@@ -4350,6 +4350,14 @@
   pointer-events: auto;
 }
 
+.day-route-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
 .day-route-map-filters {
   display: flex;
   flex-wrap: wrap;
@@ -4375,7 +4383,7 @@
 }
 
 .map-research-btn {
-  margin-left: auto;
+  margin-left: 0;
   border: 0;
   background: var(--sea-deep);
   color: #fff;
@@ -4395,6 +4403,22 @@
 .map-research-btn.emphasize {
   outline: 2px solid #fbbf24;
   outline-offset: 2px;
+}
+
+.map-clear-btn {
+  border: 1px solid var(--sand-border);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.map-clear-btn:hover {
+  background: #fff;
 }
 
 .day-route-map-pin.search-pin .day-route-map-pin-num {
@@ -4491,6 +4515,11 @@
 
 .map-place-chip.muted {
   font-weight: 600;
+}
+
+.map-place-chip.added {
+  background: color-mix(in srgb, #0f766e 14%, white);
+  color: #0f766e;
 }
 
 .map-place-hours.phase-open {
@@ -4895,6 +4924,7 @@
   }
 
   .map-research-btn,
+  .map-clear-btn,
   .map-filter-chip,
   .map-place-card-cta,
   .map-place-card-kakao {
