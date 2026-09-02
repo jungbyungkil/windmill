@@ -182,6 +182,22 @@ class ItineraryServiceTimeConflictTest {
     }
 
     @Test
+    void updateItem_afternoonTimeAfterMorningLastStop_isAllowed() {
+        itineraryWith(
+                existing(1, 0, "아쿠아플라넷 제주", "09:00"),
+                existing(2, 1, "고흐의정원", "10:10"),
+                existing(3, 2, "가시식당", "11:05"));
+
+        UpdateItineraryItemRequest request = new UpdateItineraryItemRequest();
+        request.setScheduledTime("14:00");
+
+        Itinerary result = service.updateItem(ITINERARY_ID, 2L, request);
+
+        assertEquals("14:00", result.getItems().stream()
+                .filter(i -> i.getId() == 2L).findFirst().orElseThrow().getScheduledTime());
+    }
+
+    @Test
     void updateItem_keepingSameTimeAsBefore_doesNotConflictWithItself() {
         itineraryWith(existing(1, 0, "경복궁", "17:00"));
 

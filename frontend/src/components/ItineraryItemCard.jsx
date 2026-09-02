@@ -54,7 +54,6 @@ export default function ItineraryItemCard({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
   const isWeather = (weatherAlerted || alerted) && !isIndoorPlace(item);
   const businessAlerted = closedDayAlerted || hoursEndedAlerted;
@@ -157,7 +156,6 @@ export default function ItineraryItemCard({
         onClick={() => {
           if (editing) return;
           setExpanded((open) => !open);
-          setMoreOpen(false);
         }}
         disabled={editing}
         aria-expanded={showDetail}
@@ -256,38 +254,26 @@ export default function ItineraryItemCard({
               <button
                 type="button"
                 className="item-text-btn"
-                aria-expanded={moreOpen}
-                onClick={() => setMoreOpen((open) => !open)}
+                onClick={() => onTogglePin(item.itemId, !item.pinned)}
               >
-                더보기
+                {item.pinned ? '고정 해제' : '고정'}
+              </button>
+              <button
+                type="button"
+                className="item-text-btn"
+                onClick={() => onOpenDocent(item)}
+              >
+                도슨트
+              </button>
+              <button
+                type="button"
+                className="item-text-btn danger"
+                onClick={() => onDelete(item.itemId)}
+              >
+                삭제
               </button>
             </div>
-            {moreOpen && (
-              <div className="item-text-actions">
-                <button
-                  type="button"
-                  className="item-text-btn"
-                  onClick={() => onTogglePin(item.itemId, !item.pinned)}
-                >
-                  {item.pinned ? '고정 해제' : '고정'}
-                </button>
-                <button
-                  type="button"
-                  className="item-text-btn"
-                  onClick={() => onOpenDocent(item)}
-                >
-                  도슨트
-                </button>
-                <button
-                  type="button"
-                  className="item-text-btn danger"
-                  onClick={() => onDelete(item.itemId)}
-                >
-                  삭제
-                </button>
-              </div>
-            )}
-            {moreOpen && !item.pinned && (
+            {!item.pinned && (
               <p className="item-pin-hint">고정하면 새 장소 추천이 이 곳 근처를 우선해요.</p>
             )}
           </>

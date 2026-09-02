@@ -128,4 +128,17 @@ class VisitTimingTest {
         assertEquals("12:15", times.get(0));
         assertTrue(times.size() <= 3);
     }
+
+    @Test
+    void suggestAlternativeStarts_whenPreferredIsAfterClose_skipsMorningGapBeforeLastStop() {
+        List<VisitTiming.Occupied> occupied = List.of(
+                new VisitTiming.Occupied(1L, "아쿠아플라넷 제주", LocalTime.of(9, 0), LocalTime.of(9, 22)),
+                new VisitTiming.Occupied(2L, "고흐의정원", LocalTime.of(10, 10), LocalTime.of(10, 32)),
+                new VisitTiming.Occupied(3L, "가시식당", LocalTime.of(11, 5), LocalTime.of(11, 25)));
+
+        List<String> times = VisitTiming.suggestAlternativeStarts(
+                LocalTime.of(22, 10), LocalTime.of(18, 30), 22, occupied, LocalTime.of(9, 0), 2L, 60);
+
+        assertEquals(List.of("12:00", "13:00", "14:00"), times);
+    }
 }

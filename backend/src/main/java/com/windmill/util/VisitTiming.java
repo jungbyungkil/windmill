@@ -339,6 +339,9 @@ public final class VisitTiming {
     /**
      * 겹침·마감을 피하는 대안 시작 시각. 선호 시각 뒤(기존 일정이 끝난 뒤)를 먼저 넣고, 모자라면 앞쪽.
      * 이동시간은 포함하지 않는다.
+     *
+     * <p>선호 시각이 마감 버퍼를 넘긴 경우(오전 10시에서 오후만 바꿔 22시가 된 네이티브 피커)에는
+     * 맨 뒤 오전 일정 앞 빈칸을 채우지 않고, 그 일정이 끝난 뒤 오후 정각부터 제안한다.
      */
     public static List<String> suggestAlternativeStarts(LocalTime preferred, LocalTime candidateClose,
                                                         int candidateStay, List<Occupied> occupied,
@@ -365,11 +368,35 @@ public final class VisitTiming {
         }
 
         List<LocalTime> out = new ArrayList<>();
-        collectSuggestions(out, ceilToStep(preferred == null ? from : preferred.plusMinutes(SUGGEST_STEP_MINUTES)),
-                latest, preferred, candidateClose, candidateStay, occupied, excludeItemId, buf);
-        collectSuggestions(out, ceilToStep(from), preferred == null ? latest : preferred,
-                preferred, candidateClose, candidateStay, occupied, excludeItemId, buf);
+        boolean preferredPastLatest = preferred != null && !preferred.isBefore(latest);
+        if (preferredPastLatest) {
+            LocalTime afternoonFrom = laterOf(lastOccupiedEnd(occupied, excludeItemId), LocalTime.NOON);
+            collectOnTheHour(out, afternoonFrom, latest, preferred, candidateClose, candidateStay,
+                    occupied, excludeItemId, buf);
+            collectSuggestions(out, ceilToStep(afternoonFrom), latest, preferred, candidateClose,
+                    candidateStay, occupied, excludeItemId, buf);
+            collectSuggestions(out, ceilToStep(from), latest, preferred, candidateClose, candidateStay,
+                    occupied, excludeItemId, buf);
+        } else {
+            collectSuggestions(out, ceilToStep(preferred == null ? from : preferred.plusMinutes(SUGGEST_STEP_MINUTES)),
+                    latest, preferred, candidateClose, candidateStay, occupied, excludeItemId, buf);
+            collectSuggestions(out, ceilToStep(from), preferred == null ? latest : preferred,
+                    preferred, candidateClose, candidateStay, occupied, excludeItemId, buf);
+        }
         return out.stream().map(HH_MM::format).toList();
+    }
+
+    private static void collectOnTheHour(List<LocalTime> out, LocalTime from, LocalTime until,
+                                         LocalTime preferred, LocalTime candidateClose, int candidateStay,
+                                         List<Occupied> occupied, Long excludeItemId, int closeBufferMinutes) {
+        LocalTime t = firstHourOnOrAfter(from);
+        while (t != null && t.isBefore(until)) {
+            if (out.size() >= MAX_SUGGESTIONS) {
+                return;
+            }
+            addIfFree(out, t, preferred, candidateClose, candidateStay, occupied, excludeItemId, closeBufferMinutes);
+            t = t.getHour() == 23 ? null : t.plusHours(1);
+        }
     }
 
     private static void collectSuggestions(List<LocalTime> out, LocalTime from, LocalTime until,
@@ -382,30 +409,73 @@ public final class VisitTiming {
             if (out.size() >= MAX_SUGGESTIONS) {
                 return;
             }
-            if (t.equals(preferred)) {
-                continue;
-            }
-            if (out.contains(t)) {
-                continue;
-            }
-            if (ClosingTimeGate.check(candidateClose, t, closeBufferMinutes).blocked()) {
-                continue;
-            }
-            LocalTime end = occupancyEnd(t, candidateStay, candidateClose);
-            boolean hit = false;
+            addIfFree(out, t, preferred, candidateClose, candidateStay, occupied, excludeItemId, closeBufferMinutes);
+        }
+    }
+
+    private static void addIfFree(List<LocalTime> out, LocalTime t, LocalTime preferred, LocalTime candidateClose,
+                                  int candidateStay, List<Occupied> occupied, Long excludeItemId,
+                                  int closeBufferMinutes) {
+        if (t == null || t.equals(preferred) || out.contains(t)) {
+            return;
+        }
+        if (ClosingTimeGate.check(candidateClose, t, closeBufferMinutes).blocked()) {
+            return;
+        }
+        LocalTime end = occupancyEnd(t, candidateStay, candidateClose);
+        if (occupied != null) {
             for (Occupied o : occupied) {
                 if (excludeItemId != null && excludeItemId.equals(o.itemId())) {
                     continue;
                 }
                 if (overlaps(t, end, o.start(), o.end())) {
-                    hit = true;
-                    break;
+                    return;
                 }
             }
-            if (!hit) {
-                out.add(t);
+        }
+        out.add(t);
+    }
+
+    private static LocalTime lastOccupiedEnd(List<Occupied> occupied, Long excludeItemId) {
+        if (occupied == null) {
+            return null;
+        }
+        LocalTime last = null;
+        for (Occupied o : occupied) {
+            if (o == null || o.end() == null) {
+                continue;
+            }
+            if (excludeItemId != null && excludeItemId.equals(o.itemId())) {
+                continue;
+            }
+            if (last == null || o.end().isAfter(last)) {
+                last = o.end();
             }
         }
+        return last;
+    }
+
+    private static LocalTime laterOf(LocalTime a, LocalTime b) {
+        if (a == null) {
+            return b;
+        }
+        if (b == null) {
+            return a;
+        }
+        return a.isAfter(b) ? a : b;
+    }
+
+    private static LocalTime firstHourOnOrAfter(LocalTime time) {
+        if (time == null) {
+            return LocalTime.NOON;
+        }
+        if (time.getMinute() == 0 && time.getSecond() == 0 && time.getNano() == 0) {
+            return time;
+        }
+        if (time.getHour() == 23) {
+            return null;
+        }
+        return time.plusHours(1).withMinute(0).withSecond(0).withNano(0);
     }
 
     private static LocalTime ceilToStep(LocalTime time) {

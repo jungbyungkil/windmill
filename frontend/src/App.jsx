@@ -1457,6 +1457,7 @@ export default function App() {
                 <section className="trip-page-section">
                   <header className="trip-section-head">
                     <h2>지도</h2>
+                    <p className="trip-section-lead">지도 보면서 일정을 더 추가해볼래?</p>
                   </header>
                   <DayRouteMap
                     items={visibleItems}
@@ -1475,6 +1476,7 @@ export default function App() {
                 <section className="trip-page-section">
                   <header className="trip-section-head">
                     <h2>검색</h2>
+                    <p className="trip-section-lead">홈에서 장소를 고정하면, 그 근처에서 더 원하는 곳을 골라요</p>
                   </header>
                   <RecommendationSearch
                     onSearch={handleSearch}
