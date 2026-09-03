@@ -299,7 +299,9 @@ public class ItineraryService {
                 request.getCloseTime(), request.getUseTimeText(), request.getDetailFacts());
 
         if (scheduledTime != null) {
-            assertScheduleFeasible(itinerary, visitDate, scheduledTime, null, close, packingStay, closeBuffer);
+            boolean skipClosing = Boolean.TRUE.equals(request.getAcknowledgeHoursWarning());
+            assertScheduleFeasible(itinerary, visitDate, scheduledTime, null, close, packingStay, closeBuffer,
+                    skipClosing);
         } else {
             LocalTime endArrival = estimateArrivalTime(itinerary, visitDate, request.getMapX(), request.getMapY());
             ClosingTimeGate.CheckResult endCheck = ClosingTimeGate.check(close, endArrival, closeBuffer);
@@ -364,9 +366,11 @@ public class ItineraryService {
     /**
      * 명시된 시각으로 넣거나 옮길 때: 같은 날 겹침을 먼저, 그다음 마감. 둘 다면 겹침만 노출.
      * 겹침은 최소 체류(packing)로만 본다 - 계획 체류만큼 비워 두지 않아도 담을 수 있게.
+     * skipClosing=true면 마감은 사용자가 이미 경고를 보고 넘어간 것이므로 저장을 막지 않는다.
      */
     private void assertScheduleFeasible(Itinerary itinerary, LocalDate visitDate, String scheduledTime,
-                                        Long excludeItemId, LocalTime close, int stayMinutes, int closeBuffer) {
+                                        Long excludeItemId, LocalTime close, int stayMinutes, int closeBuffer,
+                                        boolean skipClosing) {
         LocalTime start = ClosingTimeGate.parseHhMm(scheduledTime);
         if (start == null) {
             return;
@@ -378,6 +382,9 @@ public class ItineraryService {
             throw new TimeSlotConflictException(overlap.message(), overlap.conflictingItemId(),
                     overlap.conflictingPlaceName(), overlap.conflictingTime(),
                     suggestTimes(start, close, stayMinutes, occupants, visitDate, excludeItemId, closeBuffer));
+        }
+        if (skipClosing) {
+            return;
         }
         ClosingTimeGate.CheckResult closing = ClosingTimeGate.check(close, start, closeBuffer);
         if (closing.blocked()) {
@@ -535,7 +542,8 @@ public class ItineraryService {
             int closeBuffer = VisitTiming.closeBufferMinutes(
                     item.getCloseTime(), item.getUseTimeText(), item.getDetailFacts());
             assertScheduleFeasible(itinerary, targetVisitDate, request.getScheduledTime(), item.getId(),
-                    close, packingStay, closeBuffer);
+                    close, packingStay, closeBuffer,
+                    Boolean.TRUE.equals(request.getAcknowledgeHoursWarning()));
             item.setScheduledTime(request.getScheduledTime());
         }
         if (request.getVisitDate() != null && !request.getVisitDate().isBlank()) {

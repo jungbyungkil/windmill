@@ -27,4 +27,6 @@ public class UpdateItineraryItemRequest {
     private Boolean indoorYn;
     private com.windmill.domain.RainSensitivity rainSensitivity;
     private com.windmill.domain.CongestionSensitivity congestionSensitivity;
+    /** 휴무·마감 경고를 사용자가 확인한 뒤의 시간 수정. 마감 게이트만 건너뛴다. */
+    private Boolean acknowledgeHoursWarning;
 }

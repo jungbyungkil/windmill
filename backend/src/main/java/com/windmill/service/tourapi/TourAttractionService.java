@@ -3,6 +3,7 @@ package com.windmill.service.tourapi;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.windmill.client.KorServiceClient;
+import com.windmill.client.TourApiArrange;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.dto.TourAttractionSummary;
 import com.windmill.util.HomepageUrlExtractor;
@@ -37,12 +38,13 @@ public class TourAttractionService {
             new SimpleTtlCache<>(Duration.ofMinutes(30));
 
     public Mono<List<TourAttractionSummary>> listByRegion(Integer contentTypeId, String lDongRegnCd, String lDongSignguCd) {
-        String cacheKey = "region:" + contentTypeId + ":" + lDongRegnCd + ":" + lDongSignguCd;
+        String cacheKey = "region:" + contentTypeId + ":" + lDongRegnCd + ":" + lDongSignguCd + ":P";
         List<TourAttractionSummary> cached = listCache.get(cacheKey);
         if (cached != null) {
             return Mono.just(cached);
         }
-        return korServiceClient.areaBasedList(contentTypeId, lDongRegnCd, lDongSignguCd, 100, 1, "C")
+        return korServiceClient.areaBasedList(contentTypeId, lDongRegnCd, lDongSignguCd, 100, 1,
+                TourApiArrange.POPULAR)
                 .map(this::toSummaries)
                 .doOnNext(list -> listCache.put(cacheKey, list));
     }

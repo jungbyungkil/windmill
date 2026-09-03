@@ -22,6 +22,7 @@ import DocentModal from './components/DocentModal';
 import TripRecordModal from './components/TripRecordModal';
 import SharedItineraryScreen from './components/SharedItineraryScreen';
 import ClosingGateModal from './components/ClosingGateModal';
+import HoursWarningModal from './components/HoursWarningModal';
 import SuggestRouteCompare from './components/SuggestRouteCompare';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import GlobalMenu from './components/GlobalMenu';
@@ -144,6 +145,8 @@ export default function App() {
   const [autoReplacing, setAutoReplacing] = useState(false);
   const [autoReplaceNotice, setAutoReplaceNotice] = useState(null);
   const [closingGate, setClosingGate] = useState(null);
+  const [hoursWarning, setHoursWarning] = useState(null);
+  const hoursWarningResolverRef = useRef(null);
   const [rerouteLoading, setRerouteLoading] = useState(false);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -353,7 +356,7 @@ export default function App() {
   async function autoApplySmartPlan(created) {
     let stops = [];
     try {
-      setCreatingStage('식당 2 · 카페 1 · 일정 4곳을 찾고 있어요...');
+      setCreatingStage('인기 명소 2 · 식당 2 · 카페 1곳을 찾고 있어요...');
       const plan = await api.getSmartPlan(created.itineraryId, { date: created.startDate, standard: true });
       stops = plan?.stops || [];
     } catch {
@@ -550,8 +553,24 @@ export default function App() {
   }
 
   async function handleUpdateTime(itemId, scheduledTime) {
+    const item = itinerary?.items?.find((i) => i.itemId === itemId);
+    const { proceed, check } = await confirmHoursIfNeeded({
+      contentId: item?.contentId,
+      contentTypeId: item?.contentTypeId,
+      placeName: item?.placeName,
+      restDateText: item?.restDateText,
+      closeTime: item?.closeTime,
+      useTimeText: item?.useTimeText,
+      scheduledTime,
+      visitDate: item?.visitDate || activeDate,
+      confirmLabel: '그래도 저장',
+    });
+    if (!proceed) return;
     try {
-      const result = await api.updateItem(itineraryId, itemId, { scheduledTime });
+      const result = await api.updateItem(itineraryId, itemId, {
+        scheduledTime,
+        acknowledgeHoursWarning: check?.warning || undefined,
+      });
       setItinerary(result);
     } catch (e) {
       reportIfTimeConflict(e, itemId);
@@ -621,10 +640,85 @@ export default function App() {
   }
 
   /**
+   * 일정 추가/시간 수정 직전 휴무·마감 경고. 막지 않고 confirm만 받는다.
+   * 스마트 동선 자동 담기는 이 경로를 타지 않는다.
+   */
+  function resolveHoursWarning(proceed) {
+    const resolve = hoursWarningResolverRef.current;
+    hoursWarningResolverRef.current = null;
+    setHoursWarning(null);
+    resolve?.(proceed);
+  }
+
+  async function confirmHoursIfNeeded({
+    contentId,
+    contentTypeId,
+    placeName,
+    restDateText,
+    closeTime,
+    useTimeText,
+    scheduledTime,
+    visitDate,
+    confirmLabel = '그래도 담기',
+  }) {
+    if (!itineraryId) return { proceed: true, check: null };
+    let check;
+    try {
+      check = await api.checkPlaceHours(itineraryId, {
+        contentId,
+        contentTypeId,
+        placeName,
+        restDateText,
+        closeTime,
+        useTimeText,
+        scheduledTime,
+        visitDate,
+      });
+    } catch {
+      return { proceed: true, check: null };
+    }
+    if (!check?.warning) {
+      return { proceed: true, check };
+    }
+    const proceed = await new Promise((resolve) => {
+      hoursWarningResolverRef.current = resolve;
+      setHoursWarning({ placeName, warnings: check.warnings, confirmLabel });
+    });
+    return { proceed, check };
+  }
+
+  /**
    * "일정에 추가" — 시각이 명시되면 서버가 같은 날 겹침(TIME_OVERLAP)을 마감보다 먼저 막는다.
    * 거절되면 겹침/마감 모달에 대안 시각을 띄워 그 시각으로 다시 넣을 수 있게 한다.
+   * 휴무·마감은 먼저 경고 confirm을 받고, 사용자가 넘기면 저장을 막지 않는다.
    */
-  async function addCandidateToItinerary(candidate, visitDate = activeDate, isAlternate = false) {
+  async function addCandidateToItinerary(candidate, visitDate = activeDate, isAlternate = false, options = {}) {
+    const scheduledTime = candidate.scheduledTime || candidate.suggestedTime;
+    let restDateText = candidate.restDateText;
+    let closeTime = candidate.closeTime;
+    let useTimeText = candidate.useTimeText;
+    let acknowledgeHoursWarning = Boolean(options.acknowledgeHoursWarning);
+
+    if (!acknowledgeHoursWarning) {
+      const { proceed, check } = await confirmHoursIfNeeded({
+        contentId: candidate.contentId,
+        contentTypeId: candidate.contentTypeId,
+        placeName: candidate.placeName,
+        restDateText,
+        closeTime,
+        useTimeText,
+        scheduledTime,
+        visitDate,
+      });
+      if (!proceed) return null;
+      if (check) {
+        restDateText = check.restDateText || restDateText;
+        closeTime = check.closeTime || closeTime;
+        useTimeText = check.useTimeText || useTimeText;
+        if (check.warning) acknowledgeHoursWarning = true;
+      }
+    }
+
     let result;
     try {
       result = await api.addItem(itineraryId, {
@@ -632,7 +726,7 @@ export default function App() {
         contentTypeId: candidate.contentTypeId,
         placeName: candidate.placeName,
         thumbnailUrl: candidate.thumbnailUrl,
-        scheduledTime: candidate.scheduledTime || candidate.suggestedTime,
+        scheduledTime,
         tags: candidate.matchedTags,
         crowdRate: candidate.crowdRate,
         visitDate,
@@ -641,9 +735,9 @@ export default function App() {
         useFeeText: candidate.useFeeText,
         isFree: candidate.isFree,
         estimatedCostPerPerson: candidate.estimatedCostPerPerson,
-        restDateText: candidate.restDateText,
-        closeTime: candidate.closeTime,
-        useTimeText: candidate.useTimeText,
+        restDateText,
+        closeTime,
+        useTimeText,
         homepageUrl: candidate.homepageUrl,
         strollerFriendly: candidate.strollerFriendly,
         accessibleFriendly: candidate.accessibleFriendly,
@@ -654,13 +748,16 @@ export default function App() {
         backupContentId: candidate.backupContentId,
         backupContentTypeId: candidate.backupContentTypeId,
         backupPlaceName: candidate.backupPlaceName,
+        acknowledgeHoursWarning: acknowledgeHoursWarning || undefined,
         ...placeSnapshotFields(candidate),
       });
     } catch (e) {
       const reported = reportScheduleGate(
         e,
         candidate.placeName,
-        (time) => addCandidateToItinerary({ ...candidate, scheduledTime: time }, visitDate, isAlternate),
+        (time) => addCandidateToItinerary({ ...candidate, scheduledTime: time }, visitDate, isAlternate, {
+          acknowledgeHoursWarning: true,
+        }),
       );
       if (!reported) {
         setAutoReplaceNotice(`"${candidate.placeName || '이 장소'}"를 담지 못했어요. ${e?.message || '다시 시도해 주세요.'}`);
@@ -675,8 +772,8 @@ export default function App() {
   async function handleAddFestival(festival) {
     setAddingFestivalId(festival.contentId);
     try {
-      await addCandidateToItinerary(festival);
-      refreshTrigger();
+      const result = await addCandidateToItinerary(festival);
+      if (result) refreshTrigger();
     } finally {
       setAddingFestivalId(null);
     }
@@ -745,8 +842,8 @@ export default function App() {
   async function handleAddAlternative(candidate) {
     setAddingContentId(candidate.contentId);
     try {
-      await addCandidateToItinerary(candidate, activeDate, true);
-      setRerouteCount((n) => n + 1);
+      const result = await addCandidateToItinerary(candidate, activeDate, true);
+      if (result) setRerouteCount((n) => n + 1);
     } finally {
       setAddingContentId(null);
     }
@@ -1541,6 +1638,15 @@ export default function App() {
                 language={docentLang}
                 onLanguageChange={handleDocentLangChange}
                 onClose={() => setDocentOpen(false)}
+              />
+
+              <HoursWarningModal
+                open={Boolean(hoursWarning)}
+                placeName={hoursWarning?.placeName}
+                warnings={hoursWarning?.warnings}
+                confirmLabel={hoursWarning?.confirmLabel}
+                onCancel={() => resolveHoursWarning(false)}
+                onConfirm={() => resolveHoursWarning(true)}
               />
 
               <ClosingGateModal

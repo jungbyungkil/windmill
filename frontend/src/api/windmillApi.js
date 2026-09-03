@@ -85,6 +85,11 @@ export function addItem(itineraryId, item) {
   return request(`/itineraries/${itineraryId}/items`, { method: 'POST', body: item });
 }
 
+/** 일정 추가/시간 수정 직전 휴무·마감 경고. 저장을 막지 않는다. */
+export function checkPlaceHours(itineraryId, body) {
+  return request(`/itineraries/${itineraryId}/hours-check`, { method: 'POST', body });
+}
+
 export function updateItem(itineraryId, itemId, patch) {
   return request(`/itineraries/${itineraryId}/items/${itemId}`, { method: 'PATCH', body: patch });
 }

@@ -102,6 +102,7 @@ public class RecommendationPipeline {
                             .map(list -> AgeGroupRanking.rank(list, request.getAdultAgeGroup(), request.getChildAges()))
                             .map(ReservationRequiredRanking::rank)
                             .map(ProximityRanking::rank)
+                            .map(PopularityRanking::rank)
                             .flatMap(list -> request.isSkipLlm()
                                     ? stage4.matchWithoutLlm(list, request.getTags(), request.getChildAges())
                                     : stage4.match(list, request.getTags(), request.getNaturalLanguageQuery(), request.getChildAges()))
@@ -118,7 +119,7 @@ public class RecommendationPipeline {
 
     /** skipLlm(속도 우선) 요청 전용 - Stage2(영업시간 상세조회, 외부 API) 대상 건수를 줄여 속도를
      *  확보한다(2026-08-16 실측: 후보 20건 기준 Stage2가 약 16초 - 표준 4단계 일정은 어차피 이 중
-     *  1곳만 선택하므로 상위 후보만 미리 조회해도 충분함). Stage1이 이미 관련도순으로 정렬해 반환한다. */
+     *  1곳만 선택하므로 상위 후보만 미리 조회해도 충분함). Stage1이 이미 인기(조회)순으로 정렬해 반환한다. */
     private static final int SPEED_MODE_CANDIDATE_CAP = 8;
 
     private static List<RelatedCandidate> capForSpeed(List<RelatedCandidate> list) {

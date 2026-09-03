@@ -2024,19 +2024,26 @@
 
 .item-text-btn {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   border: 1px solid color-mix(in srgb, var(--sea) 22%, var(--sand-border));
   background: color-mix(in srgb, var(--sea) 6%, white);
   border-radius: 10px;
-  padding: 8px 6px;
+  padding: 8px 4px;
   min-height: 44px;
   min-width: 44px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--sea-deep);
   cursor: pointer;
   white-space: nowrap;
+}
+
+.item-text-btn-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .item-text-btn:disabled {
@@ -5194,7 +5201,7 @@
   }
 
   .item-text-btn {
-    font-size: 12px;
+    font-size: 11px;
     padding: 8px 4px;
   }
 
@@ -5867,6 +5874,92 @@
 .exit-confirm-exit {
   border: none;
   background: var(--level-danger);
+  color: #fff;
+}
+
+/* ---------- 휴무·마감 경고 (막지 않고 확인만) ---------- */
+
+.hours-warning-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.hours-warning-modal {
+  width: min(100%, 360px);
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+}
+
+.hours-warning-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a86a00;
+}
+
+.hours-warning-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.hours-warning-block {
+  margin: 0 0 8px;
+}
+
+.hours-warning-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.hours-warning-detail {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.hours-warning-hint {
+  margin: 12px 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.hours-warning-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hours-warning-cancel,
+.hours-warning-confirm {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hours-warning-cancel {
+  border: 1px solid var(--sand-border);
+  background: #fff;
+  color: var(--ink);
+}
+
+.hours-warning-confirm {
+  border: none;
+  background: var(--sea);
   color: #fff;
 }
 

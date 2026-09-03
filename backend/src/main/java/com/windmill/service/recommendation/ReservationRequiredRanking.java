@@ -7,11 +7,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 정기휴무 원문에 "예약 시에만 영업" 류 안내가 있는 곳은 뒤로 미룬다(제거는 아님 - AccessibilityRanking과
- * 동일한 원칙). 당일치기처럼 즉흥적으로 들르는 여행에서, 사전 예약 없이는 못 들어가는 곳을 1순위로
- * 추천하면 실제로는 못 가는 추천이 되어버린다(2026-08-16 사용자 제보 - 고정핀 근처 맛집 검색 1순위가
- * "예약 시 영업 가능"인 한정식집이었음. 유가네닭갈비 같은 예약 없이 바로 들어갈 수 있는 곳이 더
- * 적절하다는 피드백). ProximityRanking 바로 앞에 배선해 근접도 버킷 안에서의 타이브레이커로 동작한다.
+ * 정기휴무 원문에 "예약 시에만 영업" 류 안내가 있는 곳은 뒤로 미룬다(제거는 아님).
+ * PopularityRanking보다 먼저 적용되므로, 조회순이 같은 후보끼리만 예약 필수가 뒤로 밀린다.
  */
 final class ReservationRequiredRanking {
 

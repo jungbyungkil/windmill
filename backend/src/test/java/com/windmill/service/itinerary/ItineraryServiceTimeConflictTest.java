@@ -135,6 +135,28 @@ class ItineraryServiceTimeConflictTest {
     }
 
     @Test
+    void addItem_acknowledgeHoursWarning_allowsAfterClose() {
+        itineraryWith(existing(1, 0, "경복궁", "10:00"));
+
+        AddItineraryItemRequest request = candidate("우표박물관", "16:20", "16:50");
+        request.setAcknowledgeHoursWarning(true);
+
+        Itinerary result = service.addItem(ITINERARY_ID, request);
+
+        assertTrue(result.getItems().stream().anyMatch(i -> "우표박물관".equals(i.getPlaceName())));
+    }
+
+    @Test
+    void addItem_acknowledgeHoursWarning_stillBlocksTimeOverlap() {
+        itineraryWith(existing(1, 0, "세종뮤지엄갤러리", "11:30"));
+
+        AddItineraryItemRequest request = candidate("호재래", "11:30", "21:00");
+        request.setAcknowledgeHoursWarning(true);
+
+        assertThrows(TimeSlotConflictException.class, () -> service.addItem(ITINERARY_ID, request));
+    }
+
+    @Test
     void addItem_cafeThirtyMinutesAfterAttraction_isAllowed() {
         itineraryWith(existing(1, 0, "경복궁", "11:30"));
 

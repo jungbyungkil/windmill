@@ -5,6 +5,7 @@ import com.windmill.client.KakaoLocalSearchClient;
 import com.windmill.client.KorServiceClient;
 import com.windmill.client.PetFriendlyAttractionClient;
 import com.windmill.client.RelatedAttractionClient;
+import com.windmill.client.TourApiArrange;
 import com.windmill.domain.RecommendThemeTag;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
@@ -15,7 +16,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +31,7 @@ public class Stage1RelatedAttractionService {
 
     /** data.go.kr 요청 제한(429) 방지를 위한 후속 단계 외부 API 동시 호출 상한 */
     private static final int EXTERNAL_CALL_CONCURRENCY = 4;
-    /** 후속 단계(이름매칭/영업시간/집중률)로 넘길 후보 상한 - 연관순위(rank) 기준 상위만 사용해 API 쿼터 절약 */
+    /** 후속 단계(이름매칭/영업시간/집중률)로 넘길 후보 상한 - 인기(조회순/연관순위) 상위만 사용해 API 쿼터 절약 */
     private static final int MAX_CANDIDATES = 20;
     /** TourAPI contentTypeId 14 = 문화시설(박물관/미술관/전시관 등) - 우천 시 실내 대체 코스 재검색 기준 */
     private static final int INDOOR_CONTENT_TYPE_ID = 14;
@@ -44,7 +44,7 @@ public class Stage1RelatedAttractionService {
     /**
      * 장소명 직접 검색 - 가고 싶은 곳을 이미 알고 있을 때, 연관/추천 로직 없이 그 지역 안에서
      * 이름으로 바로 찾는다("DDP" 검색 → 앵커로 등록). LLM/집중률 필터 없이 KorService2
-     * searchKeyword2 결과를 이름 관련도 순 그대로 사용한다.
+     * searchKeyword2 결과를 인기(조회)순으로 사용한다.
      *
      * ⚠ 선택한 시/군/구로 좁혀 찾다가 0건이면 시/도 전체 → 전국 순으로 넓혀서 재시도한다(라이브로
      * 실제 확인한 사례: "DDP"는 이름 때문에 동대문구로 착각하기 쉽지만 실제 행정구역은 중구라,
@@ -118,11 +118,7 @@ public class Stage1RelatedAttractionService {
                             .build());
                 }
             }
-            List<RelatedCandidate> result = new ArrayList<>(byName.values());
-            result.sort(Comparator.comparingInt(RelatedCandidate::getRank));
-            if (result.size() > MAX_CANDIDATES) {
-                result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
-            }
+            List<RelatedCandidate> result = takeTopByPopularity(new ArrayList<>(byName.values()));
             log.info("[Stage1] 연관관광지 후보 {}건 확보(상위 {}건로 제한, seed={})", result.size(), MAX_CANDIDATES, seedPlaceName);
             return result;
         });
@@ -171,7 +167,7 @@ public class Stage1RelatedAttractionService {
      */
     public Mono<List<RelatedCandidate>> fetchIndoor(RegionCode region) {
         return korServiceClient.areaBasedList(INDOOR_CONTENT_TYPE_ID, region.getLDongRegnCd(), region.getLDongSignguCd(),
-                        MAX_CANDIDATES, 1, "C")
+                        MAX_CANDIDATES, 1, TourApiArrange.POPULAR)
                 .map(items -> mapKorItems(items, "실내"));
     }
 
@@ -196,10 +192,7 @@ public class Stage1RelatedAttractionService {
                             byId.putIfAbsent(c.getContentId(), c);
                         }
                     }
-                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
-                    if (result.size() > MAX_CANDIDATES) {
-                        result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
-                    }
+                    List<RelatedCandidate> result = takeTopByPopularity(new ArrayList<>(byId.values()));
                     log.info("[Stage1] 폭염 대체(실내) 후보 {}건 확보", result.size());
                     return result;
                 });
@@ -233,10 +226,7 @@ public class Stage1RelatedAttractionService {
                             }
                         }
                     }
-                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
-                    if (result.size() > MAX_CANDIDATES) {
-                        result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
-                    }
+                    List<RelatedCandidate> result = takeTopByPopularity(new ArrayList<>(byId.values()));
                     log.info("[Stage1] 테마 태그 후보 {}건 확보 (themes={})", result.size(),
                             themes.stream().map(RecommendThemeTag::getTag).toList());
                     return result;
@@ -253,14 +243,16 @@ public class Stage1RelatedAttractionService {
             for (RecommendThemeTag.CategoryCode code : categoryCodes) {
                 calls.add(korServiceClient
                         .areaBasedList(primaryType, code.cat1(), code.cat2(), code.cat3(),
-                                region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                                region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1,
+                                TourApiArrange.POPULAR)
                         .map(items -> mapKorItems(items, theme.getLabel()))
                         .onErrorReturn(List.of()));
             }
         } else {
             for (int typeId : theme.getContentTypeIds()) {
                 calls.add(korServiceClient
-                        .areaBasedList(typeId, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                        .areaBasedList(typeId, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1,
+                                TourApiArrange.POPULAR)
                         .map(items -> mapKorItems(items, theme.getLabel()))
                         .onErrorReturn(List.of()));
             }
@@ -333,7 +325,8 @@ public class Stage1RelatedAttractionService {
         boolean preferRestaurant = !containsAny(keyword, "카페", "커피", "디저트");
 
         Mono<List<RelatedCandidate>> byType = korServiceClient
-                .areaBasedList(39, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1, "C")
+                .areaBasedList(39, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1,
+                        TourApiArrange.POPULAR)
                 .map(items -> mapKorItems(items, "맛집"))
                 .onErrorReturn(List.of());
 
@@ -366,10 +359,7 @@ public class Stage1RelatedAttractionService {
                             putFoodCandidate(byId, c, false);
                         }
                     }
-                    List<RelatedCandidate> result = new ArrayList<>(byId.values());
-                    if (result.size() > MAX_CANDIDATES) {
-                        result = new ArrayList<>(result.subList(0, MAX_CANDIDATES));
-                    }
+                    List<RelatedCandidate> result = takeTopByPopularity(new ArrayList<>(byId.values()));
                     log.info("[Stage1] 맛집/식당 후보 {}건 확보 (keyword={})", result.size(), keyword);
                     return result;
                 });
@@ -397,6 +387,15 @@ public class Stage1RelatedAttractionService {
             }
         }
         return false;
+    }
+
+    /** TourAPI 조회순(rank) 상위 MAX_CANDIDATES만 남긴다. skipLlm 속도 캡이 이 순서를 그대로 잘라 쓴다. */
+    private static List<RelatedCandidate> takeTopByPopularity(List<RelatedCandidate> result) {
+        result.sort(PopularityRanking.relatedComparator());
+        if (result.size() > MAX_CANDIDATES) {
+            return new ArrayList<>(result.subList(0, MAX_CANDIDATES));
+        }
+        return result;
     }
 
     private List<RelatedCandidate> mapKorItems(List<JsonNode> items, String categoryLcls) {

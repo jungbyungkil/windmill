@@ -13,6 +13,8 @@ import com.windmill.dto.ItineraryListItemResponse;
 import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.ItineraryStatus;
 import com.windmill.dto.OngoingItineraryResponse;
+import com.windmill.dto.PlaceHoursCheckRequest;
+import com.windmill.dto.PlaceHoursCheckResponse;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.SmartPlanResponse;
@@ -21,6 +23,7 @@ import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.GreedyRouteSuggestService;
 import com.windmill.service.itinerary.ItineraryService;
+import com.windmill.service.itinerary.PlaceHoursCheckService;
 import com.windmill.service.notification.AlertFeedService;
 import com.windmill.service.recommendation.AnchorPlanService;
 import com.windmill.service.recommendation.InitialPlanService;
@@ -46,6 +49,7 @@ import java.util.stream.Collectors;
 public class ItineraryController {
 
     private final ItineraryService itineraryService;
+    private final PlaceHoursCheckService placeHoursCheckService;
     private final GreedyRouteSuggestService greedyRouteSuggestService;
     private final TriggerDetectionService triggerDetectionService;
     private final RecommendationPipeline recommendationPipeline;
@@ -100,6 +104,18 @@ public class ItineraryController {
         return Mono.<Void>fromRunnable(() -> itineraryService.delete(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(ResponseEntity.noContent().build());
+    }
+
+    /**
+     * 일정 추가/시간 수정 직전 휴무·마감 경고. 저장을 막지 않으며, 프론트가 confirm 후 add/update 한다.
+     */
+    @PostMapping("/{id}/hours-check")
+    public Mono<ResponseEntity<PlaceHoursCheckResponse>> checkHours(
+            @PathVariable Long id,
+            @RequestBody PlaceHoursCheckRequest request) {
+        return Mono.fromCallable(() -> placeHoursCheckService.check(id, request))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
     }
 
     @PostMapping("/{id}/items")
@@ -200,8 +216,8 @@ public class ItineraryController {
     /**
      * 핵심 스마트 일정: TourAPI 후보 → 혼잡↓ 필터 → 날씨 실내 전환 → 동선 최적화 → 시각 배정.
      * AI가 장소를 만들지 않으며, 검증된 API 데이터만 사용한다.
-     * standard=true면 "당일치기 시작하기" 전용 표준 7슬롯(그외 4 · 식당 2 · 카페 1)을
-     * 현재 시각과 무관하게 무조건 채워서 돌려준다.
+     * standard=true면 "당일치기 시작하기" 전용 표준 일정(오전 인기 · 점심 · 오후 인기 · 카페 · 저녁,
+     * 가까우면 주변 관광지 1곳)을 현재 시각과 무관하게 채워 돌려준다.
      */
     @GetMapping("/{id}/smart-plan")
     public Mono<ResponseEntity<SmartPlanResponse>> smartPlan(

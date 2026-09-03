@@ -2,39 +2,31 @@ import { useNavigate } from 'react-router-dom';
 
 const PAGE1_STEPS = [
   { icon: '📍', title: '여행 지역 선택', body: '시/도 → 시/군/구 순서로 다녀올 지역을 골라요.' },
-  { icon: '📅', title: '여행 날짜 선택', body: '바람따라는 당일치기만 지원해요. 하루 날짜만 고르면 돼요.' },
-  { icon: '🧑‍🤝‍🧑', title: '누구와 함께하나요?', body: '1인·2인·4인 가족·대가족 중 고르고, 필요하면 반려동물·유모차 동반·무장애 이동 옵션도 함께 체크해요.' },
+  { icon: '📅', title: '여행 날짜 선택', body: '바람따라는 당일치기만 지원해요. 하루 날짜만 고르면 되고, 지난날은 고를 수 없어요. 같은 날 진행 중인 여행이 있으면 이어하기나 새로 만들기를 고를 수 있어요.' },
+  { icon: '🧑‍🤝‍🧑', title: '누구와 함께하나요?', body: '1인·2인·3인·4인 가족·대가족 중 고르고, 성인 연령대를 골라요. 자녀가 있으면 나이를 넣고, 반려동물·유모차 동반·무장애 이동이 필요하면 함께 체크해요.' },
 ];
 
 const PAGE1_BRANCH = [
   {
     tag: 'A',
     icon: '🌬️',
-    title: '스마트 동선 자동',
-    body: '식당 2곳 · 카페 1곳 · 일정 4곳을 지금 시각과 상관없이 채워 드려요. 인기 명소를 먼저 담고, 붐비면 비교적 한산한 오전에 배치해요.',
+    title: '스마트 동선으로 시작',
+    body: '큰 버튼 하나로 오전 인기 명소, 점심, 오후 인기 명소, 가까운 카페, 저녁을 채워 드려요. 가까우면 주변 관광지 한 곳을 더 넣어요. 인기 1위는 오전에 두고, 붐비면 비교적 한산한 오전에 맞춰 줘요. 지금 시각과 상관없이 하루 일정이 준비돼요.',
   },
   {
     tag: 'B',
     icon: '📖',
-    title: '다른 여행자 추천 여행 코스',
-    body: '다녀온 사람이 남긴 당일치기 카드를 보고 "이 일정으로 시작"을 누르면, 같은 장소·순서 그대로 복제돼요.',
+    title: '추천 코스',
+    body: '아래에 「📖 추천 코스 또는 📌 직접 선택」을 연 뒤, 다녀온 사람이 남긴 당일치기 카드에서 「이 일정으로 시작」을 누르면 같은 장소·순서 그대로 복제돼요.',
   },
   {
     tag: 'C',
     icon: '📌',
-    title: '내가 정말 가고 싶은 장소 선택',
-    body: '공연·예약처럼 시각이 정해진 장소를 등록하면, 앞뒤 빈 시간(식사·가벼운 관광)을 자동으로 채워 드려요.',
+    title: '직접 선택',
+    body: '같은 칸에서 공연·예약처럼 시각이 정해진 장소를 이름으로 찾아 시작 시각만 정하면 돼요. 그 장소를 기준으로 앞뒤 빈 시간(식사·가벼운 관광)을 근처에서 채워 드려요.',
   },
 ];
 
-// "고정 일정(앵커) 등록" 문구는 CreateTripScreen의 실제 UI 문구를 그대로 재사용(일관성 유지)
-const ANCHOR_STEPS = [
-  { icon: '📌', title: '앵커 등록', body: 'DDP 공연처럼 시각이 이미 정해진 장소가 있다면 이름으로 찾아 등록해요. 시작 시각만 정하면 돼요.' },
-  { icon: '⏱️', title: '앞뒤 시간 자동 채움', body: '등록한 시각을 기준으로 앞뒤 빈 시간(식사·가벼운 관광)을 자동으로 채워, 바로 시작할 수 있게 준비해요.' },
-  { icon: '📍', title: '근처 추천 코스 확인', body: '앵커 장소를 기준으로 이동 가능한 반경 안에서 어울리는 코스를 자동으로 구성해 보여줘요.' },
-];
-
-// 색상/상태명/의미는 PinwheelHero의 LEVEL_META(NORMAL/WARNING/DANGER)와 1:1로 일치시킴 - 문구가 실제 트리거 로직과 어긋나지 않도록 유지
 const PINWHEEL_LEVELS = [
   { level: 'normal', emoji: '🟢', name: '순풍', meaning: '계획대로 진행 가능, 이상 없음' },
   { level: 'warning', emoji: '🟡', name: '주의', meaning: '경미한 이슈 발생, 참고 필요' },
@@ -44,23 +36,28 @@ const PINWHEEL_LEVELS = [
 const PAGE2_STEPS = [
   {
     icon: '🧭',
-    title: '한 화면에서 일정·지도·검색·알림',
-    body: '오늘 일정 아래에 지도, 장소 검색, 알림, 프로필이 이어져 있어요. 지도에서는 동선을 보고 "이 지역 재검색"으로 주변 장소를 담을 수 있어요. 위쪽 흐름 표시나 아래 탭을 누르면 그 구간으로 바로 이동해요.',
+    title: '홈 · 지도 · 검색 · 알림 · 프로필',
+    body: '일정 화면은 아래 탭(또는 위쪽 흐름)으로 다섯 구간을 오가요. 홈에서 오늘 일정을 보고, 지도에서 동선을, 검색에서 장소를 더 담고, 알림에서 온 메시지를, 프로필에서 글씨·알림·마무리를 다뤄요.',
+  },
+  {
+    icon: '📋',
+    title: '일정 카드 다루기',
+    body: '장소 이름을 누르면 상세가 펼쳐져요. 왼쪽 시각을 눌러 방문 시간을 바꾸고, 「⏱ 시간순 정렬」로 목록 순서를 맞출 수 있어요. 펼친 카드에서는 🗺️ 지도 · ✏️ 수정 · 📌 고정 · 🎧 도슨트 · 🗑️ 삭제를 쓸 수 있어요. 고정하면 새 장소 추천이 그곳 근처를 우선해요.',
   },
   {
     icon: '🏷️',
-    title: '태그 선택 → 추천받기',
-        body: '#자연 #실내 #맛집 #아이동반 #액티비티 #역사 중 원하는 태그를 고르고 "추천받기"를 누르면 어울리는 장소 목록이 떠요. 맛집·카페를 고를 때는 1인 식사 참고 금액이 보일 수 있어요. 마음에 드는 곳을 일정에 담고 방문 시간을 정해요.',
+    title: '장소 더 담기',
+    body: '검색 탭에서 맛집·카페 / 실내 / 역사·전통 / 자연·액티비티 / 쇼핑·체험 태그를 고르고 「추천받기」를 눌러요. 맛집이면 1인 식사 참고 금액을, 그 외에는 무료 장소만 보기를 켤 수 있어요. 지도에서는 옮긴 뒤 「이 지역 재검색」으로 주변을 담아요. 방문일이 휴무이거나 마감에 가까우면 「그래도 담기 / 취소」로 물어보고, 다른 일정과 시간이 겹치면 담지 않아요.',
   },
-    {
+  {
     icon: '🌀',
-    title: '실제 여행 진행 - 세 가지 변수',
-    body: '일정 화면 위쪽 바람개비와 바로 아래 세 장(비·폭염 / 혼잡 / 동선)이 지금 상황을 알려줘요. 반짝이면 그 버튼을 눌러 실내·한산한 곳·짧은 동선으로 바로 바꿀 수 있어요. 프로필에서 알림을 켜 두면, 순풍일 때는 첫 일정 30분 전과 마지막 일정 종료 뒤에 알려 드리고, 주황·빨강(비·폭염·혼잡·동선)은 감지되는 즉시 휴대폰으로 알려드려요.',
+    title: '변수에 바로 대응하기',
+    body: '홈 위쪽 바람개비와 「지금 변수에 대응하기」 세 장(비·폭염 / 혼잡 / 동선)이 지금 상황을 알려줘요. 반짝이면 실내·한산한 곳·짧은 동선으로 바로 바꿀 수 있어요. 휴무·영업종료·이동시간 부족도 바람개비가 잡아 주고, 「동선 다시」로 순서를 다시 짤 수 있어요.',
   },
   {
     icon: '✅',
-    title: '여행 마무리 작성(완료 기록)',
-    body: '다녀온 뒤 "여행 마무리"에서 별점과 후기를 남기면, 같은 지역을 찾는 다른 여행자의 추천 기록으로 쓰여요. "일정 공유"로 링크를 만들어 함께 가는 사람에게 미리 보낼 수도 있어요.',
+    title: '알림 · 마무리 · 공유',
+    body: '프로필에서 알림을 켜 두면, 순풍일 때는 첫 일정 30분 전과 여행 마무리를, 주황·빨강(비·폭염·혼잡·동선·휴무)은 감지되는 즉시 휴대폰으로 알려드려요. 글씨 크기도 여기서 키울 수 있어요. 「여행 마무리」는 좋았음·보통·별로만 누르면 되고, 별로인 장소는 다음 추천에서 빼 드려요. 좋았음이면 같은 지역 추천 코스로 쓰일 수 있어요. 홈의 「공유」로 링크를 보내고, 메뉴의 「내 여행 관리」에서 지난 일정을 볼 수 있어요.',
   },
 ];
 
@@ -80,7 +77,7 @@ function StepList({ steps, startNumber = 1 }) {
   );
 }
 
-/** 전체 메뉴 > 이용 가이드 - 실제 화면 흐름(PAGE1 온보딩 → PAGE2 여행 진행) 그대로 정리 + 버튼으로 바로 따라 해볼 수 있게 함 */
+/** 전체 메뉴 > 이용 가이드 - 실제 화면 흐름(준비 → 당일) 그대로 정리 */
 export default function GuideScreen() {
   const navigate = useNavigate();
 
@@ -94,7 +91,7 @@ export default function GuideScreen() {
           <li>
             <span className="guide-trust-icon" aria-hidden="true">🔍</span>
             <span>지금 이 순간의 혼잡도·영업시간은 한국관광공사·기상청 공식 데이터로만 확인해요.
-              "보통 주말엔 붐빕니다" 같은 짐작이 아니에요.</span>
+              「보통 주말엔 붐빕니다」 같은 짐작이 아니에요.</span>
           </li>
           <li>
             <span className="guide-trust-icon" aria-hidden="true">🛡️</span>
@@ -111,7 +108,7 @@ export default function GuideScreen() {
       <section className="guide-page">
         <h2 className="guide-page-title">
           <span className="guide-page-badge">PAGE 1</span>
-          여행 준비 (온보딩)
+          여행 준비
         </h2>
         <StepList steps={PAGE1_STEPS} startNumber={1} />
 
@@ -133,14 +130,6 @@ export default function GuideScreen() {
           </div>
         </div>
 
-        <div className="guide-subsection">
-          <h3 className="guide-subsection-title">📌 이미 정해진 일정이 있다면 (앵커 등록)</h3>
-          <p className="guide-subsection-body">
-            이미 정해진 일정이 있어요? 앵커로 등록해두면 앞뒤 빈 시간을 자동으로 채워드려요.
-          </p>
-          <StepList steps={ANCHOR_STEPS} startNumber={1} />
-        </div>
-
         <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/')}>
           🌬️ 여기서부터 따라 해보기
         </button>
@@ -149,14 +138,14 @@ export default function GuideScreen() {
       <section className="guide-page">
         <h2 className="guide-page-title">
           <span className="guide-page-badge">PAGE 2</span>
-          여행 진행
+          여행 당일
         </h2>
         <StepList steps={PAGE2_STEPS} startNumber={5} />
 
         <div className="guide-subsection">
           <h3 className="guide-subsection-title">🌀 바람개비 색상, 무슨 뜻일까요?</h3>
           <p className="guide-subsection-body">
-            바람개비는 여행 중에도 날씨·혼잡도·동선을 주기적으로 확인해서, 상황이 바뀌면 색으로 바로 알려드려요.
+            바람개비는 여행 중에도 날씨·혼잡·동선·휴무·영업시간을 주기적으로 확인해서, 상황이 바뀌면 색으로 바로 알려드려요.
           </p>
           <div className="guide-status-legend">
             {PINWHEEL_LEVELS.map((s) => (
@@ -168,14 +157,14 @@ export default function GuideScreen() {
             ))}
           </div>
           <p className="guide-subsection-body">
-            바람개비를 탭하면 색이 바뀐 사유를 확인하고, 이어서 대응 방안(대안 코스)까지 바로 볼 수 있어요.
+            바람개비를 탭하면 색이 바뀐 사유를 확인하고, 이어서 대응(실내 일정 · 다른 장소 · 동선 다시)까지 바로 볼 수 있어요.
           </p>
           <div className="guide-callout">
             🔍 이 판단은 AI의 임의 추측이 아니에요. 기상청·한국관광공사 공공데이터로 실시간 검증한 결과예요.
           </div>
         </div>
 
-        <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/')}>
+        <button type="button" className="btn-primary guide-cta" onClick={() => navigate('/trip')}>
           🧭 내 일정에서 이어서 따라 해보기
         </button>
         <p className="guide-cta-hint">진행 중인 일정이 있으면 바로 그 일정으로, 없으면 새 여행 시작 화면으로 이동해요.</p>

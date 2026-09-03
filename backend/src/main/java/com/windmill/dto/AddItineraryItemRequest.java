@@ -47,4 +47,9 @@ public class AddItineraryItemRequest {
     private Boolean indoor;
     private com.windmill.domain.RainSensitivity rainSensitivity;
     private com.windmill.domain.CongestionSensitivity congestionSensitivity;
+    /**
+     * 휴무·마감 경고를 사용자가 확인한 뒤의 추가. 마감 게이트는 건너뛰고(저장은 허용),
+     * 시간 겹침(TIME_OVERLAP)은 그대로 막는다.
+     */
+    private Boolean acknowledgeHoursWarning;
 }

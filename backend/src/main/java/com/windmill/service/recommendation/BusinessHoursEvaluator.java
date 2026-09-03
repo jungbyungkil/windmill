@@ -153,6 +153,37 @@ public final class BusinessHoursEvaluator {
         return statusAt(field -> introFields.getOrDefault(field, ""), resolved);
     }
 
+    /** 방문일이 휴무인 이유. 별도 DB 필드 없이 restdate 원문 + 공휴일 달력으로 구분한다. */
+    public enum ClosedDayKind {
+        NONE,
+        /** 정기휴무 요일(매주 월요일 등) */
+        REGULAR,
+        /** 정기휴무가 공휴일과 겹쳐 다음 날로 밀린 휴관 */
+        HOLIDAY_SHIFT
+    }
+
+    public static String weekdayKorean(LocalDate date) {
+        if (date == null) {
+            return "";
+        }
+        return WEEKDAY_KO[date.getDayOfWeek().getValue() - 1];
+    }
+
+    /**
+     * 방문일이 휴무인지, 그리고 공휴일 때문에 밀린 휴관인지 구분.
+     * TourAPI restdate는 자유 텍스트라 대체휴무 전용 컬럼은 두지 않고, 원문의 공휴일 밀림 안내 +
+     * KoreanHolidayCache로 판정한다.
+     */
+    public static ClosedDayKind classifyClosedDay(String restText, LocalDate date) {
+        if (!isClosedOnRestDate(restText, date)) {
+            return ClosedDayKind.NONE;
+        }
+        if (hasHolidayShiftClause(restText) && !isClosedByWeekdayRule(restText, date)) {
+            return ClosedDayKind.HOLIDAY_SHIFT;
+        }
+        return ClosedDayKind.REGULAR;
+    }
+
     /**
      * "매주 월요일(단, 월요일이 공휴일인 경우 다음날 휴관)"류 - 공휴일과 겹치면 휴무가 밀리는 안내
      * 문구 감지. 실제 원문마다 "공휴일"과 트리거 단어의 순서·거리가 제각각이라(예: 덕수궁 원문은

@@ -398,7 +398,7 @@ export default function CreateTripScreen({
             loadingStage
               || (anchorCandidate
                 ? `${anchorCandidate.placeName} 기준으로 장소를 찾고 있어요...`
-                : '식당 2 · 카페 1 · 일정 4곳을 찾고 있어요...')
+                : '인기 명소 2 · 식당 2 · 카페 1곳을 찾고 있어요...')
           }
         />
       )}
@@ -599,13 +599,13 @@ export default function CreateTripScreen({
             type="button"
             className="trip-alt-start-btn"
             aria-expanded={otherWaysOpen}
-            aria-label="다른 여행자 추천 여행 코스 또는 내가 정말 가고 싶은 장소 선택"
+            aria-label="추천 코스 또는 직접 선택"
             onClick={() => setOtherWaysOpen((open) => !open)}
           >
             <span className="trip-alt-start-choices">
-              <span className="trip-alt-start-choice">다른 여행자 추천 여행 코스</span>
+              <span className="trip-alt-start-choice">📖 추천 코스</span>
               <span className="trip-alt-start-or">또는</span>
-              <span className="trip-alt-start-choice">내가 정말 가고 싶은 장소 선택</span>
+              <span className="trip-alt-start-choice">📌 직접 선택</span>
             </span>
             <span className="trip-alt-start-chevron" aria-hidden="true">{otherWaysOpen ? '▾' : '▸'}</span>
           </button>
@@ -613,7 +613,7 @@ export default function CreateTripScreen({
             <div className="trip-form-disclose-body">
         <div className="plan-mode-section">
           <article className="plan-mode-card" hidden={!storyFeedAvailable}>
-            <h3 className="plan-mode-title">다른 여행자 추천 여행 코스</h3>
+            <h3 className="plan-mode-title">📖 추천 코스</h3>
             <p className="plan-mode-desc">
               다녀온 사람이 남긴 당일치기를 그대로 복제해 시작할 수 있어요.
             </p>
@@ -629,7 +629,7 @@ export default function CreateTripScreen({
           </article>
 
           <article className="plan-mode-card">
-            <h3 className="plan-mode-title">내가 정말 가고 싶은 장소 선택</h3>
+            <h3 className="plan-mode-title">📌 직접 선택</h3>
             <p className="plan-mode-desc">
               공연·예약처럼 시각이 정해진 장소를 등록하면, 앞뒤 빈 시간을 자동으로 채워 드려요.
             </p>

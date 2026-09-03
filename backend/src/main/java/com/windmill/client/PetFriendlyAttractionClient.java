@@ -47,7 +47,7 @@ public class PetFriendlyAttractionClient {
                             .queryParam("MobileOS", "ETC")
                             .queryParam("MobileApp", MOBILE_APP)
                             .queryParam("_type", "json")
-                            .queryParam("arrange", "C");
+                            .queryParam("arrange", TourApiArrange.POPULAR);
                     if (lDongRegnCd != null) {
                         uriBuilder.queryParam("lDongRegnCd", lDongRegnCd);
                     }
@@ -75,7 +75,7 @@ public class PetFriendlyAttractionClient {
                             .queryParam("MobileOS", "ETC")
                             .queryParam("MobileApp", MOBILE_APP)
                             .queryParam("_type", "json")
-                            .queryParam("arrange", "C")
+                            .queryParam("arrange", TourApiArrange.POPULAR)
                             .queryParam("keyword", TourApiWebClientFactory.encode(keyword));
                     if (lDongRegnCd != null) {
                         uriBuilder.queryParam("lDongRegnCd", lDongRegnCd);

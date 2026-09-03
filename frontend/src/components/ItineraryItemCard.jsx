@@ -242,6 +242,7 @@ export default function ItineraryItemCard({
                 onClick={handleOpenMap}
                 disabled={!mapAvailable}
               >
+                <span className="item-text-btn-icon" aria-hidden="true">🗺️</span>
                 지도
               </button>
               <button
@@ -249,6 +250,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn"
                 onClick={() => setEditing(true)}
               >
+                <span className="item-text-btn-icon" aria-hidden="true">✏️</span>
                 수정
               </button>
               <button
@@ -256,6 +258,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn"
                 onClick={() => onTogglePin(item.itemId, !item.pinned)}
               >
+                <span className="item-text-btn-icon" aria-hidden="true">📌</span>
                 {item.pinned ? '고정 해제' : '고정'}
               </button>
               <button
@@ -263,6 +266,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn"
                 onClick={() => onOpenDocent(item)}
               >
+                <span className="item-text-btn-icon" aria-hidden="true">🎧</span>
                 도슨트
               </button>
               <button
@@ -270,6 +274,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn danger"
                 onClick={() => onDelete(item.itemId)}
               >
+                <span className="item-text-btn-icon" aria-hidden="true">🗑️</span>
                 삭제
               </button>
             </div>

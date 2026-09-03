@@ -117,17 +117,15 @@ class SmartPlanTimingTest {
     }
 
     /**
-     * 2026-08-21 - 슬롯 확장(4→최대7) 요구사항 검증. 후보가 서로 가까이 밀집해 있으면 오전2/오후2/
-     * 저녁후까지 확장돼 최대 7슬롯(관광5+식사2)에 도달해야 하고, 그 이상은 절대 넘지 않아야 한다.
+     * 밀집 후보면 필수(오전 인기·점심·오후 인기·저녁)에 주변 관광지 1곳을 더해 최대 5슬롯.
      */
     @Test
-    void denseNearbyAttractions_expandsUpToSevenSlots() {
+    void denseNearbyAttractions_addsOneOptionalNearbyStop() {
         List<RecommendationCandidate> attrs = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             attrs.add(RecommendationCandidate.builder()
                     .contentId("A" + i)
                     .placeName("관광지" + i)
-                    // 모두 반경 0.5km 안쪽 밀집 클러스터 - 어떤 조합이 anchor가 되어도 1.5km 이내
                     .mapX(String.valueOf(127.000 + i * 0.001))
                     .mapY(String.valueOf(37.000 + i * 0.001))
                     .build());
@@ -145,14 +143,14 @@ class SmartPlanTimingTest {
         List<RecommendationCandidate> day = service.buildDayRhythm(
                 attrs, foods, LocalTime.of(9, 0), false, 0);
 
-        assertEquals(7, day.size(), "밀집 후보가 충분하면 최대 7슬롯까지 확장돼야 함");
+        assertEquals(5, day.size(), "밀집 후보면 필수 4 + 주변 관광지 1이어야 함");
         long meals = day.stream().filter(s -> "점심".equals(s.getCategory()) || "저녁".equals(s.getCategory())).count();
         assertEquals(2, meals);
-        assertEquals(5, day.size() - meals, "관광 슬롯은 오전1·2 + 오후1·2 + 저녁후 = 5개여야 함");
+        assertEquals(3, day.size() - meals, "관광은 오전·오후 인기 + 주변 1곳");
         assertTrue(day.get(0).getBackupContentId() != null, "대표를 배치할 때 예비 후보도 함께 채워져야 함");
     }
 
-    /** 후보가 서로 멀리 떨어져 있으면(밀도 기준 미충족) 기존과 동일하게 4슬롯(오전1·점심·오후1·저녁)에 머물러야 함 */
+    /** 후보가 서로 멀리 떨어져 있으면 주변 관광지를 넣지 않고 필수 4슬롯(오전·점심·오후·저녁)에 머문다 */
     @Test
     void sparseFarApartAttractions_staysAtBaseFourSlots() {
         List<RecommendationCandidate> attrs = new ArrayList<>(List.of(
@@ -176,11 +174,11 @@ class SmartPlanTimingTest {
         assertEquals(4, day.size(), "밀도 기준을 못 채우면 기존과 동일하게 4슬롯이어야 함");
         long meals = day.stream().filter(s -> "점심".equals(s.getCategory()) || "저녁".equals(s.getCategory())).count();
         assertEquals(2, meals);
-        assertEquals(2, day.size() - meals, "오전1·오후1만 배치돼야 함(2번째/저녁후 확장 없음)");
+        assertEquals(2, day.size() - meals, "오전·오후 인기만 배치되고 주변 관광지는 없어야 함");
     }
 
     @Test
-    void standardSevenSlots_alwaysFillsRestaurantsCafeAndSights() {
+    void standardDaySlots_fillsRequiredFiveAndOptionalNearby() {
         List<RecommendationCandidate> attrs = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
             attrs.add(RecommendationCandidate.builder()
@@ -212,17 +210,42 @@ class SmartPlanTimingTest {
                 .mapY("37.02")
                 .build());
 
-        List<RecommendationCandidate> day = service.assembleStandardSevenSlots(attrs, foods, cafes);
+        List<RecommendationCandidate> day = service.assembleStandardDaySlots(attrs, foods, cafes);
 
-        assertEquals(7, day.size(), "지금 시각과 무관하게 7슬롯을 채워야 함");
+        assertTrue(day.size() >= 5 && day.size() <= 6, "필수 5칸, 가까우면 주변 1곳 추가");
         long meals = day.stream().filter(s -> "점심".equals(s.getCategory()) || "저녁".equals(s.getCategory())).count();
         long cafeCount = day.stream().filter(s -> "카페".equals(s.getCategory())).count();
         assertEquals(2, meals, "식당은 점심·저녁 2곳");
         assertEquals(1, cafeCount, "카페는 1곳");
-        assertEquals(4, day.size() - meals - cafeCount, "그외 일정 4곳");
-        assertEquals("점심", day.get(2).getCategory());
-        assertEquals("카페", day.get(4).getCategory());
-        assertEquals("저녁", day.get(6).getCategory());
+        assertEquals("점심", day.get(1).getCategory());
+        assertEquals("카페", day.get(3).getCategory());
+        assertEquals("저녁", day.get(day.size() - 1).getCategory());
+    }
+
+    @Test
+    void standardDaySlots_skipsOptionalNearbyWhenFar() {
+        List<RecommendationCandidate> attrs = new ArrayList<>(List.of(
+                RecommendationCandidate.builder().contentId("TOP1").placeName("인기1")
+                        .rank(1).mapX("127.000").mapY("37.000").build(),
+                RecommendationCandidate.builder().contentId("TOP2").placeName("인기2")
+                        .rank(2).mapX("127.002").mapY("37.002").build(),
+                RecommendationCandidate.builder().contentId("FAR").placeName("먼 관광지")
+                        .rank(3).mapX("128.500").mapY("38.500").build()));
+        List<RecommendationCandidate> foods = new ArrayList<>(List.of(
+                RecommendationCandidate.builder().contentId("F1").placeName("맛집1")
+                        .matchedTags(List.of("#맛집")).mapX("127.000").mapY("37.000").build(),
+                RecommendationCandidate.builder().contentId("F2").placeName("맛집2")
+                        .matchedTags(List.of("#맛집")).mapX("127.001").mapY("37.001").build()));
+        List<RecommendationCandidate> cafes = new ArrayList<>(List.of(
+                RecommendationCandidate.builder().contentId("C1").placeName("카페")
+                        .matchedTags(List.of("#카페")).mapX("127.000").mapY("37.000").build()));
+
+        List<RecommendationCandidate> day = service.assembleStandardDaySlots(attrs, foods, cafes);
+
+        assertEquals(5, day.size(), "먼 관광지는 넣지 않고 필수 5칸만");
+        assertTrue(day.stream().noneMatch(s -> "FAR".equals(s.getContentId())));
+        assertEquals("TOP1", day.get(0).getContentId());
+        assertEquals("TOP2", day.get(2).getContentId());
     }
 
     @Test
@@ -239,6 +262,34 @@ class SmartPlanTimingTest {
         assertEquals("F", result.get(0).getContentId(), "집중률이 높은 인기 명소가 맨 앞이어야 함");
         assertEquals("Q", result.get(1).getContentId());
         assertEquals("U", result.get(2).getContentId(), "집계 없는 후보는 맨 뒤");
+    }
+
+    @Test
+    void sortPopular_tourApiRankComesBeforeCrowdRate() {
+        RecommendationCandidate busyLowRank = RecommendationCandidate.builder()
+                .contentId("BUSY").placeName("조회 낮은 혼잡 명소").rank(9).crowdRate(95.0).build();
+        RecommendationCandidate topQuiet = RecommendationCandidate.builder()
+                .contentId("TOP").placeName("지역 1위").rank(1).crowdRate(22.0).build();
+
+        List<RecommendationCandidate> result = service.sortPopular(List.of(busyLowRank, topQuiet));
+
+        assertEquals("TOP", result.get(0).getContentId(), "TourAPI 조회순이 집중률보다 우선해야 함");
+        assertEquals("BUSY", result.get(1).getContentId());
+    }
+
+    @Test
+    void peekMostPopular_picksRegionalNumberOneOutsideWindow() {
+        List<RecommendationCandidate> pool = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            pool.add(RecommendationCandidate.builder()
+                    .contentId("W" + i).rank(i + 1).crowdRate(30.0).build());
+        }
+        pool.add(RecommendationCandidate.builder()
+                .contentId("REGION_TOP").rank(1).crowdRate(40.0).build());
+
+        RecommendationCandidate chosen = service.peekMostPopular(pool);
+
+        assertEquals("REGION_TOP", chosen.getContentId(), "개인화 윈도우 밖의 지역 1위도 골라야 함");
     }
 
     @Test
@@ -261,12 +312,13 @@ class SmartPlanTimingTest {
                 RecommendationCandidate.builder().contentId("C1").placeName("카페")
                         .matchedTags(List.of("#카페")).mapX("127.000").mapY("37.000").build()));
 
-        List<RecommendationCandidate> day = service.assembleStandardSevenSlots(attrs, foods, cafes);
+        List<RecommendationCandidate> day = service.assembleStandardDaySlots(attrs, foods, cafes);
 
         assertEquals("FAMOUS_FAR", day.get(0).getContentId(), "가장 인기(혼잡)한 곳은 오전에 가야 함");
-        assertEquals("FAMOUS_NEAR", day.get(1).getContentId(), "그다음 인기 명소도 오전에");
+        assertEquals("점심", day.get(1).getCategory());
+        assertEquals("FAMOUS_NEAR", day.get(2).getContentId(), "그다음 인기 명소는 오후에");
         assertEquals("09:00", day.get(0).getSuggestedTime());
-        assertEquals("10:30", day.get(1).getSuggestedTime());
+        assertEquals("14:00", day.get(2).getSuggestedTime());
         assertTrue(day.get(0).getOneLiner().contains("오전에"), "붐비는 인기 명소는 오전 안내가 있어야 함");
     }
 }

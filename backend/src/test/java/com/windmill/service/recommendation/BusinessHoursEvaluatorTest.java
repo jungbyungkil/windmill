@@ -285,6 +285,20 @@ class BusinessHoursEvaluatorTest {
     }
 
     @Test
+    void classifyClosedDay_regularMondayVsHolidayShift() {
+        seed2026SubstituteHoliday();
+        String rest = "매주 월요일 (단, 월요일이 공휴일인 경우 다음날 휴관)";
+        assertEquals(BusinessHoursEvaluator.ClosedDayKind.NONE,
+                BusinessHoursEvaluator.classifyClosedDay(rest, LocalDate.of(2026, 8, 17)));
+        assertEquals(BusinessHoursEvaluator.ClosedDayKind.HOLIDAY_SHIFT,
+                BusinessHoursEvaluator.classifyClosedDay(rest, LocalDate.of(2026, 8, 18)));
+        assertEquals(BusinessHoursEvaluator.ClosedDayKind.REGULAR,
+                BusinessHoursEvaluator.classifyClosedDay(rest, LocalDate.of(2026, 8, 24)));
+        assertEquals(BusinessHoursEvaluator.ClosedDayKind.REGULAR,
+                BusinessHoursEvaluator.classifyClosedDay("매주 월요일", LocalDate.of(2026, 8, 24)));
+    }
+
+    @Test
     void holidayShiftClause_withoutHolidayCalendarData_fallsBackToWeekdayRule() {
         // 캐시가 비어있으면(조회 실패 등) 공휴일 예외 없이 기존 요일 판정 그대로 - 안전한 폴백
         String rest = "매주 월요일 (단, 월요일이 공휴일인 경우 다음날 휴관)";

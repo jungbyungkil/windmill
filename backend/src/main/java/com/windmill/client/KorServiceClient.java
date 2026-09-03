@@ -36,7 +36,7 @@ public class KorServiceClient {
         return serviceKey != null && !serviceKey.isBlank();
     }
 
-    /** 지역기반 관광정보 목록 조회 (areaBasedList2) */
+    /** 지역기반 관광정보 목록 조회 (areaBasedList2). arrange 기본값은 조회순(인기). */
     public Mono<List<JsonNode>> areaBasedList(Integer contentTypeId, String lDongRegnCd, String lDongSignguCd,
                                                int numOfRows, int pageNo, String arrange) {
         return areaBasedList(contentTypeId, null, null, null, lDongRegnCd, lDongSignguCd, numOfRows, pageNo, arrange);
@@ -61,7 +61,7 @@ public class KorServiceClient {
                             .queryParam("MobileOS", "ETC")
                             .queryParam("MobileApp", MOBILE_APP)
                             .queryParam("_type", "json")
-                            .queryParam("arrange", arrange == null ? "C" : arrange);
+                            .queryParam("arrange", arrange == null ? TourApiArrange.POPULAR : arrange);
                     if (contentTypeId != null) {
                         uriBuilder.queryParam("contentTypeId", contentTypeId);
                     }
@@ -108,7 +108,7 @@ public class KorServiceClient {
                             .queryParam("mapX", mapX)
                             .queryParam("mapY", mapY)
                             .queryParam("radius", radius)
-                            .queryParam("arrange", "E");
+                            .queryParam("arrange", TourApiArrange.DISTANCE);
                     if (contentTypeId != null) {
                         uriBuilder.queryParam("contentTypeId", contentTypeId);
                     }
@@ -121,7 +121,7 @@ public class KorServiceClient {
                 .onErrorReturn(List.of());
     }
 
-    /** 키워드 검색 조회 (searchKeyword2) */
+    /** 키워드 검색 조회 (searchKeyword2). 같은 키워드 안에서는 조회순(인기)으로 정렬한다. */
     public Mono<List<JsonNode>> searchKeyword(String keyword, Integer contentTypeId,
                                                String lDongRegnCd, String lDongSignguCd,
                                                int numOfRows, int pageNo) {
@@ -134,7 +134,7 @@ public class KorServiceClient {
                             .queryParam("MobileOS", "ETC")
                             .queryParam("MobileApp", MOBILE_APP)
                             .queryParam("_type", "json")
-                            .queryParam("arrange", "C")
+                            .queryParam("arrange", TourApiArrange.POPULAR)
                             .queryParam("keyword", TourApiWebClientFactory.encode(keyword));
                     if (contentTypeId != null) {
                         uriBuilder.queryParam("contentTypeId", contentTypeId);
@@ -231,7 +231,7 @@ public class KorServiceClient {
                             .queryParam("MobileApp", MOBILE_APP)
                             .queryParam("_type", "json")
                             .queryParam("listYN", "Y")
-                            .queryParam("arrange", "C")
+                            .queryParam("arrange", TourApiArrange.MODIFIED)
                             .queryParam("eventStartDate", eventStartDateYyyyMMdd);
                     if (lDongRegnCd != null && !lDongRegnCd.isBlank()) {
                         uriBuilder.queryParam("lDongRegnCd", lDongRegnCd);

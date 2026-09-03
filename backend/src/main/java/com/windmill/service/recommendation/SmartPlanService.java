@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 
 /**
  * 바람따라 핵심 플로우: TourAPI 기반 후보를
- * 1) 인기(집중률) 높은 명소를 우선하고, 붐비는 곳은 비교적 한산한 오전에 두며
+ * 1) 그 지역 인기(조회순) 명소를 우선하고, 붐비는 곳은 비교적 한산한 오전에 두며
  * 2) 날씨(비/폭염)면 실내 코스로 전환하고
  * 3) 현실적인 당일치기 리듬(오전→점심→오후→저녁)으로 배치한다.
  * 가족 여행은 관광을 줄이고 식사 슬롯을 반드시 넣는다.
@@ -58,7 +58,7 @@ public class SmartPlanService {
     private static final int MEAL_STAY = VisitTiming.MEAL_STAY_MINUTES;
     private static final int DEFAULT_TRAVEL_MINUTES = GeoUtils.DEFAULT_TRAVEL_MINUTES;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
-    /** 슬롯 확장(오전2/오후2/저녁후) 판단용 근접 기준 - ProximityRanking.NEAR_KM/AnchorPlanService와 동일값 */
+    /** 주변 관광지 1곳 추가 판단용 근접 기준 - ProximityRanking.NEAR_KM/AnchorPlanService와 동일값 */
     private static final double SLOT_EXPANSION_NEAR_KM = 1.5;
 
     private final RecommendationPipeline recommendationPipeline;
@@ -71,9 +71,9 @@ public class SmartPlanService {
     }
 
     /**
-     * "당일치기 시작하기" 전용 표준 7슬롯 일정.
-     * 지금 시각과 무관하게 하루 전체를 채운다: 그외 일정 4 + 식당 2 + 카페 1.
-     * (요청의 식당2·카페1·그외3에 슬롯 7개 채우기를 맞추면 그외는 4곳이 된다.)
+     * "당일치기 시작하기" 전용 표준 일정.
+     * 지금 시각과 무관하게 필수 5칸을 채운다: 오전 인기 1 · 점심 · 오후 다음 인기 · 가까운 카페 · 저녁.
+     * 직전 장소에서 1.5km 안에 관광지가 남아 있으면 주변 관광지 1곳을 더 넣는다(최대 6).
      * 여행 중 "다시 짜기"는 {@link #build}의 시간창 판정을 그대로 쓴다.
      */
     public Mono<SmartPlanResponse> buildStandardDayPlan(Itinerary itinerary) {
@@ -122,7 +122,7 @@ public class SmartPlanService {
         foodPool = new ArrayList<>(sortPopular(foodPool));
         cafePool = new ArrayList<>(sortPopular(cafePool));
 
-        List<RecommendationCandidate> day = assembleStandardSevenSlots(attrPool, foodPool, cafePool);
+        List<RecommendationCandidate> day = assembleStandardDaySlots(attrPool, foodPool, cafePool);
 
         fillDistances(day);
         double dayKm = RouteOptimizer.totalDistanceKm(day);
@@ -136,7 +136,7 @@ public class SmartPlanService {
                 .anyMatch(c -> CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered());
         String summary = buildSummary(rain, heat, crowdFiltered, dayKm, day, 1, null, isFamilyPace(companion));
 
-        log.info("[SmartPlan] 표준 7슬롯 일정 생성 - date={}, stops={}, family={}", date, day.size(), isFamilyPace(companion));
+        log.info("[SmartPlan] 표준 일정 생성 - date={}, stops={}, family={}", date, day.size(), isFamilyPace(companion));
 
         return SmartPlanResponse.builder()
                 .strategySummary(summary)
@@ -159,12 +159,12 @@ public class SmartPlanService {
     }
 
     /**
-     * 시각과 무관하게 7칸을 채운다.
-     * 오전1 → 오전2 → 점심(식당) → 오후 → 카페 → 저녁 전 → 저녁(식당).
+     * 시각과 무관하게 필수 5칸을 채운다.
+     * 오전 인기 → 점심 → 오후 다음 인기 → 가까운 카페 → (선택) 주변 관광지 → 저녁.
      */
-    List<RecommendationCandidate> assembleStandardSevenSlots(List<RecommendationCandidate> attrPool,
-                                                               List<RecommendationCandidate> foodPool,
-                                                               List<RecommendationCandidate> cafePool) {
+    List<RecommendationCandidate> assembleStandardDaySlots(List<RecommendationCandidate> attrPool,
+                                                             List<RecommendationCandidate> foodPool,
+                                                             List<RecommendationCandidate> cafePool) {
         attrPool = new ArrayList<>(sortPopular(attrPool));
         foodPool = new ArrayList<>(sortPopular(foodPool));
         cafePool = new ArrayList<>(sortPopular(cafePool));
@@ -173,20 +173,32 @@ public class SmartPlanService {
         Set<String> usedContentIds = new java.util.HashSet<>();
 
         prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(9, 0), "오전 일정", SlotKind.ATTRACTION);
+                LocalTime.of(9, 0), "오전 일정", SlotKind.ATTRACTION, true);
         prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(10, 30), "오전 일정 2", SlotKind.ATTRACTION);
+                LocalTime.of(12, 0), "점심 식사", SlotKind.MEAL, false);
         prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(12, 0), "점심 식사", SlotKind.MEAL);
+                LocalTime.of(14, 0), "오후 일정", SlotKind.ATTRACTION, true);
         prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(14, 0), "오후 일정", SlotKind.ATTRACTION);
-        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(15, 30), "카페", SlotKind.CAFE);
-        prev = addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(17, 0), "저녁 전 일정", SlotKind.ATTRACTION);
+                LocalTime.of(15, 30), "카페", SlotKind.CAFE, false);
+        prev = addOptionalNearbyAttraction(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                LocalTime.of(17, 0), "주변 일정");
         addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
-                LocalTime.of(18, 30), "저녁 식사", SlotKind.MEAL);
+                LocalTime.of(18, 30), "저녁 식사", SlotKind.MEAL, false);
         return day;
+    }
+
+    private RecommendationCandidate addOptionalNearbyAttraction(List<RecommendationCandidate> day,
+                                                                  List<RecommendationCandidate> attrPool,
+                                                                  List<RecommendationCandidate> foodPool,
+                                                                  List<RecommendationCandidate> cafePool,
+                                                                  RecommendationCandidate prev,
+                                                                  Set<String> usedContentIds,
+                                                                  LocalTime time, String label) {
+        if (!isNearby(prev, peekNearest(attrPool, prev))) {
+            return prev;
+        }
+        return addForcedSlot(day, attrPool, foodPool, cafePool, prev, usedContentIds,
+                time, label, SlotKind.ATTRACTION, false);
     }
 
     private RecommendationCandidate addForcedSlot(List<RecommendationCandidate> day,
@@ -195,22 +207,22 @@ public class SmartPlanService {
                                                     List<RecommendationCandidate> cafePool,
                                                     RecommendationCandidate prev,
                                                     Set<String> usedContentIds,
-                                                    LocalTime time, String label, SlotKind kind) {
+                                                    LocalTime time, String label, SlotKind kind,
+                                                    boolean preferPopular) {
         List<RecommendationCandidate> preferred = switch (kind) {
             case MEAL -> foodPool;
             case CAFE -> cafePool;
             case ATTRACTION -> attrPool;
         };
-        boolean morningPopular = kind == SlotKind.ATTRACTION && time.isBefore(LocalTime.of(12, 0));
-        RecommendationCandidate placed = placeForced(preferred, prev, time, label, kind, morningPopular);
+        RecommendationCandidate placed = placeForced(preferred, prev, time, label, kind, preferPopular);
         if (placed == null) {
             List<RecommendationCandidate> fallback = kind == SlotKind.CAFE ? foodPool
                     : kind == SlotKind.MEAL ? cafePool
                     : foodPool;
-            placed = placeForced(fallback, prev, time, label, kind, morningPopular);
+            placed = placeForced(fallback, prev, time, label, kind, preferPopular);
         }
         if (placed == null && kind != SlotKind.ATTRACTION) {
-            placed = placeForced(attrPool, prev, time, label, kind, morningPopular);
+            placed = placeForced(attrPool, prev, time, label, kind, preferPopular);
         }
         if (placed == null) {
             return prev;
@@ -284,7 +296,7 @@ public class SmartPlanService {
     /**
      * pool에서 후보 하나를 골라 targetTime에 강제 배치한다(무조건 채우기 - 마감 게이트에
      * 걸려도 안전 시각으로 당기거나, 그마저 불가능하면 요청 시각 그대로 강행한다). pool이 비어 있으면 null.
-     * 오전 관광은 인기(집중률) 높은 곳을, 그 외는 직전 스탑에서 가까운 곳을 고른다.
+     * 인기 슬롯(오전·오후 대표)은 그 지역 조회순을, 그 외는 직전 스탑에서 가까운 곳을 고른다.
      */
     private RecommendationCandidate placeForced(List<RecommendationCandidate> pool, RecommendationCandidate origin,
                                                   LocalTime targetTime, String slotLabel, SlotKind kind,
@@ -515,11 +527,8 @@ public class SmartPlanService {
     }
 
     /**
-     * 현실적인 당일치기: 오전 1~2 · 점심 · 오후 1~2 · 저녁 · (선택) 저녁 후 — 최대 7슬롯.
-     * 각 구간의 "1번째"는 기존과 동일하게 시간창·예산만으로 무조건 시도한다(회귀 없음). "2번째"
-     * (오전2/오후2/저녁후)는 방금 배치한 곳에서 가까운 후보가 남아 있을 때만 밀도+거리 기준으로
-     * 추가한다 — 슬롯 개수를 늘리려고 먼 곳을 억지로 넣지 않는다는 요구사항(isNearby).
-     * 가족은 오후 1곳(2번째 없음), 저녁 후는 생략해 여유를 둔다.
+     * 현실적인 당일치기: 오전 인기 1 · 점심 · 오후 다음 인기 · 저녁, 가까우면 주변 관광지 1곳.
+     * 슬롯을 늘리려고 먼 곳을 억지로 넣지 않는다(isNearby).
      */
     List<RecommendationCandidate> buildDayRhythm(List<RecommendationCandidate> attrPool,
                                                    List<RecommendationCandidate> foodPool,
@@ -532,14 +541,10 @@ public class SmartPlanService {
         }
         LocalTime cursor = dayStart;
         int attractionStay = familyPace ? FAMILY_ATTRACTION_STAY : ATTRACTION_STAY;
-        int afternoonLimit = familyPace ? 1 : 2;
-        int attractionBudget = placeCap > 0
-                ? placeCap
-                : (familyPace ? 3 : 5); // 오전1~2+오후1~2+(저녁후0~1)
+        int attractionBudget = placeCap > 0 ? placeCap : 3;
         int attractionsUsed = 0;
         RecommendationCandidate prev = null;
 
-        // 1) 오전 관광 1~2곳 (11:30 이전 시작 가능할 때, 2번째는 밀도+거리 통과 시에만)
         if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget) {
             RecommendationCandidate morning = takeMostPopularInWindow(attrPool);
             if (morning != null) {
@@ -549,23 +554,9 @@ public class SmartPlanService {
                 attractionsUsed++;
                 prev = morning;
                 cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekMostPopular(attrPool)));
-
-                if (cursor.isBefore(LocalTime.of(11, 30)) && attractionsUsed < attractionBudget
-                        && isNearby(prev, peekMostPopular(attrPool))) {
-                    RecommendationCandidate morning2 = takeMostPopularInWindow(attrPool);
-                    if (morning2 != null) {
-                        placeStop(morning2, cursor, "오전 2", false);
-                        attachBackup(morning2, attrPool);
-                        day.add(morning2);
-                        attractionsUsed++;
-                        prev = morning2;
-                        cursor = cursor.plusMinutes(attractionStay + travelMinutes(prev, peekNearest(attrPool, prev)));
-                    }
-                }
             }
         }
 
-        // 2) 점심 (14:00 전)
         if (!cursor.isAfter(LocalTime.of(14, 0))) {
             LocalTime lunchTime = maxTime(cursor, LUNCH_ANCHOR);
             if (!lunchTime.isAfter(LocalTime.of(14, 0))) {
@@ -580,32 +571,39 @@ public class SmartPlanService {
             }
         }
 
-        // 3) 오후 관광 1~2곳 (17:30 전) - 1번째는 기존과 동일하게 무조건 시도, 2번째만 밀도+거리 게이팅
-        int afternoonLeft = afternoonLimit;
-        boolean firstAfternoon = true;
-        while (afternoonLeft > 0 && attractionsUsed < attractionBudget && cursor.isBefore(LocalTime.of(17, 30))) {
-            if (!firstAfternoon && !isNearby(prev, peekNearest(attrPool, prev))) {
-                break;
+        if (attractionsUsed < attractionBudget && cursor.isBefore(LocalTime.of(17, 30))) {
+            RecommendationCandidate afternoon = takeMostPopularInWindow(attrPool);
+            if (afternoon != null) {
+                if (cursor.isAfter(LATEST_START)) {
+                    attrPool.add(0, afternoon);
+                } else {
+                    placeStop(afternoon, cursor, "오후 1", false);
+                    attachBackup(afternoon, attrPool);
+                    day.add(afternoon);
+                    attractionsUsed++;
+                    prev = afternoon;
+                    cursor = cursor.plusMinutes(attractionStay + DEFAULT_TRAVEL_MINUTES);
+                }
             }
-            RecommendationCandidate afternoon = takeNearest(attrPool, prev);
-            if (afternoon == null) {
-                break;
-            }
-            if (cursor.isAfter(LATEST_START)) {
-                attrPool.add(0, afternoon);
-                break;
-            }
-            placeStop(afternoon, cursor, firstAfternoon ? "오후 1" : "오후 2", false);
-            attachBackup(afternoon, attrPool);
-            day.add(afternoon);
-            attractionsUsed++;
-            afternoonLeft--;
-            firstAfternoon = false;
-            prev = afternoon;
-            cursor = cursor.plusMinutes(attractionStay + DEFAULT_TRAVEL_MINUTES);
         }
 
-        // 4) 저녁 (19:30 전)
+        if (attractionsUsed < attractionBudget && cursor.isBefore(LocalTime.of(17, 30))
+                && isNearby(prev, peekNearest(attrPool, prev))) {
+            RecommendationCandidate nearby = takeNearest(attrPool, prev);
+            if (nearby != null) {
+                if (cursor.isAfter(LATEST_START)) {
+                    attrPool.add(0, nearby);
+                } else {
+                    placeStop(nearby, cursor, "주변 일정", false);
+                    attachBackup(nearby, attrPool);
+                    day.add(nearby);
+                    attractionsUsed++;
+                    prev = nearby;
+                    cursor = cursor.plusMinutes(attractionStay + DEFAULT_TRAVEL_MINUTES);
+                }
+            }
+        }
+
         if (!cursor.isAfter(LocalTime.of(19, 30))) {
             LocalTime dinnerTime = maxTime(cursor, DINNER_ANCHOR);
             if (!dinnerTime.isAfter(LocalTime.of(19, 30))) {
@@ -614,23 +612,7 @@ public class SmartPlanService {
                     placeStop(dinner, dinnerTime, "🍽️ 저녁", true);
                     attachBackup(dinner, foodPool);
                     day.add(dinner);
-                    prev = dinner;
-                    cursor = dinnerTime.plusMinutes(MEAL_STAY + DEFAULT_TRAVEL_MINUTES);
                 }
-            }
-        }
-
-        // 5) 저녁 후 선택 1곳 — 가족은 생략(여유), 솔로/커플만 + 밀도+거리 통과 시에만
-        if (!familyPace && attractionsUsed < attractionBudget && !cursor.isAfter(LocalTime.of(19, 45))
-                && isNearby(prev, peekNearest(attrPool, prev))) {
-            RecommendationCandidate evening = takeNearest(attrPool, prev);
-            if (evening != null && !cursor.isAfter(LATEST_START)) {
-                placeStop(evening, cursor.isBefore(LocalTime.of(19, 30)) ? LocalTime.of(19, 30) : cursor,
-                        "저녁 후 일정", false);
-                attachBackup(evening, attrPool);
-                day.add(evening);
-            } else if (evening != null) {
-                attrPool.add(0, evening);
             }
         }
 
@@ -754,17 +736,15 @@ public class SmartPlanService {
     }
 
     /**
-     * 인기(집중률) 높은 순. 혼잡하다고 뒤로 밀지 않는다 — 스마트 동선은 인기 명소를 살리고
-     * 오전에 배치한다. 집중률 없는 후보는 뒤로, 같은 값이면 들어온 순서를 유지한다.
+     * 그 지역 인기순. TourAPI 조회순(rank)이 ORDER BY 1순위이고, 같으면 집중률 높은 순이다.
+     * 혼잡하다고 뒤로 밀지 않는다 — 스마트 동선은 인기 명소를 살리고 오전에 배치한다.
      */
     List<RecommendationCandidate> sortPopular(List<RecommendationCandidate> raw) {
         if (raw == null || raw.isEmpty()) {
             return new ArrayList<>();
         }
         List<RecommendationCandidate> pool = new ArrayList<>(raw);
-        pool.sort(Comparator
-                .comparing(RecommendationCandidate::getCrowdRate, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(c -> c.getThumbnailUrl() == null || c.getThumbnailUrl().isBlank() ? 1 : 0));
+        pool.sort(PopularityRanking.candidateComparator());
         int cap = Math.min(pool.size(), 24);
         return new ArrayList<>(pool.subList(0, cap));
     }
@@ -774,7 +754,7 @@ public class SmartPlanService {
     }
 
     /**
-     * 오전 슬롯용 - 개인화 윈도우 안에서 집중률(인기)이 가장 높은 곳을 고른다.
+     * 오전 슬롯용 - 후보 풀 전체에서 그 지역 인기 1순위를 고른다.
      * 붐비는 인기 명소를 빼지 않고, 상대적으로 한산한 오전에 넣기 위함.
      */
     RecommendationCandidate takeMostPopularInWindow(List<RecommendationCandidate> pool) {
@@ -790,18 +770,7 @@ public class SmartPlanService {
         if (pool == null || pool.isEmpty()) {
             return null;
         }
-        int windowSize = Math.min(PERSONALIZATION_WINDOW, pool.size());
-        int bestIdx = 0;
-        double bestRate = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < windowSize; i++) {
-            Double rate = pool.get(i).getCrowdRate();
-            double v = rate == null ? Double.NEGATIVE_INFINITY : rate;
-            if (v > bestRate) {
-                bestRate = v;
-                bestIdx = i;
-            }
-        }
-        return pool.get(bestIdx);
+        return pool.stream().min(PopularityRanking.candidateComparator()).orElse(null);
     }
 
     /**
