@@ -62,8 +62,8 @@ public class KoreanHolidayCache {
         }
     }
 
-    /** 테스트 전용 - 실제 API 호출 없이 캐시를 직접 세팅한다 */
-    static void setForTesting(Map<Integer, Set<LocalDate>> testCache) {
+    /** 테스트 전용 - 실제 API 호출 없이 캐시를 직접 세팅한다. itinerary 패키지 테스트에서도 쓴다. */
+    public static void setForTesting(Map<Integer, Set<LocalDate>> testCache) {
         cache = testCache;
     }
 
