@@ -14,6 +14,14 @@
   --muted: #3d5260;
   --shadow: 0 10px 28px -16px rgba(6, 70, 90, 0.28);
   --shadow-soft: 0 2px 10px -4px rgba(6, 70, 90, 0.1);
+  /* 인지해야 할 글자 / 더 중요한 글자(색+음영) */
+  --text-shadow-notice: 0 1px 0 rgba(255, 255, 255, 0.92);
+  --text-shadow-priority: 0 1px 0 rgba(255, 255, 255, 0.82), 0 1px 10px rgba(6, 70, 90, 0.22);
+  --text-shadow-warn: 0 1px 0 rgba(255, 248, 230, 0.9), 0 1px 10px rgba(232, 155, 18, 0.38);
+  --text-shadow-danger: 0 1px 0 rgba(255, 240, 238, 0.9), 0 1px 10px rgba(217, 74, 66, 0.38);
+  --chip-shadow: 0 3px 12px -4px rgba(6, 70, 90, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  --chip-shadow-warn: 0 3px 12px -4px rgba(232, 155, 18, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --chip-shadow-danger: 0 3px 12px -4px rgba(217, 74, 66, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -78,10 +86,11 @@ h1, h2, h3 {
   color: var(--ink);
   margin: 0 0 8px;
   letter-spacing: -0.03em;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: keep-all;
+  text-shadow: var(--text-shadow-notice);
 }
 
 p {

@@ -81,12 +81,6 @@ function getCurrentPositionSafe() {
   });
 }
 
-/** 고정(pin)한 장소 중 가장 뒤쪽(나중에 담긴) 항목 - 새 장소 추천의 근접 검색 기준점 */
-function pinnedOriginItem(items) {
-  const pinnedItems = (items || []).filter((i) => i.pinned);
-  return pinnedItems.length > 0 ? pinnedItems[pinnedItems.length - 1] : null;
-}
-
 /** "09:00" → 분. 없거나 잘못되면 null */
 function scheduleMinutes(scheduledTime) {
   if (!scheduledTime || typeof scheduledTime !== 'string') return null;
@@ -280,7 +274,12 @@ export default function App() {
           return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
         })
     : [];
-  const pinnedOrigin = itinerary ? pinnedOriginItem(itinerary.items) : null;
+  const searchOriginPlaces = visibleItems.filter((item) => item.contentId);
+  const pinnedToday = searchOriginPlaces.filter((item) => item.pinned);
+  const defaultSearchOrigin = pinnedToday.length > 0
+    ? pinnedToday[pinnedToday.length - 1]
+    : searchOriginPlaces[0];
+  const defaultSearchOriginId = defaultSearchOrigin ? String(defaultSearchOrigin.itemId) : '';
 
   function selectTripSection(key) {
     if (!TRIP_SECTIONS.includes(key)) return;
@@ -610,12 +609,10 @@ export default function App() {
     }
   }
 
-  async function handleSearch({ query, tags, maxBudgetPerPerson }) {
+  async function handleSearch({ tags, maxBudgetPerPerson, originContentId, originContentTypeId }) {
     setRecoLoading(true);
     try {
       const excludeContentIds = itinerary.items.map((i) => i.contentId).filter(Boolean);
-      // 근처 우선 추천은 고정(pin)한 장소가 있을 때만 동작 - 고정 전에는 기준점 없이(거리 미반영) 검색
-      const originItem = pinnedOriginItem(itinerary.items);
       const results = await api.getRecommendations({
         regionCode: itinerary.signguFullCode,
         withPet: itinerary.withPet,
@@ -624,12 +621,11 @@ export default function App() {
         companionType: itinerary.companionType,
         adultAgeGroup: itinerary.adultAgeGroup,
         childAges: itinerary.childAges,
-        query,
         tags,
         maxBudgetPerPerson,
         excludeContentIds,
-        originContentId: originItem?.contentId,
-        originContentTypeId: originItem?.contentTypeId,
+        originContentId,
+        originContentTypeId,
       });
       setRecoResults(results);
     } catch {
@@ -1554,7 +1550,7 @@ export default function App() {
                 <section className="trip-page-section">
                   <header className="trip-section-head">
                     <h2>지도</h2>
-                    <p className="trip-section-lead">지도 보면서 일정을 더 추가해볼래?</p>
+                    <p className="trip-section-lead">지도에서 마커를 눌러 일정에 추가해보세요</p>
                   </header>
                   <DayRouteMap
                     items={visibleItems}
@@ -1573,7 +1569,7 @@ export default function App() {
                 <section className="trip-page-section">
                   <header className="trip-section-head">
                     <h2>검색</h2>
-                    <p className="trip-section-lead">홈에서 장소를 고정하면, 그 근처에서 더 원하는 곳을 골라요</p>
+                    <p className="trip-section-lead">원하는 카테고리로 근처 장소를 찾아보세요</p>
                   </header>
                   <RecommendationSearch
                     onSearch={handleSearch}
@@ -1581,7 +1577,8 @@ export default function App() {
                     results={recoResults}
                     loading={recoLoading}
                     addingId={addingContentId}
-                    pinnedPlaceName={pinnedOrigin?.placeName}
+                    originPlaces={searchOriginPlaces}
+                    defaultOriginItemId={defaultSearchOriginId}
                   />
                 </section>
                 )}

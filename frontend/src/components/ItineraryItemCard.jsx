@@ -232,7 +232,7 @@ export default function ItineraryItemCard({
             )}
 
             {item.pinned && (
-              <p className="item-pin-hint">이 장소를 근처 추천 기준으로 쓰고 있어요.</p>
+              <p className="item-pin-hint">검색할 때 근처 기준의 기본값이에요. 검색 화면에서 바꿀 수 있어요.</p>
             )}
 
             <div className="item-text-actions">
@@ -279,7 +279,7 @@ export default function ItineraryItemCard({
               </button>
             </div>
             {!item.pinned && (
-              <p className="item-pin-hint">고정하면 새 장소 추천이 이 곳 근처를 우선해요.</p>
+              <p className="item-pin-hint">고정하면 검색의 근처 기준이 이 장소로 바뀌어요. 검색에서 직접 골라도 돼요.</p>
             )}
           </>
         ) : (

@@ -18,7 +18,7 @@ export default function TagGroupPicker({ selected, onToggle, className = '' }) {
         const selectedCount = group.tags.filter((tag) => selected.includes(tag)).length;
         const isOpen = openGroups.includes(group.label);
         return (
-          <div className="tag-group" key={group.label}>
+          <div className={`tag-group${selectedCount > 0 ? ' has-selected' : ''}${isOpen ? ' is-open' : ''}`} key={group.label}>
             <button
               type="button"
               className="tag-group-header"

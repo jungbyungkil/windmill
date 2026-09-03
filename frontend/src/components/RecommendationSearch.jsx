@@ -1,16 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import RecommendationCard from './RecommendationCard';
 import TrustBadge from './TrustBadge';
 import TagGroupPicker from './TagGroupPicker';
 import { BUDGET_OPTIONS, isFoodSearch } from '../constants';
 
-export default function RecommendationSearch({ onSearch, onAdd, results, loading, addingId, pinnedPlaceName }) {
-  const [query, setQuery] = useState('');
+export default function RecommendationSearch({
+  onSearch,
+  onAdd,
+  results,
+  loading,
+  addingId,
+  originPlaces = [],
+  defaultOriginItemId = '',
+}) {
   const [tags, setTags] = useState([]);
   const [freeOnly, setFreeOnly] = useState(false);
   const [budget, setBudget] = useState(null);
+  const [originItemId, setOriginItemId] = useState(defaultOriginItemId);
+  const originIdsKey = originPlaces.map((p) => p.itemId).join(',');
 
-  const foodSearch = isFoodSearch({ tags, query });
+  useEffect(() => {
+    const ids = originIdsKey.split(',').filter(Boolean);
+    setOriginItemId((current) => {
+      if (current && ids.includes(String(current))) return String(current);
+      if (defaultOriginItemId && ids.includes(String(defaultOriginItemId))) {
+        return String(defaultOriginItemId);
+      }
+      return ids[0] || '';
+    });
+  }, [originIdsKey, defaultOriginItemId]);
+
+  const foodSearch = isFoodSearch({ tags });
+  const selectedOrigin = originPlaces.find((p) => String(p.itemId) === String(originItemId));
 
   function toggleTag(tag) {
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
@@ -23,9 +44,10 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
   function handleSubmit(e) {
     e.preventDefault();
     onSearch({
-      query,
       tags,
       maxBudgetPerPerson: foodSearch ? budget : null,
+      originContentId: selectedOrigin?.contentId,
+      originContentTypeId: selectedOrigin?.contentTypeId,
     });
   }
 
@@ -36,18 +58,29 @@ export default function RecommendationSearch({ onSearch, onAdd, results, loading
       <h2 className="section-title">새로운 장소 추천받기</h2>
       <TrustBadge />
       <p className="place-name-search-hint">
-        {pinnedPlaceName
-          ? `📌 ${pinnedPlaceName} 근처로 추천해드리고 있어요. #실내·#맛집 같은 태그를 눌러보세요.`
-          : '지금은 근처 추천 기능이 꺼져있어요. 장소를 📌 고정하면 그때부터 이 장소 근처 위주로 추천해드려요.'}
+        {selectedOrigin
+          ? `${selectedOrigin.placeName} 근처를 우선해요. 아래 기준 장소를 바꾸면 다른 곳 근처를 볼 수 있어요.`
+          : '일정에 담긴 장소가 없으면 지역 전체에서 찾아요. 태그를 고른 뒤 추천받기를 누르세요.'}
       </p>
       <form className="reco-search-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          className="reco-query-input"
-          placeholder="예: 아이랑 갈만한 곳"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        {originPlaces.length > 0 && (
+          <label className="reco-origin-field">
+            <span className="reco-budget-label">근처 기준</span>
+            <select
+              className="reco-origin-select"
+              value={originItemId}
+              onChange={(e) => setOriginItemId(e.target.value)}
+            >
+              {originPlaces.map((place) => (
+                <option key={place.itemId} value={String(place.itemId)}>
+                  {place.scheduledTime ? `${place.scheduledTime} · ` : ''}
+                  {place.placeName}
+                  {place.pinned ? ' · 고정' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <TagGroupPicker selected={tags} onToggle={toggleTag} />
         {foodSearch && (
           <div className="reco-budget-row">
