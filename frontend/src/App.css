@@ -133,6 +133,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  overflow-wrap: normal;
 }
 
 .header-trip-date {
@@ -395,10 +396,14 @@
   color: var(--sea-deep);
   background: color-mix(in srgb, var(--sea) 10%, white);
   border: 1px solid color-mix(in srgb, var(--sea) 18%, var(--sand-border));
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 6px 12px;
-  display: inline-block;
+  display: block;
+  max-width: 100%;
+  box-sizing: border-box;
   line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: keep-all;
   box-shadow: var(--chip-shadow);
   text-shadow: var(--text-shadow-notice);
 }
@@ -1041,8 +1046,9 @@
 
 .pinwheel-card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
+  min-width: 0;
 }
 
 .pinwheel-hero.is-calm {
@@ -1241,6 +1247,8 @@
 }
 
 .pinwheel-headline {
+  flex: 1;
+  min-width: 0;
   text-align: left;
 }
 
@@ -1267,6 +1275,8 @@
   line-height: 1.3;
   color: var(--level-color);
   text-shadow: var(--text-shadow-priority);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .pinwheel-sub {
@@ -1649,12 +1659,12 @@
 .festival-name {
   font-size: 14px;
   font-weight: 600;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .festival-name-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  display: inline;
   max-width: 100%;
   border: 0;
   padding: 0;
@@ -1667,6 +1677,8 @@
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .festival-name-link:hover {
@@ -1688,7 +1700,7 @@
   font-size: 13px;
   color: var(--muted);
   line-height: 1.45;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: keep-all;
 }
 
@@ -1717,6 +1729,12 @@
   box-shadow: var(--shadow-soft);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   overflow: hidden;
+}
+
+.item-card.is-expanded,
+.item-card.editing {
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .item-status-rail {
@@ -1794,7 +1812,7 @@
 
 .item-time-picker {
   width: auto;
-  min-width: 5.75rem;
+  min-width: 5.5rem;
   max-width: 7.5rem;
   padding: 6px 6px 6px 8px;
   cursor: pointer;
@@ -1819,11 +1837,13 @@
 }
 
 .item-status-chip {
+  flex-shrink: 0;
   font-size: 12px;
   font-weight: 800;
   border-radius: 999px;
   padding: 3px 8px;
   letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .item-status-chip.status-normal {
@@ -1850,7 +1870,7 @@
   letter-spacing: -0.02em;
   color: var(--ink);
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: keep-all;
   text-shadow: var(--text-shadow-notice);
 }
@@ -1981,6 +2001,7 @@
 .item-body {
   flex: 1;
   min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2031,7 +2052,7 @@
 }
 
 .item-card-summary {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -2051,8 +2072,15 @@
 }
 
 .item-card-summary .item-name {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.item-card.is-expanded .item-name,
+.item-card.editing .item-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .item-card-chevron {
@@ -2063,6 +2091,8 @@
 
 .item-detail {
   flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2106,12 +2136,16 @@
   border-radius: 10px;
   padding: 8px 4px;
   min-height: 44px;
-  min-width: 44px;
+  min-width: 0;
   font-size: 12px;
   font-weight: 700;
   color: var(--sea-deep);
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .item-text-btn-icon {
@@ -2157,6 +2191,10 @@
 }
 
 .item-edit-label input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--sand-border);
   border-radius: 10px;
   padding: 8px 10px;
@@ -2340,6 +2378,9 @@
 
 .tag-group-title {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .tag-group.has-selected .tag-group-title,
@@ -2446,9 +2487,11 @@
 
 .reco-head {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 12px;
+  min-width: 0;
 }
 
 .reco-rank {
@@ -2464,12 +2507,16 @@
   font-family: var(--display);
   font-weight: 800;
   font-size: 16px;
-  flex: 1;
+  flex: 1 1 12em;
+  min-width: 0;
   color: var(--ink);
   text-shadow: var(--text-shadow-notice);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .reco-category {
+  flex-shrink: 0;
   font-size: 12px;
   color: var(--muted);
   background: var(--sand);
@@ -2856,6 +2903,8 @@
   font-weight: 800;
   color: var(--ink);
   text-shadow: var(--text-shadow-notice);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .nudge-card-detail {
@@ -3458,8 +3507,9 @@
   font-size: 13px;
   color: var(--muted);
   line-height: 1.45;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: keep-all;
+  min-width: 0;
 }
 
 .place-overview {
@@ -3487,7 +3537,7 @@
 
 .place-fact-row {
   display: grid;
-  grid-template-columns: 5.5em 1fr;
+  grid-template-columns: minmax(4.5em, 7em) minmax(0, 1fr);
   gap: 8px;
   align-items: start;
 }
@@ -3495,14 +3545,19 @@
 .place-fact-label {
   font-weight: 700;
   color: var(--ink);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .place-fact-value {
+  min-width: 0;
   color: var(--muted);
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .situational-chips {
@@ -3535,6 +3590,10 @@
 }
 
 .item-edit-label select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--sand-border);
   border-radius: 10px;
   padding: 8px 10px;
@@ -4068,6 +4127,8 @@
 .smart-stop-body h3 {
   font-size: 15px;
   margin: 0;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .smart-stop-body p {
@@ -4280,6 +4341,8 @@
 .category-place-body h3 {
   font-size: 16px;
   margin: 0;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .category-place-body p {
@@ -4757,7 +4820,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: keep-all;
   white-space: normal;
 }
@@ -4956,12 +5019,16 @@
 
 .map-place-card-head strong {
   flex: 1;
+  min-width: 0;
   font-size: 14px;
   line-height: 1.3;
   color: var(--ink);
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .map-place-card-close {
+  flex-shrink: 0;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -5021,6 +5088,8 @@
   font-size: 12px;
   color: var(--muted);
   line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .map-place-card-actions {
@@ -5307,8 +5376,6 @@
 
   .item-card.is-expanded,
   .item-card.editing {
-    flex-wrap: wrap;
-    align-items: flex-start;
     gap: 10px;
     padding: 12px 12px 12px 16px;
   }
@@ -5319,7 +5386,8 @@
   }
 
   .item-body {
-    flex: 1 1 140px;
+    flex: 1 1 auto;
+    width: 100%;
   }
 
   .item-name {
@@ -5381,7 +5449,7 @@
   .festival-name-link {
     font-size: 15px;
     line-height: 1.35;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     word-break: keep-all;
     white-space: normal;
   }
@@ -5425,7 +5493,7 @@
   .category-place-body h3 {
     font-size: 15px;
     line-height: 1.35;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     word-break: keep-all;
   }
 
@@ -6981,6 +7049,11 @@
   font-size: 13px;
   font-weight: 700;
   color: inherit;
+  max-width: 100%;
+  text-align: center;
+  overflow-wrap: break-word;
+  word-break: keep-all;
+  line-height: 1.2;
 }
 
 .trip-flow-rail {
@@ -7100,13 +7173,15 @@
 
 .trip-section-head h2 {
   margin: 0;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--sea-deep);
   line-height: 1.25;
   text-shadow: var(--text-shadow-priority);
+  overflow-wrap: break-word;
 }
 
 .trip-section-lead {
@@ -7118,6 +7193,7 @@
   letter-spacing: -0.03em;
   color: var(--sea);
   line-height: 1.4;
+  overflow-wrap: break-word;
   word-break: keep-all;
   text-shadow: var(--text-shadow-priority);
 }

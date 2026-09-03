@@ -88,7 +88,7 @@ h1, h2, h3 {
   letter-spacing: -0.03em;
   font-weight: 800;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: keep-all;
   text-shadow: var(--text-shadow-notice);
 }
@@ -97,7 +97,7 @@ p {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: keep-all;
 }
 
