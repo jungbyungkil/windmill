@@ -4,6 +4,7 @@ import com.windmill.dto.Badge;
 import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.service.trigger.RegionCondition;
+import com.windmill.util.KoreaClock;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -118,5 +119,25 @@ class BadgeAssemblerTest {
         assertTrue(hoursEnded.getBadges().stream().anyMatch(b -> "영업종료".equals(b.getLabel())));
         assertTrue(unknown.getBadges() == null || unknown.getBadges().stream()
                 .noneMatch(b -> b.getType() == Badge.BadgeType.HOURS));
+    }
+
+    @Test
+    void futureVisitDateSkipsTodaysRainAndCrowdBadges() {
+        RegionCondition raining = RegionCondition.builder()
+                .crowdRateByPlaceName(Map.of("설악산", 95.0))
+                .currentPop(80.0)
+                .dailyMaxTemp(36.0)
+                .build();
+        RecommendationCandidate candidate = RecommendationCandidate.builder()
+                .placeName("설악산")
+                .crowdRate(95.0)
+                .businessStatus(BusinessStatus.OPEN)
+                .build();
+
+        assembler.attach(List.of(candidate), raining, KoreaClock.today().plusDays(4));
+
+        assertTrue(candidate.getBadges().stream().noneMatch(b -> b.getType() == Badge.BadgeType.WEATHER));
+        assertTrue(candidate.getBadges().stream().noneMatch(b -> b.getType() == Badge.BadgeType.CONGESTION));
+        assertTrue(candidate.getBadges().stream().anyMatch(b -> "영업중".equals(b.getLabel())));
     }
 }

@@ -399,7 +399,7 @@ export default function CreateTripScreen({
             loadingStage
               || (anchorCandidate
                 ? `${anchorCandidate.placeName} 기준으로 장소를 찾고 있어요...`
-                : '인기 명소 2 · 식당 2 · 카페 1곳을 찾고 있어요...')
+                : '이 지역 축제와 인기 스팟으로 오전·오후 일정을 만들고 있어요...')
           }
         />
       )}
@@ -411,7 +411,7 @@ export default function CreateTripScreen({
           height={512}
         />
       </h1>
-      <p className="brand-tagline">당일치기 날씨·혼잡·동선을 미리 알려주고, 바로 바꿔 드려요</p>
+      <p className="brand-tagline">당일치기 휴무·마감은 미리, 날씨·혼잡은 여행 당일에 먼저 알려 바로 바꿔 드려요</p>
 
       {resumeBlock}
 

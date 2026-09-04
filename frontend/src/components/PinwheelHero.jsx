@@ -13,7 +13,7 @@ const CAUSE_META = {
   heatTrigger: { label: '폭염', avoid: 'HEAT' },
   weatherTrigger: { label: '비 소식', avoid: 'WEATHER' },
   closedDayTrigger: { label: '휴무', avoid: 'BUSINESS' },
-  hoursEndedTrigger: { label: '영업종료', avoid: 'BUSINESS' },
+  hoursEndedTrigger: { label: '마감', avoid: 'BUSINESS' },
   crowdTrigger: { label: '혼잡', avoid: 'CROWD' },
   routeTangleTrigger: { label: '동선 꼬임', avoid: null },
   travelTimeTrigger: { label: '이동시간 부족', avoid: 'BUSINESS' },

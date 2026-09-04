@@ -5,8 +5,10 @@ import com.windmill.dto.RecommendationCandidate;
 import com.windmill.service.trigger.RegionCondition;
 import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.TriggerThresholds;
+import com.windmill.util.TripDayPolicy;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,15 +20,20 @@ import java.util.List;
 public class BadgeAssembler {
 
     public void attach(List<RecommendationCandidate> candidates, RegionCondition condition) {
+        attach(candidates, condition, null);
+    }
+
+    public void attach(List<RecommendationCandidate> candidates, RegionCondition condition, LocalDate visitDate) {
+        boolean live = TripDayPolicy.liveSnapshotApplies(visitDate);
         for (RecommendationCandidate c : candidates) {
-            c.setBadges(buildBadges(c, condition));
+            c.setBadges(buildBadges(c, live ? condition : null, live));
         }
     }
 
-    private List<Badge> buildBadges(RecommendationCandidate c, RegionCondition condition) {
+    private List<Badge> buildBadges(RecommendationCandidate c, RegionCondition condition, boolean liveWeatherCrowd) {
         List<Badge> badges = new ArrayList<>();
 
-        Double heatTemp = condition == null ? null : condition.heatProxyTemp();
+        Double heatTemp = liveWeatherCrowd && condition != null ? condition.heatProxyTemp() : null;
         if (heatTemp != null && heatTemp >= TriggerThresholds.HEAT_WARNING_TMX) {
             badges.add(Badge.builder()
                     .type(Badge.BadgeType.WEATHER)
@@ -39,7 +46,7 @@ public class BadgeAssembler {
                     .label(String.format("폭염주의보 수준 %.0f℃ · 실내 추천", heatTemp))
                     .severity(Badge.Severity.WARNING)
                     .build());
-        } else if (condition != null && condition.getCurrentPop() != null
+        } else if (liveWeatherCrowd && condition != null && condition.getCurrentPop() != null
                 && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD) {
             badges.add(Badge.builder()
                     .type(Badge.BadgeType.WEATHER)
@@ -48,29 +55,31 @@ public class BadgeAssembler {
                     .build());
         }
 
-        String placeName = c.getPlaceName();
-        String category = condition == null ? null : condition.getCrowdCategory(placeName);
-        Double relative = condition == null ? null : condition.getCrowdRelativePercent(placeName);
-        Double rate = c.getCrowdRate() != null ? c.getCrowdRate()
-                : (condition == null ? null : condition.getCrowdRate(placeName));
-        CrowdCongestionEvaluator.Level crowdLevel =
-                CrowdCongestionEvaluator.evaluate(category, relative, rate);
-        if (crowdLevel.isUrgent()) {
-            badges.add(Badge.builder()
-                    .type(Badge.BadgeType.CONGESTION)
-                    .label(relative != null
-                            ? String.format("평소 대비 %.0f%% · 매우 붐빔", relative)
-                            : "매우 붐빔")
-                    .severity(Badge.Severity.DANGER)
-                    .build());
-        } else if (crowdLevel.isTriggered()) {
-            badges.add(Badge.builder()
-                    .type(Badge.BadgeType.CONGESTION)
-                    .label(relative != null && relative >= TriggerThresholds.CROWD_RELATIVE_WARNING_PCT
-                            ? String.format("평소 대비 %.0f%% · 혼잡", relative)
-                            : (category != null ? category + " · 혼잡" : "혼잡 예상"))
-                    .severity(Badge.Severity.WARNING)
-                    .build());
+        if (liveWeatherCrowd) {
+            String placeName = c.getPlaceName();
+            String category = condition == null ? null : condition.getCrowdCategory(placeName);
+            Double relative = condition == null ? null : condition.getCrowdRelativePercent(placeName);
+            Double rate = c.getCrowdRate() != null ? c.getCrowdRate()
+                    : (condition == null ? null : condition.getCrowdRate(placeName));
+            CrowdCongestionEvaluator.Level crowdLevel =
+                    CrowdCongestionEvaluator.evaluate(category, relative, rate);
+            if (crowdLevel.isUrgent()) {
+                badges.add(Badge.builder()
+                        .type(Badge.BadgeType.CONGESTION)
+                        .label(relative != null
+                                ? String.format("평소 대비 %.0f%% · 매우 붐빔", relative)
+                                : "매우 붐빔")
+                        .severity(Badge.Severity.DANGER)
+                        .build());
+            } else if (crowdLevel.isTriggered()) {
+                badges.add(Badge.builder()
+                        .type(Badge.BadgeType.CONGESTION)
+                        .label(relative != null && relative >= TriggerThresholds.CROWD_RELATIVE_WARNING_PCT
+                                ? String.format("평소 대비 %.0f%% · 혼잡", relative)
+                                : (category != null ? category + " · 혼잡" : "혼잡 예상"))
+                        .severity(Badge.Severity.WARNING)
+                        .build());
+            }
         }
 
         if (c.getBusinessStatus() == com.windmill.dto.BusinessStatus.OPEN) {

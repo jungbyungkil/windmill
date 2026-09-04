@@ -126,8 +126,7 @@ export function getAutoPlan(itineraryId, { tags, query, placeCount } = {}) {
 
 /**
  * 혼잡↓ · 날씨 · 동선 최적화 스마트 일정 (핵심 플로우). date면 해당 일자만.
- * standard=true면 "당일치기 시작하기" 전용 - 아침 일정/점심 식사/오후 일정/저녁 식사 4단계를
- * 현재 시각과 무관하게 무조건 채운 표준 하루 계획을 받는다.
+ * standard=true면 오전·오후 인기 스팟 일정을 받는다. 식당·카페는 자동으로 넣지 않는다.
  */
 export function getSmartPlan(itineraryId, { placeCount, date, standard } = {}) {
   return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date, standard })}`);

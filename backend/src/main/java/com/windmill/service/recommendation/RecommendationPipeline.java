@@ -74,6 +74,13 @@ public class RecommendationPipeline {
                         stage1Result = stage1.fetchIndoorForHeat(region);
                     } else if (rainAlternative) {
                         stage1Result = stage1.fetchIndoor(region);
+                    } else if (request.isPopularSights()) {
+                        Mono<List<RelatedCandidate>> sights = stage1.fetchPopularSights(region);
+                        stage1Result = request.isWithPet()
+                                ? Mono.zip(stage1.fetchPetFriendly(region, seed), sights)
+                                        .map(petTuple -> mergePetFirst(
+                                                dropDining(petTuple.getT1()), petTuple.getT2()))
+                                : sights;
                     } else if (!themes.isEmpty()) {
                         // UI 해시태그는 TourAPI(KorService2) 테마 조회로 최소 후보를 확보
                         Mono<List<RelatedCandidate>> themed = stage1.fetchByThemes(region, request.getTags(), seed);
@@ -94,7 +101,7 @@ public class RecommendationPipeline {
                                     .filter(c -> !exclude.contains(c.getContentId()))
                                     .collect(Collectors.toList()))
                             .map(list -> request.isSkipLlm() ? capForSpeed(list) : list)
-                            .flatMap(stage2::filter)
+                            .flatMap(list -> stage2.filter(list, request.getVisitDate()))
                             .map(list -> attachDistance(list, origin))
                             .flatMap(list -> stage3.filter(list, region))
                             .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
@@ -107,7 +114,7 @@ public class RecommendationPipeline {
                                     ? stage4.matchWithoutLlm(list, request.getTags(), request.getChildAges())
                                     : stage4.match(list, request.getTags(), request.getNaturalLanguageQuery(), request.getChildAges()))
                             .map(list -> enrichThemeTags(list, themes))
-                            .doOnNext(list -> badgeAssembler.attach(list, condition));
+                            .doOnNext(list -> badgeAssembler.attach(list, condition, request.getVisitDate()));
                 })
                 .map(list -> list.stream()
                         .filter(c -> !excludeNames.contains(c.getPlaceName()))
@@ -120,7 +127,7 @@ public class RecommendationPipeline {
     /** skipLlm(속도 우선) 요청 전용 - Stage2(영업시간 상세조회, 외부 API) 대상 건수를 줄여 속도를
      *  확보한다(2026-08-16 실측: 후보 20건 기준 Stage2가 약 16초 - 표준 4단계 일정은 어차피 이 중
      *  1곳만 선택하므로 상위 후보만 미리 조회해도 충분함). Stage1이 이미 인기(조회)순으로 정렬해 반환한다. */
-    private static final int SPEED_MODE_CANDIDATE_CAP = 8;
+    private static final int SPEED_MODE_CANDIDATE_CAP = 12;
 
     private static List<RelatedCandidate> capForSpeed(List<RelatedCandidate> list) {
         return list.size() > SPEED_MODE_CANDIDATE_CAP
@@ -243,6 +250,15 @@ public class RecommendationPipeline {
             }
         }
         return new ArrayList<>(byId.values());
+    }
+
+    private static List<RelatedCandidate> dropDining(List<RelatedCandidate> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        return candidates.stream()
+                .filter(c -> !Stage1RelatedAttractionService.isDiningOrLodging(c.getContentTypeId()))
+                .collect(Collectors.toList());
     }
 
     /** origin의 mapX/mapY가 없으면(또는 조회 실패) distanceKm은 null로 남는다 - 프론트에서 뱃지를 숨긴다 */

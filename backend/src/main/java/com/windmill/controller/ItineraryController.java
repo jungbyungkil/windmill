@@ -216,8 +216,7 @@ public class ItineraryController {
     /**
      * 핵심 스마트 일정: TourAPI 후보 → 혼잡↓ 필터 → 날씨 실내 전환 → 동선 최적화 → 시각 배정.
      * AI가 장소를 만들지 않으며, 검증된 API 데이터만 사용한다.
-     * standard=true면 "당일치기 시작하기" 전용 표준 일정(오전 인기 · 점심 · 오후 인기 · 카페 · 저녁,
-     * 가까우면 주변 관광지 1곳)을 현재 시각과 무관하게 채워 돌려준다.
+     * standard=true면 오전·오후 인기 스팟(축제 우선)을 방문일 휴무·마감을 피해 채운다.
      */
     @GetMapping("/{id}/smart-plan")
     public Mono<ResponseEntity<SmartPlanResponse>> smartPlan(

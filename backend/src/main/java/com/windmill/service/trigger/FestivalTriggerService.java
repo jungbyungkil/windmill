@@ -168,6 +168,8 @@ public class FestivalTriggerService {
                     .placeName(title)
                     .thumbnailUrl(thumbnail)
                     .addr1(text(item, "addr1"))
+                    .mapX(text(item, "mapx", "mapX"))
+                    .mapY(text(item, "mapy", "mapY"))
                     .eventStartDate(text(item, "eventstartdate", "eventStartDate"))
                     .eventEndDate(text(item, "eventenddate", "eventEndDate"))
                     .homepageUrl(homepageUrl)

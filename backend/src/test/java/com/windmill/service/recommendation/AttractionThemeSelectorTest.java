@@ -32,8 +32,9 @@ class AttractionThemeSelectorTest {
     void adultAgeGroupDrivesThemeWhenNoChildren_twenties() {
         List<String> tags = AttractionThemeSelector.select(CompanionType.COUPLE, AgeGroup.TWENTIES, List.of());
 
-        assertTrue(tags.contains("#카페"));
         assertTrue(tags.contains("#이색거리"));
+        assertTrue(tags.contains("#액티비티"));
+        assertTrue(tags.stream().noneMatch(t -> t.contains("카페")));
     }
 
     @Test

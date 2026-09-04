@@ -469,4 +469,18 @@ class NotificationSchedulerServiceTest {
         verify(pushSenderService, times(1)).send(eq("token-1"),
                 eq("🟠 여행에 변수가 생겼어요"), anyString(), anyMap());
     }
+
+    @Test
+    void skipsItineraryWhenStartDateIsNotTheTickDay() {
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        itinerary.setStartDate(DAY.toLocalDate().plusDays(3));
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerLevel.DANGER, "비 소식이 있어요.");
+
+        scheduler.runTick(MID_TRIP);
+
+        verifyNoInteractions(pushSenderService);
+        verify(triggerDetectionService, never()).detectForItinerary(any(Itinerary.class));
+    }
 }

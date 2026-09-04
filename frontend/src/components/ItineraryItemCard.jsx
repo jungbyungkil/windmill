@@ -119,7 +119,7 @@ export default function ItineraryItemCard({
 
   function summaryStatusLabel() {
     if (closedDayAlerted) return '휴무';
-    if (hoursEndedAlerted) return '영업종료';
+    if (hoursEndedAlerted) return '마감';
     if (isWeather) return '야외';
     if (crowdAlerted) return '혼잡';
     return STATUS_LABEL[status];

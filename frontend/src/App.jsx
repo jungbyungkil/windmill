@@ -62,6 +62,15 @@ function formatTripDate(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()} (${weekday})`;
 }
 
+function isTripToday(dateStr) {
+  if (!dateStr) return false;
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return dateStr === `${y}-${m}-${d}`;
+}
+
 /**
  * 트리거 폴링용 현재 위치 - 실패/권한거부/미지원이면 조용히 null(이동시간 트리거만 생략되고
  * 나머지 트리거는 그대로 동작). 90초마다 도는 백그라운드 폴링이라 GPS를 매번 새로 켜지 않도록
@@ -356,7 +365,7 @@ export default function App() {
   async function autoApplySmartPlan(created) {
     let stops = [];
     try {
-      setCreatingStage('인기 명소 2 · 식당 2 · 카페 1곳을 찾고 있어요...');
+      setCreatingStage('이 지역 축제와 인기 스팟으로 오전·오후 일정을 만들고 있어요...');
       const plan = await api.getSmartPlan(created.itineraryId, { date: created.startDate, standard: true });
       stops = plan?.stops || [];
     } catch {
@@ -411,7 +420,7 @@ export default function App() {
   }
 
   /**
-   * 여행 생성 직후 - 첫 화면에서 미리 등록한 고정 일정(앵커)이 있으면 표준 4단계 대신 이 장소를
+   * 여행 생성 직후 - 첫 화면에서 미리 등록한 고정 일정(앵커)이 있으면 스마트 동선 대신 이 장소를
    * 기준으로 하루를 채운다(사용자가 이미 계획이 있으면 그 순서로 시작). autoApplySmartPlan과 동일하게
    * 리뷰 화면 없이 바로 담아 다음 화면을 시작한다.
    */
@@ -1027,6 +1036,7 @@ export default function App() {
     return api.getSmartPlan(itineraryId, {
       placeCount: 5,
       date,
+      standard: true,
     });
   }
 
@@ -1535,7 +1545,7 @@ export default function App() {
                   crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
                   weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
                   trigger={trigger}
-                  dayLabel="오늘"
+                  dayLabel={isTripToday(tripDate) ? '오늘' : (tripDate ? formatTripDate(tripDate) : null)}
                   onUpdateTime={handleUpdateTime}
                   onUpdateItem={handleUpdateItem}
                   onTogglePin={handleTogglePin}

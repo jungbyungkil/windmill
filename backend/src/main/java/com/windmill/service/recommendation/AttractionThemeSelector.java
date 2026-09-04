@@ -62,8 +62,8 @@ final class AttractionThemeSelector {
 
     private static List<String> adultThemeTags(AgeGroup adultAgeGroup) {
         return switch (adultAgeGroup) {
-            case TWENTIES -> List.of("#카페", "#이색거리");
-            case THIRTIES -> List.of("#카페", "#전시");
+            case TWENTIES -> List.of("#이색거리", "#액티비티");
+            case THIRTIES -> List.of("#역사", "#전시");
             case FORTIES -> List.of("#자연", "#등산트레킹");
             case FIFTIES -> List.of("#자연", "#사찰");
             case SIXTIES, SEVENTIES_PLUS -> List.of("#사찰", "#온천스파");

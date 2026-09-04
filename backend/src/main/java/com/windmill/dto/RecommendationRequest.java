@@ -5,6 +5,7 @@ import com.windmill.domain.CompanionType;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -43,6 +44,11 @@ public class RecommendationRequest {
      *  "최대한 빨리 큼직한 일정을 보여줘야" 하는 자동 생성 경로 전용. LLM은 순위를 안 바꾸므로
      *  건너뛰어도 어떤 장소가 뽑히는지는 동일하고, matchedTags/oneLiner만 더 단순해진다. */
     private boolean skipLlm;
+    /** true면 해시태그 테마 검색 대신 그 지역 인기 관광지·문화시설·레포츠를 후보로 쓴다.
+     *  스마트 동선의 오전·오후 스팟용. 맛집·카페 테마는 타지 않는다. */
+    private boolean popularSights;
+    /** 방문일. Stage2가 지금이 아니라 이 날짜의 휴무를 본다. */
+    private LocalDate visitDate;
 
     public enum AvoidanceHint { CROWD, WEATHER, HEAT, BUSINESS }
 }

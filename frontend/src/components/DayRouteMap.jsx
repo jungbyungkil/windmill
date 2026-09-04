@@ -41,7 +41,7 @@ function statusText(item, weather, closedDay, hoursEnded, crowd) {
   });
   if (level === 'DANGER') parts.push('야외·날씨 주의');
   else if (closedDay) parts.push('휴무');
-  else if (hoursEnded) parts.push('영업종료');
+  else if (hoursEnded) parts.push('마감');
   else if (crowd || level === 'WARNING') parts.push('혼잡 주의');
   else parts.push(STATUS_LABEL.NORMAL);
   return parts.join(' · ');

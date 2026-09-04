@@ -64,8 +64,12 @@ public class NotificationSchedulerService {
 
     /** 실제 처리 본문 - KoreaClock을 목킹하지 않고 명시적 now로 테스트하기 위해 분리. */
     void runTick(LocalDateTime now) {
-        List<Itinerary> active = itineraryRepository.findActiveTodayForNotification(now.toLocalDate());
+        LocalDate today = now.toLocalDate();
+        List<Itinerary> active = itineraryRepository.findActiveTodayForNotification(today);
         for (Itinerary itinerary : active) {
+            if (itinerary.getStartDate() != null && !itinerary.getStartDate().equals(today)) {
+                continue;
+            }
             try {
                 processItinerary(itinerary, now);
             } catch (Exception e) {

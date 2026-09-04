@@ -77,7 +77,7 @@ export function tipsFromTrigger(trigger) {
     tips.push({ id: 'closedDay', icon: '🚫', text: '방문일이 정기휴무일인 장소가 있어요. 대체 일정을 골라보세요.' });
   }
   if (trigger.hoursEndedTrigger) {
-    tips.push({ id: 'hoursEnded', icon: '🕐', text: '지금 영업이 끝난 장소가 있어요. 「이 순서 어때요?」로 순서를 바꿔 오늘 일정을 살려 보세요.' });
+    tips.push({ id: 'hoursEnded', icon: '🕐', text: '방문 시각이 마감에 닿는 장소가 있어요. 시간을 바꾸거나 다른 곳을 담아보세요.' });
   }
   if (trigger.routeTangleTrigger) {
     tips.push({ id: 'route', icon: '🔀', text: '동선이 꼬였어요. 자동 재배치로 이동을 줄여 보세요.' });

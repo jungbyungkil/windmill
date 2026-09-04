@@ -19,6 +19,8 @@ import com.windmill.util.CrowdCongestionEvaluator;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.OutdoorActivityClassifier;
 import com.windmill.util.TriggerThresholds;
+import com.windmill.util.TripDayPolicy;
+import com.windmill.util.VisitTiming;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,8 +37,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 바람개비 실시간 변수 감지 - 기상(비)/폭염/혼잡도/영업상태/(GPS 있으면) 다음 장소까지 이동시간.
- * 비·폭염은 야외 일정에만, 휴무는 정기휴무 문구를 날짜에 맞게 판정한다.
+ * 바람개비 변수 감지.
+ * 미리 짠 일정은 방문일의 휴무·마감만 보고, 실시간 비·혼잡·지금 영업종료는 여행 당일에만 비교한다.
  */
 @Slf4j
 @Service
@@ -103,6 +105,9 @@ public class TriggerDetectionService {
     private Mono<TriggerResult> attachTravelTimeTrigger(TriggerResult result, Itinerary itinerary,
                                                           Double originLon, Double originLat) {
         if (originLon == null || originLat == null) {
+            return Mono.just(result);
+        }
+        if (!TripDayPolicy.liveConditionsApply(itinerary.getStartDate())) {
             return Mono.just(result);
         }
         ItineraryItem next = nextUpcomingItem(itinerary);
@@ -202,49 +207,92 @@ public class TriggerDetectionService {
 
     public Mono<TriggerResult> detect(ItineraryItem item, RegionCondition condition, LocalDate visitDate) {
         LocalDate day = visitDate != null ? visitDate : KoreaClock.today();
-        boolean rainWave = condition.getCurrentPop() != null
-                && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
-
-        Double heatTemp = condition.heatProxyTemp();
-        boolean heatAdvisory = heatTemp != null && heatTemp >= TriggerThresholds.HEAT_ADVISORY_TMX;
-        boolean heatWarning = heatTemp != null && heatTemp >= TriggerThresholds.HEAT_WARNING_TMX;
+        boolean live = TripDayPolicy.liveConditionsApply(day);
         boolean outdoor = OutdoorActivityClassifier.isOutdoor(item);
 
+        boolean rainWave = live && condition.getCurrentPop() != null
+                && condition.getCurrentPop() >= TriggerThresholds.WEATHER_POP_THRESHOLD;
+        Double heatTemp = condition.heatProxyTemp();
+        boolean heatAdvisory = live && heatTemp != null && heatTemp >= TriggerThresholds.HEAT_ADVISORY_TMX;
+        boolean heatWarning = live && heatTemp != null && heatTemp >= TriggerThresholds.HEAT_WARNING_TMX;
         boolean weatherTrigger = rainWave && outdoor;
         boolean heatTrigger = heatAdvisory && outdoor;
         boolean heatUrgent = heatTrigger && heatWarning;
 
-        CrowdCongestionEvaluator.Level crowdLevel = CrowdCongestionEvaluator.evaluate(
-                condition.getCrowdCategory(item.getPlaceName()),
-                condition.getCrowdRelativePercent(item.getPlaceName()),
-                condition.getCrowdRate(item.getPlaceName()));
+        CrowdCongestionEvaluator.Level crowdLevel = live
+                ? CrowdCongestionEvaluator.evaluate(
+                        condition.getCrowdCategory(item.getPlaceName()),
+                        condition.getCrowdRelativePercent(item.getPlaceName()),
+                        condition.getCrowdRate(item.getPlaceName()))
+                : CrowdCongestionEvaluator.Level.NORMAL;
         boolean crowdTrigger = crowdLevel.isTriggered();
         boolean crowdUrgent = crowdLevel.isUrgent();
 
-        boolean closedBySnapshot = BusinessHoursEvaluator.isClosedOnRestDate(item.getRestDateText(), day);
+        boolean closedDay = BusinessHoursEvaluator.isClosedOnRestDate(item.getRestDateText(), day);
+        boolean closingConflict = !closedDay && visitConflictsWithClose(item);
 
-        if (closedBySnapshot) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, true, false));
+        if (!live) {
+            return Mono.just(buildResult(false, false, false, false, false, closedDay, closingConflict));
         }
 
-        // 방문일이 오늘이 아니면(미래 당일치기 사전 계획) "지금 이 순간 영업 중인지" 실시간 비교는 의미가
-        // 없다 - 이 아래 라이브 체크는 실제 현재 시각을 방문일에 갖다 붙여 비교하므로, 오늘 진행 중인
-        // 여행에만 적용하고 미래 방문일은 위 정기휴무 요일 판정까지만 반영한다.
-        if (!day.equals(KoreaClock.today())) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, false));
+        if (closedDay) {
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, true, closingConflict));
         }
 
         if (item.getContentId() == null || item.getContentTypeId() == null) {
-            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, false));
+            return Mono.just(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, closingConflict));
         }
 
-        LocalDateTime at = LocalDateTime.of(day, KoreaClock.nowTime());
+        LocalTime nowTime = KoreaClock.nowTime();
+        LocalDateTime at = LocalDateTime.of(day, nowTime);
         return tourAttractionService.getDetail(item.getContentId(), item.getContentTypeId())
                 .map(TourAttractionDetail::getIntroFields)
                 .map(fields -> BusinessHoursEvaluator.statusAt(fields, at))
-                .map(status -> buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent,
-                        status == BusinessStatus.CLOSED_DAY, status == BusinessStatus.HOURS_ENDED))
-                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, false));
+                .map(status -> {
+                    boolean rest = status == BusinessStatus.CLOSED_DAY;
+                    boolean hours = closingConflict;
+                    if (!rest && status == BusinessStatus.HOURS_ENDED && visitWindowActive(item, nowTime)) {
+                        hours = true;
+                    }
+                    return buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, rest, hours);
+                })
+                .defaultIfEmpty(buildResult(weatherTrigger, heatTrigger, heatUrgent, crowdTrigger, crowdUrgent, false, closingConflict));
+    }
+
+    /**
+     * 지금 시각의 영업종료는 그 장소 방문 창(시작~점유 종료) 안에서만 본다.
+     * 여행 당일 아침 7시에 14:00 일정을 영업종료로 찍지 않기 위함.
+     */
+    static boolean visitWindowActive(ItineraryItem item, LocalTime now) {
+        if (item == null || now == null) {
+            return true;
+        }
+        LocalTime scheduled = ClosingTimeGate.parseHhMm(item.getScheduledTime());
+        if (scheduled == null) {
+            return true;
+        }
+        if (now.isBefore(scheduled)) {
+            return false;
+        }
+        LocalTime end = VisitTiming.occupancyEnd(item);
+        return end == null || !now.isAfter(end);
+    }
+
+    /** 계획한 도착 시각이 마감(버퍼 포함)에 닿는지 - 미리 짤 때와 당일 모두 본다. */
+    static boolean visitConflictsWithClose(ItineraryItem item) {
+        if (item == null) {
+            return false;
+        }
+        LocalTime arrival = ClosingTimeGate.parseHhMm(item.getScheduledTime());
+        if (arrival == null) {
+            return false;
+        }
+        LocalTime close = ClosingTimeGate.parseHhMm(item.getCloseTime());
+        if (close == null) {
+            close = BusinessHoursEvaluator.extractCloseTimeFromText(item.getUseTimeText());
+        }
+        int buffer = VisitTiming.closeBufferMinutes(item.getCloseTime(), item.getUseTimeText(), item.getDetailFacts());
+        return ClosingTimeGate.check(close, arrival, buffer).blocked();
     }
 
     private TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem) {
@@ -321,11 +369,11 @@ public class TriggerDetectionService {
             }
         }
         if (closedDay && hoursEnded) {
-            details.add("오늘(방문일) 정기휴무·영업종료인 장소가 있어요. 대체 장소를 골라보세요.");
+            details.add("방문일에 휴무이거나 마감 시각과 일정이 겹치는 장소가 있어요. 대체 장소를 골라보세요.");
         } else if (closedDay) {
-            details.add("오늘(방문일) 정기휴무인 장소가 있어요. 대체 장소를 골라보세요.");
+            details.add("방문일이 정기휴무인 장소가 있어요. 대체 장소를 골라보세요.");
         } else if (hoursEnded) {
-            details.add("지금 영업이 끝난 장소가 있어요. 대체 장소를 골라보세요.");
+            details.add("방문 시각이 마감에 닿아요. 시간을 바꾸거나 다른 곳을 담아보세요.");
         }
 
         TriggerLevel level = TriggerLevel.NORMAL;

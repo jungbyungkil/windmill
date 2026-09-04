@@ -12,6 +12,8 @@ public class FestivalSuggestion {
     private String placeName;
     private String thumbnailUrl;
     private String addr1;
+    private String mapX;
+    private String mapY;
     /** yyyyMMdd 원문 그대로 - 프론트에서 표시 형식으로 가공 */
     private String eventStartDate;
     private String eventEndDate;

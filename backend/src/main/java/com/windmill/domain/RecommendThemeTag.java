@@ -173,6 +173,13 @@ public enum RecommendThemeTag {
         return categoryCodes;
     }
 
+    /** 음식점·카페 테마. 관광 슬롯 검색에서 식당이 섞이지 않게 구분한다. */
+    public boolean isDining() {
+        return this == FOOD || this == CAFE
+                || this == KOREAN_FOOD || this == CHINESE_FOOD
+                || this == JAPANESE_FOOD || this == WESTERN_FOOD;
+    }
+
     /** areaBasedList2의 cat1/cat2/cat3 정밀 필터 - cat3는 cat2 단위까지만 좁혀도 되는 태그(예: 수상레포츠)는 null 가능 */
     public record CategoryCode(String cat1, String cat2, String cat3) {
     }

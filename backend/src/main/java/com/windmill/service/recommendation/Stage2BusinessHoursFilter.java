@@ -1,9 +1,11 @@
 package com.windmill.service.recommendation;
 
+import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.RelatedCandidate;
 import com.windmill.dto.TourAttractionDetail;
 import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.util.IntroFieldCatalog;
+import com.windmill.util.TripDayPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -36,28 +39,35 @@ public class Stage2BusinessHoursFilter {
     private final SituationalTagService situationalTagService;
 
     public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates) {
+        return filter(candidates, null);
+    }
+
+    /**
+     * @param visitDate 방문일. 미래 날짜면 지금 시각의 영업종료가 아니라 그날 휴무만 표시한다.
+     */
+    public Mono<List<RelatedCandidate>> filter(List<RelatedCandidate> candidates, LocalDate visitDate) {
         return Flux.fromIterable(candidates)
-                .flatMap(this::enrichAndCheckOpen, EXTERNAL_CALL_CONCURRENCY)
+                .flatMap(c -> enrichAndCheckOpen(c, visitDate), EXTERNAL_CALL_CONCURRENCY)
                 .collectList()
                 .doOnNext(list -> {
                     long openCount = list.stream().filter(c -> Boolean.TRUE.equals(c.getBusinessOpen())).count();
-                    log.info("[Stage2] 상세정보 보강 완료 {}건 (그중 지금 영업중 {}건, 모두 통과)", list.size(), openCount);
+                    log.info("[Stage2] 상세정보 보강 완료 {}건 (그중 방문일 기준 영업 {}건, 모두 통과)", list.size(), openCount);
                 });
     }
 
-    private Mono<RelatedCandidate> enrichAndCheckOpen(RelatedCandidate candidate) {
+    private Mono<RelatedCandidate> enrichAndCheckOpen(RelatedCandidate candidate, LocalDate visitDate) {
         if (candidate.getContentId() == null || candidate.getContentTypeId() == null) {
             candidate.setBusinessOpen(null);
             return Mono.just(candidate);
         }
         return tourAttractionService.getDetail(candidate.getContentId(), candidate.getContentTypeId())
-                .flatMap(detail -> Mono.fromCallable(() -> applyDetail(candidate, detail))
+                .flatMap(detail -> Mono.fromCallable(() -> applyDetail(candidate, detail, visitDate))
                         .subscribeOn(Schedulers.boundedElastic()))
                 .defaultIfEmpty(openWithoutDetail(candidate))
                 .onErrorReturn(openWithoutDetail(candidate));
     }
 
-    private RelatedCandidate applyDetail(RelatedCandidate candidate, TourAttractionDetail detail) {
+    private RelatedCandidate applyDetail(RelatedCandidate candidate, TourAttractionDetail detail, LocalDate visitDate) {
         candidate.setAddr1(detail.getAddr1());
         candidate.setTel(detail.getTel());
         candidate.setHomepageUrl(detail.getHomepage());
@@ -81,7 +91,7 @@ public class Stage2BusinessHoursFilter {
         var close = BusinessHoursEvaluator.extractCloseTime(detail.getIntroFields());
         candidate.setCloseTime(BusinessHoursEvaluator.formatHhMm(close));
 
-        var status = BusinessHoursEvaluator.currentStatus(detail.getIntroFields());
+        var status = resolveStatusForVisit(detail.getIntroFields(), visitDate);
         candidate.setBusinessOpen(status == com.windmill.dto.BusinessStatus.OPEN);
         candidate.setBusinessStatus(status);
 
@@ -115,7 +125,21 @@ public class Stage2BusinessHoursFilter {
         return t.isBlank() ? null : t.replaceAll("\\s+", " ");
     }
 
-    /** 상세조회 실패/빈 응답 - 보수적으로 영업중 취급하되 위치/요금 등 부가정보는 비워둔다 */
+    /**
+     * 여행 당일이면 지금 시각의 영업 상태. 미리 계획할 때는 방문일 휴무만 보고,
+     * 지금 밤이라 문이 닫혀 있다고 미래 일정을 영업종료로 찍지 않는다.
+     */
+    static BusinessStatus resolveStatusForVisit(java.util.Map<String, String> introFields, LocalDate visitDate) {
+        if (TripDayPolicy.liveConditionsApply(visitDate)) {
+            return BusinessHoursEvaluator.currentStatus(introFields);
+        }
+        if (visitDate != null
+                && BusinessHoursEvaluator.isClosedOnRestDate(
+                        BusinessHoursEvaluator.extractRestDateText(introFields), visitDate)) {
+            return BusinessStatus.CLOSED_DAY;
+        }
+        return BusinessStatus.OPEN;
+    }
     private RelatedCandidate openWithoutDetail(RelatedCandidate candidate) {
         candidate.setBusinessOpen(true);
         candidate.setBusinessStatus(com.windmill.dto.BusinessStatus.OPEN);

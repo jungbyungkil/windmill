@@ -172,28 +172,46 @@ public class Stage1RelatedAttractionService {
     }
 
     /**
-     * 폭염 시 실내 대체 - 문화시설 + 카페를 함께 모아 야외 일정을 대체할 실내 후보를 넓힌다.
+     * 폭염 시 실내 대체 - 문화시설(박물관·전시)로 야외를 바꾼다. 카페·식당은 넣지 않는다.
      */
     public Mono<List<RelatedCandidate>> fetchIndoorForHeat(RegionCode region) {
-        Mono<List<RelatedCandidate>> culture = fetchIndoor(region);
-        Mono<List<RelatedCandidate>> cafes = korServiceClient
-                .searchKeyword("카페", 39, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
-                .map(items -> mapKorItems(items, "실내"));
-        return Mono.zip(culture, cafes)
+        return fetchIndoor(region)
+                .doOnNext(list -> log.info("[Stage1] 폭염 대체(실내) 후보 {}건 확보", list.size()));
+    }
+
+    /**
+     * 스마트 동선 오전·오후 스팟 - 그 지역 인기 관광지(12)·문화시설(14)·레포츠(28).
+     * 음식점(39)·숙박(32)은 넣지 않는다. 축제는 FestivalTriggerService가 날짜가 겹치는 것만 얹는다.
+     */
+    public Mono<List<RelatedCandidate>> fetchPopularSights(RegionCode region) {
+        Mono<List<RelatedCandidate>> spots = korServiceClient
+                .areaBasedList(12, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1,
+                        TourApiArrange.POPULAR)
+                .map(items -> mapKorItems(items, "관광지"))
+                .onErrorReturn(List.of());
+        Mono<List<RelatedCandidate>> culture = korServiceClient
+                .areaBasedList(14, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1,
+                        TourApiArrange.POPULAR)
+                .map(items -> mapKorItems(items, "문화시설"))
+                .onErrorReturn(List.of());
+        Mono<List<RelatedCandidate>> leports = korServiceClient
+                .areaBasedList(28, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1,
+                        TourApiArrange.POPULAR)
+                .map(items -> mapKorItems(items, "레포츠"))
+                .onErrorReturn(List.of());
+        return Mono.zip(spots, culture, leports)
                 .map(tuple -> {
                     Map<String, RelatedCandidate> byId = new LinkedHashMap<>();
-                    for (RelatedCandidate c : tuple.getT1()) {
-                        if (c.getContentId() != null) {
-                            byId.put(c.getContentId(), c);
-                        }
-                    }
-                    for (RelatedCandidate c : tuple.getT2()) {
-                        if (c.getContentId() != null) {
+                    for (List<RelatedCandidate> batch : List.of(tuple.getT1(), tuple.getT2(), tuple.getT3())) {
+                        for (RelatedCandidate c : batch) {
+                            if (c.getContentId() == null || isDiningOrLodging(c.getContentTypeId())) {
+                                continue;
+                            }
                             byId.putIfAbsent(c.getContentId(), c);
                         }
                     }
                     List<RelatedCandidate> result = takeTopByPopularity(new ArrayList<>(byId.values()));
-                    log.info("[Stage1] 폭염 대체(실내) 후보 {}건 확보", result.size());
+                    log.info("[Stage1] 인기 스팟 후보 {}건 확보", result.size());
                     return result;
                 });
     }
@@ -291,6 +309,9 @@ public class Stage1RelatedAttractionService {
                     for (List<RelatedCandidate> batch : batches) {
                         for (RelatedCandidate c : batch) {
                             if (c.getContentId() == null || c.getPlaceName() == null) {
+                                continue;
+                            }
+                            if (!theme.isDining() && isDiningOrLodging(c.getContentTypeId())) {
                                 continue;
                             }
                             if (theme == RecommendThemeTag.FOOD
@@ -427,6 +448,11 @@ public class Stage1RelatedAttractionService {
     private Integer parseContentTypeId(JsonNode item) {
         String typeId = item.path("contenttypeid").asText(null);
         return typeId == null || typeId.isBlank() ? null : Integer.valueOf(typeId);
+    }
+
+    /** TourAPI 39 음식점, 32 숙박 - 오전·오후 관광 슬롯에 넣지 않는다. */
+    static boolean isDiningOrLodging(Integer contentTypeId) {
+        return contentTypeId != null && (contentTypeId == 39 || contentTypeId == 32);
     }
 
     /**
