@@ -583,6 +583,19 @@
   margin: 0;
 }
 
+.brand-mark {
+  margin: 0 auto;
+  width: min(220px, 58vw);
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 32px;
+  box-shadow: 0 12px 28px rgba(31, 58, 95, 0.14);
+}
+
 .brand-tagline {
   font-size: 14px;
   font-weight: 700;

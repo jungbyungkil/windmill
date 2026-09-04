@@ -403,7 +403,14 @@ export default function CreateTripScreen({
           }
         />
       )}
-      <h1 className="brand-title">바람따라</h1>
+      <h1 className="brand-mark">
+        <img
+          src="/baramttara-logo.png"
+          alt="바람따라"
+          width={512}
+          height={512}
+        />
+      </h1>
       <p className="brand-tagline">당일치기 날씨·혼잡·동선을 미리 알려주고, 바로 바꿔 드려요</p>
 
       {resumeBlock}
