@@ -57,6 +57,9 @@ class FestivalTriggerServiceTest {
         assertTrue(FestivalTriggerService.matchesRegion(jongno, seoul));
         assertFalse(FestivalTriggerService.matchesRegion(jongno, BUSAN));
     }
+
+    @Test
+    void matchesRegion_keepsBusanAndDropsSeoul() {
         JsonNode busanByCode = festival("부산불꽃축제", "26", "부산광역시 수영구");
         JsonNode seoulByCode = festival("서울거리공연", "11", "서울특별시 종로구 효자로13길 45");
         JsonNode busanByAddr = festival("광안리축제", null, "부산광역시 수영구 광안동");
