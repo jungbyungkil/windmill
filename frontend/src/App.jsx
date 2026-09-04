@@ -231,6 +231,7 @@ export default function App() {
   const exitConfirm = useExitConfirm(isTopLevel && !shareToken && !restoring);
 
   function handleGoHome() {
+    setMenuOpen(false);
     leaveItineraryView();
     navigate('/');
   }
@@ -1356,6 +1357,7 @@ export default function App() {
       <GlobalMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
+        onNavigateHome={handleGoHome}
         onNavigateMyTrips={handleOpenMyTrips}
         onNavigateGuide={handleOpenGuide}
       />
@@ -1474,19 +1476,30 @@ export default function App() {
                 <div className="header-inner">
                   <button
                     type="button"
-                    className="icon-btn header-menu-btn"
-                    aria-label="전체 메뉴"
-                    onClick={() => setMenuOpen(true)}
+                    className="header-home-btn"
+                    onClick={handleGoHome}
+                    aria-label="메인으로"
                   >
-                    ☰
+                    <span aria-hidden="true">←</span>
+                    메인
                   </button>
-                  <button type="button" className="header-trip-meta" onClick={handleGoHome} title="메인으로">
+                  <div className="header-trip-meta">
                     <span className="header-trip-region">{itinerary.regionDisplayName || '바람따라'}</span>
                     {tripDate && <span className="header-trip-date">{formatTripDate(tripDate)}</span>}
-                  </button>
-                  <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
-                    {shareBusy ? '준비 중...' : '공유'}
-                  </button>
+                  </div>
+                  <div className="header-actions">
+                    <button
+                      type="button"
+                      className="icon-btn header-menu-btn"
+                      aria-label="전체 메뉴"
+                      onClick={() => setMenuOpen(true)}
+                    >
+                      ☰
+                    </button>
+                    <button className="btn-share" type="button" onClick={handleShareItinerary} disabled={shareBusy}>
+                      {shareBusy ? '준비 중...' : '공유'}
+                    </button>
+                  </div>
                 </div>
               </header>
 
