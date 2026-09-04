@@ -1,7 +1,9 @@
 package com.windmill.service.trigger;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.windmill.client.KorServiceClient;
+import com.windmill.client.TourApiAreaCodes;
 import com.windmill.dto.FestivalSuggestion;
 import com.windmill.dto.RegionCode;
 import com.windmill.util.HomepageUrlExtractor;
@@ -51,24 +53,86 @@ public class FestivalTriggerService {
         if (cached != null) {
             return Mono.just(cached);
         }
-        // searchFestival2는 날짜 필터는 잘 되지만, 법정동 지역 파라미터를 무시하고 전국(서울이 앞줄)을
-        // 돌려주는 경우가 있다. 시·도 단위로 조회한 뒤 응답을 다시 거르고, 비면 지역기반 축제 목록으로 폴백한다.
         String queryFrom = tripStart.format(YYYYMMDD);
-        return korServiceClient.searchFestival(queryFrom, regn, null, 100, 1)
-                .map(items -> filterAndMap(items, region, tripStart, tripEnd))
+        String areaCode = TourApiAreaCodes.fromLDongRegnCd(regn);
+        return searchByAreaThenPages(queryFrom, areaCode, region, tripStart, tripEnd)
                 .flatMap(list -> {
                     if (!list.isEmpty()) {
                         return Mono.just(list);
                     }
-                    log.info("[Festival] searchFestival2 지역 필터 후 0건 - areaBasedList2(축제)로 시·도={} 재조회", regn);
-                    return korServiceClient.areaBasedList(FESTIVAL_CONTENT_TYPE_ID, regn, null, 100, 1, "C")
-                            .map(items -> filterAndMap(items, region, tripStart, tripEnd));
+                    log.info("[Festival] searchFestival2 0건 - areaBasedList2(축제)로 시·도={} 재조회", regn);
+                    return fromAreaBasedList(region, tripStart, tripEnd);
                 })
                 .flatMap(this::enrichHomepages)
                 .doOnNext(list -> {
-                    cache.put(cacheKey, list);
-                    log.info("[Festival] 여행기간({}~{}) 시·도={} 겹치는 축제 {}건", tripStart, tripEnd, regn, list.size());
+                    if (!list.isEmpty()) {
+                        cache.put(cacheKey, list);
+                    }
+                    log.info("[Festival] 여행기간({}~{}) 시·도={} areaCode={} 겹치는 축제 {}건",
+                            tripStart, tripEnd, regn, areaCode, list.size());
                 });
+    }
+
+    private Mono<List<FestivalSuggestion>> searchByAreaThenPages(String queryFrom, String areaCode,
+                                                                 RegionCode region, LocalDate tripStart,
+                                                                 LocalDate tripEnd) {
+        return korServiceClient.searchFestival(queryFrom, areaCode, 100, 1)
+                .map(items -> filterAndMap(items, region, tripStart, tripEnd))
+                .flatMap(page1 -> {
+                    if (!page1.isEmpty()) {
+                        return Mono.just(page1);
+                    }
+                    return korServiceClient.searchFestival(queryFrom, areaCode, 100, 2)
+                            .map(items -> filterAndMap(items, region, tripStart, tripEnd));
+                });
+    }
+
+    /**
+     * areaBasedList2 축제 목록에는 기간 필드가 빠지는 경우가 많다.
+     * 없으면 소개정보(detailIntro2)의 eventstartdate/enddate로 보강한 뒤 여행일과 겹치는 것만 남긴다.
+     */
+    private Mono<List<FestivalSuggestion>> fromAreaBasedList(RegionCode region, LocalDate tripStart,
+                                                             LocalDate tripEnd) {
+        return korServiceClient.areaBasedList(FESTIVAL_CONTENT_TYPE_ID, region.getLDongRegnCd(), null, 40, 1, "C")
+                .flatMapMany(Flux::fromIterable)
+                .filter(item -> matchesRegion(item, region))
+                .concatMap(this::withEventDates)
+                .map(item -> filterAndMap(List.of(item), region, tripStart, tripEnd))
+                .filter(list -> !list.isEmpty())
+                .take(MAX_SUGGESTIONS)
+                .concatMap(Flux::fromIterable)
+                .collectList();
+    }
+
+    private Mono<JsonNode> withEventDates(JsonNode item) {
+        if (parseDate(text(item, "eventstartdate", "eventStartDate")) != null
+                && parseDate(text(item, "eventenddate", "eventEndDate")) != null) {
+            return Mono.just(item);
+        }
+        String contentId = text(item, "contentid", "contentId");
+        if (contentId == null) {
+            return Mono.just(item);
+        }
+        return korServiceClient.detailIntro(contentId, FESTIVAL_CONTENT_TYPE_ID)
+                .map(intro -> copyEventDates(item, intro))
+                .defaultIfEmpty(item)
+                .onErrorReturn(item);
+    }
+
+    static JsonNode copyEventDates(JsonNode item, JsonNode intro) {
+        if (item == null || intro == null || !item.isObject()) {
+            return item;
+        }
+        String start = text(intro, "eventstartdate", "eventStartDate");
+        String end = text(intro, "eventenddate", "eventEndDate");
+        ObjectNode copy = item.deepCopy();
+        if (start != null) {
+            copy.put("eventstartdate", start);
+        }
+        if (end != null) {
+            copy.put("eventenddate", end);
+        }
+        return copy;
     }
 
     static List<FestivalSuggestion> filterAndMap(List<JsonNode> items, RegionCode region,
@@ -125,6 +189,11 @@ public class FestivalTriggerService {
         String itemRegn = text(item, "ldongregncd", "lDongRegnCd");
         if (itemRegn != null) {
             return itemRegn.equals(region.getLDongRegnCd());
+        }
+        String itemArea = text(item, "areacode", "areaCode");
+        String expectedArea = TourApiAreaCodes.fromLDongRegnCd(region.getLDongRegnCd());
+        if (itemArea != null && expectedArea != null && itemArea.equals(expectedArea)) {
+            return true;
         }
         String addr = text(item, "addr1");
         return matchesSidoAddress(addr, region.getSidoName());

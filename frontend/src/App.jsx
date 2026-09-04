@@ -1525,6 +1525,12 @@ export default function App() {
                   <span className="daytrip-count">{visibleItems.length}곳</span>
                 </div>
 
+                <FestivalBanner
+                  festivals={trigger?.festivalSuggestions}
+                  onAdd={handleAddFestival}
+                  addingId={addingFestivalId}
+                />
+
                 <ItineraryList
                   items={visibleItems}
                   affectedItemIds={trigger?.affectedItemIds}
@@ -1548,12 +1554,6 @@ export default function App() {
                 />
 
                 <WeatherBanner items={weatherItems} />
-
-                <FestivalBanner
-                  festivals={trigger?.festivalSuggestions}
-                  onAdd={handleAddFestival}
-                  addingId={addingFestivalId}
-                />
 
                 <MidWeatherBanner forecast={midWeather} />
                 </section>

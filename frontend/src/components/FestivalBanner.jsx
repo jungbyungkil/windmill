@@ -6,7 +6,7 @@ function formatDate(yyyyMMdd) {
   return `${yyyyMMdd.slice(4, 6)}.${yyyyMMdd.slice(6, 8)}`;
 }
 
-/** 본문 흐름과 분리된 하단 참고 영역 - 축제 정보는 선택 사항 */
+/** 일정 홈 상단 참고 영역 - 축제 정보는 선택 사항 */
 export default function FestivalBanner({ festivals, onAdd, addingId }) {
   if (!festivals || festivals.length === 0) return null;
 

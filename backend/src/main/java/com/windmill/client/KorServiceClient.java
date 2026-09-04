@@ -215,11 +215,12 @@ public class KorServiceClient {
                 .onErrorReturn(List.of());
     }
 
-    /** 기간별 축제/행사 조회 (searchFestival2) - eventStartDate 이후 종료되는 행사만 반환되므로
-     *  호출부에서 실제 일정 기간과 겹치는지(eventStartDate~eventEndDate) 다시 걸러야 한다.
-     *  lDong 지역 파라미터는 스펙상 선택값이지만 엔드포인트가 무시하고 전국 결과를 주는 경우가 있어,
-     *  호출부에서 시·도 코드/주소로 한 번 더 걸러야 한다. */
-    public Mono<List<JsonNode>> searchFestival(String eventStartDateYyyyMMdd, String lDongRegnCd, String lDongSignguCd,
+    /**
+     * 기간별 축제/행사 조회 (searchFestival2).
+     * 지역은 {@code areaCode}(1=서울 …)로 거른다. lDongRegnCd는 이 엔드포인트에서
+     * 빈 목록을 내는 경우가 있어 쓰지 않는다. areaCode가 없어도 응답은 다시 주소/법정동으로 걸러야 한다.
+     */
+    public Mono<List<JsonNode>> searchFestival(String eventStartDateYyyyMMdd, String areaCode,
                                                 int numOfRows, int pageNo) {
         return webClient.get()
                 .uri(uriBuilder -> {
@@ -233,11 +234,8 @@ public class KorServiceClient {
                             .queryParam("listYN", "Y")
                             .queryParam("arrange", TourApiArrange.MODIFIED)
                             .queryParam("eventStartDate", eventStartDateYyyyMMdd);
-                    if (lDongRegnCd != null && !lDongRegnCd.isBlank()) {
-                        uriBuilder.queryParam("lDongRegnCd", lDongRegnCd);
-                    }
-                    if (lDongSignguCd != null && !lDongSignguCd.isBlank()) {
-                        uriBuilder.queryParam("lDongSignguCd", lDongSignguCd);
+                    if (areaCode != null && !areaCode.isBlank()) {
+                        uriBuilder.queryParam("areaCode", areaCode);
                     }
                     return uriBuilder.build();
                 })
