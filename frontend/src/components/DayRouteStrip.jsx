@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { itemStatusLevel, isIndoorPlace } from '../utils/statusLevel';
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
+import VisitTimePicker from './VisitTimePicker';
 
 /**
  * 당일치기 동선 스트립 — 장소 순서·상태 색을 한 줄로 표시.
@@ -34,12 +35,13 @@ export default function DayRouteStrip({
         <span className="day-route-sub">탭하면 카카오맵 · 상태 색으로 표시</span>
         {showRecalc && (
           <div className="day-route-recalc-controls">
-            <input
-              type="time"
+            <VisitTimePicker
               className="day-route-start-time"
               value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
+              onChange={setStartTime}
               disabled={gpsOptimizing}
+              placeholder="자동"
+              allowEmpty
               aria-label="첫 장소 도착 시각 지정(선택)"
               title="첫 장소 도착 시각을 직접 정해보세요. 비워두면 자동으로 잡아요."
             />

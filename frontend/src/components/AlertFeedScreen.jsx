@@ -3,10 +3,25 @@ import * as api from '../api/windmillApi';
 
 const LEVEL_TONE = { NORMAL: 'normal', WARNING: 'warning', DANGER: 'danger' };
 
-function formatRelativeTime(createdAt) {
-  if (!createdAt) return '';
-  const then = new Date(createdAt);
-  const minutes = Math.max(0, Math.floor((Date.now() - then.getTime()) / 60000));
+/**
+ * 서버 시각 파싱.
+ * - 오프셋/Z가 있으면 그대로 Instant로 읽는다 (신규: 2026-09-04T14:25:00+09:00).
+ * - 없으면 UTC 벽시계로 본다. 구버전 API가 LocalDateTime을 타임존 없이 보냈고,
+ *   Render는 UTC라 브라우저가 KST로 해석하면 9시간 전으로 표시됐다.
+ */
+export function parseAlertTime(createdAt) {
+  if (!createdAt) return null;
+  const raw = String(createdAt).trim();
+  if (!raw) return null;
+  const iso = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const then = new Date(iso);
+  return Number.isNaN(then.getTime()) ? null : then;
+}
+
+export function formatRelativeTime(createdAt, now = Date.now()) {
+  const then = parseAlertTime(createdAt);
+  if (!then) return '';
+  const minutes = Math.max(0, Math.floor((now - then.getTime()) / 60000));
   if (minutes < 1) return '방금 전';
   if (minutes < 60) return `${minutes}분 전`;
   const hours = Math.floor(minutes / 60);

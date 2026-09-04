@@ -8,7 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/** 알림 피드 화면(GET /api/itineraries/{id}/alert-feed) 조회 전용 - 최신순 N건 */
+/** 알림 피드 화면(GET /api/itineraries/{id}/alert-feed) 조회 전용 - 최신순 N건.
+ * 시작 알림이 종료 알림보다 먼저 발생해도, 피드는 발생 시각 내림차순이라 종료가 위에 온다. */
 @Service
 @RequiredArgsConstructor
 public class AlertFeedService {

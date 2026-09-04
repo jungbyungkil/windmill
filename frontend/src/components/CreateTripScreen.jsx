@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import PinwheelLoader from './PinwheelLoader';
+import VisitTimePicker from './VisitTimePicker';
 import TripStoryFeed from './TripStoryFeed';
 import RecommendationCard from './RecommendationCard';
 import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
@@ -636,11 +637,11 @@ export default function CreateTripScreen({
             {anchorCandidate ? (
               <div className="anchor-selected-summary">
                 <span className="anchor-selected-name">📌 {anchorCandidate.placeName}</span>
-                <input
-                  type="time"
+                <VisitTimePicker
                   className="anchor-selected-time"
                   value={anchorTime}
-                  onChange={(e) => setAnchorTime(e.target.value)}
+                  onChange={setAnchorTime}
+                  aria-label="고정 일정 시각"
                 />
                 <button
                   type="button"

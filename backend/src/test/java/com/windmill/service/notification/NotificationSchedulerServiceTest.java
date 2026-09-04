@@ -1,5 +1,6 @@
 package com.windmill.service.notification;
 
+import com.windmill.domain.AlertEvent;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.PushSubscription;
@@ -10,6 +11,7 @@ import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.PushSubscriptionRepository;
 import com.windmill.service.push.PushSenderService;
 import com.windmill.service.trigger.TriggerDetectionService;
+import com.windmill.util.KoreaClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -235,6 +237,10 @@ class NotificationSchedulerServiceTest {
                 eq("오늘 일정 시작 30분 전입니다. 순풍이 부니 바람따라 여행해주세요."),
                 anyMap());
         assertTrue(itinerary.isDayStartNotified());
+        ArgumentCaptor<AlertEvent> saved = ArgumentCaptor.forClass(AlertEvent.class);
+        verify(alertEventRepository).save(saved.capture());
+        assertEquals("DAY_START", saved.getValue().getKind());
+        assertEquals(KoreaClock.toUtcWall(LEAD_NOW), saved.getValue().getCreatedAt());
     }
 
     @Test
@@ -303,6 +309,10 @@ class NotificationSchedulerServiceTest {
                 data.capture());
         assertTrue(data.getValue().get("url").contains("finish=1"));
         assertTrue(itinerary.isDayEndNotified());
+        ArgumentCaptor<AlertEvent> saved = ArgumentCaptor.forClass(AlertEvent.class);
+        verify(alertEventRepository).save(saved.capture());
+        assertEquals("DAY_END", saved.getValue().getKind());
+        assertEquals(KoreaClock.toUtcWall(AFTER_END), saved.getValue().getCreatedAt());
     }
 
     @Test

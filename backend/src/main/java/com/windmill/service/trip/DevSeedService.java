@@ -13,6 +13,7 @@ import com.windmill.repository.AlertEventRepository;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.TripRecordRepository;
 import com.windmill.service.region.RegionCodeService;
+import com.windmill.util.KoreaClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -228,7 +229,7 @@ public class DevSeedService {
         if (!itineraryRepository.existsById(itineraryId)) {
             throw new IllegalArgumentException("존재하지 않는 itineraryId: " + itineraryId);
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = KoreaClock.utcNow();
         List<AlertEvent> samples = List.of(
                 AlertEvent.builder().itineraryId(itineraryId).kind("STATUS").level(TriggerLevel.DANGER)
                         .icon("🌧️").headline("🔴 지금 코스를 바꿔야 해요")

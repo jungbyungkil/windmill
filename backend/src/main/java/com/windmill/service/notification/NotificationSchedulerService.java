@@ -156,7 +156,7 @@ public class NotificationSchedulerService {
         String nudgeId = "STATUS:" + newSig + "@" + minuteKey(now);
         String title = composer.statusTitle(newLevel);
         String body = composer.statusBody(result);
-        recordAlertEvent(itinerary, "STATUS", result, title, body);
+        recordAlertEvent(itinerary, "STATUS", result, title, body, now);
         dispatch(itinerary, subs, title, body, nudgeId, now, false);
     }
 
@@ -177,7 +177,7 @@ public class NotificationSchedulerService {
             if (inLeadWindow && result.getLevel() == TriggerLevel.NORMAL) {
                 String title = composer.dayStartTitle();
                 String body = composer.dayStartBody();
-                recordBookend(itinerary, "DAY_START", title, body);
+                recordBookend(itinerary, "DAY_START", title, body, now);
                 dispatch(itinerary, subs, title, body, "DAY_START@" + minuteKey(now), now, false);
                 itinerary.setDayStartNotified(true);
             } else if (!nowTime.isBefore(bounds.firstStart())) {
@@ -192,7 +192,7 @@ public class NotificationSchedulerService {
             } else if (minutesSinceEnd >= 0 && result.getLevel() == TriggerLevel.NORMAL) {
                 String title = composer.dayEndTitle();
                 String body = composer.dayEndBody();
-                recordBookend(itinerary, "DAY_END", title, body);
+                recordBookend(itinerary, "DAY_END", title, body, now);
                 dispatch(itinerary, subs, title, body, "DAY_END@" + minuteKey(now), now, true);
                 itinerary.setDayEndNotified(true);
             }
@@ -304,7 +304,8 @@ public class NotificationSchedulerService {
         }
     }
 
-    private void recordAlertEvent(Itinerary itinerary, String kind, TriggerResult result, String title, String body) {
+    private void recordAlertEvent(Itinerary itinerary, String kind, TriggerResult result, String title, String body,
+                                  LocalDateTime now) {
         alertEventRepository.save(AlertEvent.builder()
                 .itineraryId(itinerary.getId())
                 .kind(kind)
@@ -312,10 +313,11 @@ public class NotificationSchedulerService {
                 .icon(AlertIconResolver.resolve(result))
                 .headline(title)
                 .detail(body)
+                .createdAt(KoreaClock.toUtcWall(now))
                 .build());
     }
 
-    private void recordBookend(Itinerary itinerary, String kind, String title, String body) {
+    private void recordBookend(Itinerary itinerary, String kind, String title, String body, LocalDateTime now) {
         alertEventRepository.save(AlertEvent.builder()
                 .itineraryId(itinerary.getId())
                 .kind(kind)
@@ -323,6 +325,7 @@ public class NotificationSchedulerService {
                 .icon("🟢")
                 .headline(title)
                 .detail(body)
+                .createdAt(KoreaClock.toUtcWall(now))
                 .build());
     }
 

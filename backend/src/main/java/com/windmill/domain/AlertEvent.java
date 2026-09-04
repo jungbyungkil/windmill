@@ -1,6 +1,7 @@
 package com.windmill.domain;
 
 import com.windmill.dto.TriggerLevel;
+import com.windmill.util.KoreaClock;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -45,6 +46,10 @@ public class AlertEvent {
     @Column(length = 500)
     private String detail;
 
+    /**
+     * UTC 벽시계(타임존 없는 TIMESTAMP). Render JVM 기본 TZ가 UTC라 기존 행도 이 의미다.
+     * 응답은 {@link com.windmill.util.KoreaClock#toKstOffset}으로 +09:00을 붙인다.
+     */
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -52,7 +57,7 @@ public class AlertEvent {
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = KoreaClock.utcNow();
         }
     }
 }

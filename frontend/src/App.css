@@ -941,8 +941,9 @@
   white-space: nowrap;
 }
 
-.anchor-selected-time {
+.visit-time-wrap.anchor-selected-time .item-time {
   width: auto;
+  min-width: 72px;
   border: 1px solid var(--sand-border, #cbd5e1);
   border-radius: 10px;
   padding: 6px 8px;
@@ -1811,18 +1812,23 @@
 }
 
 .item-time-picker {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: auto;
-  min-width: 5.5rem;
-  max-width: 7.5rem;
-  padding: 6px 6px 6px 8px;
+  min-width: 64px;
+  padding: 7px 8px;
   cursor: pointer;
-  color-scheme: light;
+  font: inherit;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
-.item-time-picker::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.55;
-  margin-left: 2px;
+.item-time-picker.is-empty {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .item-time-picker:focus {
@@ -1831,9 +1837,257 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 14%, transparent);
 }
 
+.item-time-picker:focus-visible {
+  outline: none;
+}
+
 .item-time-picker:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.clock-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.clock-picker-dialog {
+  width: min(100%, 340px);
+  background: #fff;
+  border-radius: 20px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
+  text-align: center;
+  outline: none;
+}
+
+.clock-picker-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--sea-deep);
+  letter-spacing: -0.02em;
+}
+
+.clock-picker-digital {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-family: var(--display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.clock-picker-period-label {
+  margin-right: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--sea-deep);
+}
+
+.clock-picker-unit {
+  appearance: none;
+  border: 0;
+  background: color-mix(in srgb, var(--sea) 8%, white);
+  color: var(--ink);
+  border-radius: 12px;
+  min-width: 64px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.clock-picker-unit.is-active {
+  background: var(--sea);
+  color: #fff;
+}
+
+.clock-picker-colon {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.clock-picker-ampm {
+  display: inline-flex;
+  margin: 0 0 16px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--sand);
+  border: 1px solid var(--sand-border);
+}
+
+.clock-picker-ampm button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  min-width: 72px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.clock-picker-ampm button.is-active {
+  background: var(--sea);
+  color: #fff;
+  box-shadow: var(--chip-shadow);
+}
+
+.clock-dial {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 10px;
+}
+
+.clock-face {
+  position: relative;
+  width: min(72vw, 252px);
+  height: min(72vw, 252px);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, #fff 0%, color-mix(in srgb, var(--sand) 70%, white) 72%, color-mix(in srgb, var(--breeze) 18%, white) 100%);
+  border: 1px solid color-mix(in srgb, var(--sea) 16%, var(--sand-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 24px -16px rgba(6, 70, 90, 0.35);
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.clock-ticks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.clock-ticks line {
+  stroke: color-mix(in srgb, var(--sea) 28%, var(--sand-border));
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+.clock-hand {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: rotate(var(--hand-deg, 0deg));
+  transition: transform 0.16s ease;
+}
+
+.clock-face.is-dragging .clock-hand {
+  transition: none;
+}
+
+.clock-hand-line {
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  bottom: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--sea);
+  border-radius: 2px;
+}
+
+.clock-hand-knob {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: var(--sea);
+}
+
+.clock-center-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--sea-deep);
+  pointer-events: none;
+}
+
+.clock-num {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.clock-num.is-selected {
+  color: #fff;
+}
+
+.clock-num-minute {
+  font-size: 15px;
+}
+
+.clock-picker-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.clock-picker-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clock-picker-empty {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--sea-deep);
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clock-picker-confirm {
+  appearance: none;
+  border: none;
+  background: var(--sea);
+  color: #fff;
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .item-status-chip {
@@ -4615,18 +4869,20 @@
   gap: 6px;
 }
 
-.day-route-start-time {
+.visit-time-wrap.day-route-start-time .item-time {
   border: 1px solid var(--sand-border);
   background: white;
   border-radius: 999px;
   height: 32px;
+  min-height: 32px;
+  min-width: 4.5rem;
   padding: 0 10px;
   font-size: 12px;
   color: var(--ink, #1e293b);
   line-height: 1;
 }
 
-.day-route-start-time:disabled {
+.visit-time-wrap.day-route-start-time .item-time:disabled {
   opacity: 0.55;
 }
 
