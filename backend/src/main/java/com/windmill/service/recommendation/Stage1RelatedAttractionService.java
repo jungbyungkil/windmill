@@ -257,13 +257,19 @@ public class Stage1RelatedAttractionService {
                 });
     }
 
+    /** 한 테마의 여러 조회를 동시에 던지는 상한 - 예전엔 concatMap으로 6~9개를 순차 대기해 검색이 수 초씩
+     *  걸렸다(2026-09-06 사용자 제보). 순서는 뒤에서 contentId 중복제거 + 인기(rank)순 재정렬로 정하므로
+     *  호출 간 순서를 보존할 이유가 없어 병렬로 바꾼다. */
+    private static final int THEME_FETCH_CONCURRENCY = 8;
+
     private Mono<List<RelatedCandidate>> fetchOneTheme(RegionCode region, RecommendThemeTag theme, String query) {
         List<Mono<List<RelatedCandidate>>> calls = new ArrayList<>();
         RecommendThemeTag.CategoryCode[] categoryCodes = theme.getCategoryCodes();
-        if (categoryCodes.length > 0) {
+        Integer primaryType = theme.getContentTypeIds().length > 0 ? theme.getContentTypeIds()[0] : null;
+        boolean hasCategoryCodes = categoryCodes.length > 0;
+        if (hasCategoryCodes) {
             // 분류코드(cat1/cat2/cat3)가 있는 태그는 정밀 조회를 우선 사용 - "사찰"/"온천" 같은 카테고리는
             // 실제 상호명에 그 단어가 안 들어가 키워드 검색만으론 정확도가 낮다.
-            Integer primaryType = theme.getContentTypeIds().length > 0 ? theme.getContentTypeIds()[0] : null;
             for (RecommendThemeTag.CategoryCode code : categoryCodes) {
                 calls.add(korServiceClient
                         .areaBasedList(primaryType, code.cat1(), code.cat2(), code.cat3(),
@@ -281,34 +287,38 @@ public class Stage1RelatedAttractionService {
                         .onErrorReturn(List.of()));
             }
         }
-        // 키워드 검색: 사용자 검색어 우선, 없으면 테마 기본 키워드 상위 3개
+        // 키워드 검색은 보조용 - 분류코드가 이미 정밀하면 1개, 타입만으로 조회하는 태그면 2개까지만.
+        // (예전엔 word 3개 × [타입지정·타입없음] 2 = 6콜을 전부 던졌음)
         List<String> searchWords = new ArrayList<>();
         if (query != null && !query.isBlank()) {
             searchWords.add(query.trim());
         }
+        int keywordLimit = hasCategoryCodes ? 1 : 2;
         for (String keyword : theme.getKeywords()) {
-            if (searchWords.size() >= 3) {
+            if (searchWords.size() >= keywordLimit) {
                 break;
             }
             if (!searchWords.contains(keyword)) {
                 searchWords.add(keyword);
             }
         }
-        Integer primaryType = theme.getContentTypeIds().length > 0 ? theme.getContentTypeIds()[0] : null;
-        for (String word : searchWords) {
+        for (int i = 0; i < searchWords.size(); i++) {
+            String word = searchWords.get(i);
             calls.add(korServiceClient
                     .searchKeyword(word, primaryType, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
                     .map(items -> mapKorItems(items, theme.getLabel()))
                     .onErrorReturn(List.of()));
-            // contentType 없이 한 번 더 (지역 타입이 비는 경우 대비)
-            calls.add(korServiceClient
-                    .searchKeyword(word, null, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
-                    .map(items -> mapKorItems(items, theme.getLabel()))
-                    .onErrorReturn(List.of()));
+            // contentType 없이 한 번 더 - 첫 단어만(지역 타입이 통째로 비는 경우 대비, 나머지는 생략해 콜 수 절감)
+            if (i == 0) {
+                calls.add(korServiceClient
+                        .searchKeyword(word, null, region.getLDongRegnCd(), region.getLDongSignguCd(), MAX_CANDIDATES, 1)
+                        .map(items -> mapKorItems(items, theme.getLabel()))
+                        .onErrorReturn(List.of()));
+            }
         }
 
         return Flux.fromIterable(calls)
-                .concatMap(mono -> mono)
+                .flatMap(mono -> mono, THEME_FETCH_CONCURRENCY)
                 .collectList()
                 .map(batches -> {
                     Map<String, RelatedCandidate> byId = new LinkedHashMap<>();

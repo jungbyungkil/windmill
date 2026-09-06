@@ -50,5 +50,5 @@ public class RecommendationRequest {
     /** 방문일. Stage2가 지금이 아니라 이 날짜의 휴무를 본다. */
     private LocalDate visitDate;
 
-    public enum AvoidanceHint { CROWD, WEATHER, HEAT, BUSINESS }
+    public enum AvoidanceHint { CROWD, WEATHER, HEAT, BUSINESS, ROUTE }
 }

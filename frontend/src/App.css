@@ -4826,6 +4826,39 @@
   margin-top: 12px;
 }
 
+/* 행동 유도 코멘트일 때 말풍선 전체가 탭 가능한 버튼 (2026-09-06 - 눌러도 반응 없던 문제) */
+.barami-bubble.as-button {
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.barami-bubble.as-button:active .barami-speech {
+  transform: translateY(1px);
+}
+
+.barami-bubble.as-button .barami-speech {
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+
+.barami-bubble.as-button:hover .barami-speech,
+.barami-bubble.as-button:focus-visible .barami-speech {
+  border-color: var(--sea);
+}
+
+.barami-cta-hint {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sea);
+}
+
 .barami-avatar {
   width: 44px;
   height: 44px;

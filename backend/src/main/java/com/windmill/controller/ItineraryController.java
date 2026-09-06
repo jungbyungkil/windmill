@@ -206,7 +206,9 @@ public class ItineraryController {
                         ? "HEAT_ALTERNATIVE"
                         : avoid == RecommendationRequest.AvoidanceHint.CROWD
                                 ? "CROWD_ALTERNATIVE"
-                                : null;
+                                : avoid == RecommendationRequest.AvoidanceHint.ROUTE
+                                        ? "ROUTE_ALTERNATIVE"
+                                        : null;
         return Mono.fromCallable(() -> itineraryService.get(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itinerary -> recommendationPipeline.recommend(buildAlternativeRequest(itinerary, avoid, seedPlaceName)))

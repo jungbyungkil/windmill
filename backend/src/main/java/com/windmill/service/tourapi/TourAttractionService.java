@@ -63,7 +63,12 @@ public class TourAttractionService {
         return detailCache.get(contentId);
     }
 
-    /** 공통정보 + 소개정보(영업시간 등) + 이미지를 조합한 상세 정보 */
+    /**
+     * 공통정보 + 소개정보(영업시간 등)를 조합한 상세 정보.
+     * detailImage2(이미지 갤러리)는 그동안 매번 같이 호출했지만 `imageUrls`를 읽는 곳이 백엔드·프론트
+     * 어디에도 없어(2026-09-06 확인) 순수 낭비였다 - 호출을 뺐다. 추천 검색은 후보마다 이 getDetail을
+     * 도는데(Stage2), 콜 3개 → 2개로 줄어 체감 속도가 개선된다. 카드 썸네일은 목록조회의 firstimage를 쓴다.
+     */
     public Mono<TourAttractionDetail> getDetail(String contentId, int contentTypeId) {
         TourAttractionDetail cached = detailCache.get(contentId);
         if (cached != null) {
@@ -72,11 +77,10 @@ public class TourAttractionService {
 
         Mono<JsonNode> commonMono = korServiceClient.detailCommon(contentId);
         Mono<JsonNode> introMono = korServiceClient.detailIntro(contentId, contentTypeId);
-        Mono<List<JsonNode>> imagesMono = korServiceClient.detailImages(contentId);
 
         return Mono.zip(commonMono.defaultIfEmpty(NullNode.getInstance()),
-                        introMono.defaultIfEmpty(NullNode.getInstance()), imagesMono)
-                .map(tuple -> buildDetail(contentId, contentTypeId, tuple.getT1(), tuple.getT2(), tuple.getT3()))
+                        introMono.defaultIfEmpty(NullNode.getInstance()))
+                .map(tuple -> buildDetail(contentId, contentTypeId, tuple.getT1(), tuple.getT2(), List.of()))
                 .doOnNext(detail -> detailCache.put(contentId, detail));
     }
 

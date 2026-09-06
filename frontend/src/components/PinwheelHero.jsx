@@ -50,7 +50,11 @@ function resolveCtas(trigger) {
     if (ctas.some((c) => c.kind === cta.kind && c.hint === cta.hint)) return;
     ctas.push(cta);
   };
-  if (trigger.travelTimeTrigger) add({ kind: 'route', label: '동선 다시' });
+  if (trigger.travelTimeTrigger) {
+    add({ kind: 'route', label: '동선 다시' });
+    // 바람이 코멘트가 "대안을 확인해볼까요?"라고 말하므로 대안 보기 버튼도 같이 노출
+    add({ kind: 'alternatives', hint: 'ROUTE', label: '다른 장소 보기' });
+  }
   if (trigger.heatTrigger) add({ kind: 'reroute', hint: 'HEAT', label: '실내로 바꾸기' });
   if (trigger.weatherTrigger) add({ kind: 'reroute', hint: 'WEATHER', label: '실내로 바꾸기' });
   if (trigger.crowdTrigger) add({ kind: 'reroute', hint: 'CROWD', label: '한산한 곳으로' });
@@ -226,7 +230,12 @@ export default function PinwheelHero({
             </div>
           )}
 
-          <BaramiBubble comment={baramiCommentFromTrigger(trigger)} compact />
+          <BaramiBubble
+            comment={baramiCommentFromTrigger(trigger)}
+            compact
+            onActivate={interactive && primaryCta && !ctaBusy(primaryCta) ? handleActivate : undefined}
+            actionLabel={interactive && primaryCta ? primaryCta.label : undefined}
+          />
         </div>
       )}
     </div>
