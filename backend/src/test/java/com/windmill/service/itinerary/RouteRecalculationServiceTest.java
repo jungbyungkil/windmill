@@ -113,8 +113,9 @@ class RouteRecalculationServiceTest {
 
         assertEquals("09:00", attr1.getScheduledTime());
         assertEquals("09:55", attr2.getScheduledTime());
-        // 09:55 + 45 + 10 = 10:50 → 점심 창(11:00)보다 이르러 11:00으로만 당긴다
-        assertEquals("11:00", food.getScheduledTime());
+        // 09:55 + 60(국도발전"전시관" 체류) + 10(이동) = 11:05 → 이미 점심 창(11:00~14:00) 안이라
+        // 정각(12:00)으로 당기지 않고 그대로 둔다
+        assertEquals("11:05", food.getScheduledTime());
     }
 
     @Test

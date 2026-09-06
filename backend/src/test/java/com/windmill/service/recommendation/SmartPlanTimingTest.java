@@ -159,13 +159,13 @@ class SmartPlanTimingTest {
                 RecommendationCandidate.builder().contentId("NEAR").placeName("근처 관광지")
                         .category("관광").contentTypeId(12)
                         .mapX("127.000").mapY("37.000").build(),
-                RecommendationCandidate.builder().contentId("FAR1").placeName("먼 관광지1")
+                RecommendationCandidate.builder().contentId("DISTANT1").placeName("먼 관광지1")
                         .category("관광").contentTypeId(12)
                         .mapX("127.100").mapY("37.100").build(),
-                RecommendationCandidate.builder().contentId("FAR2").placeName("먼 관광지2")
+                RecommendationCandidate.builder().contentId("DISTANT2").placeName("먼 관광지2")
                         .category("관광").contentTypeId(12)
                         .mapX("127.200").mapY("37.100").build(),
-                RecommendationCandidate.builder().contentId("FAR3").placeName("먼 관광지3")
+                RecommendationCandidate.builder().contentId("DISTANT3").placeName("먼 관광지3")
                         .category("관광").contentTypeId(12)
                         .mapX("126.900").mapY("36.900").build()));
         List<RecommendationCandidate> foods = new ArrayList<>(List.of(
@@ -180,7 +180,8 @@ class SmartPlanTimingTest {
         assertTrue(day.size() >= 2, "관광 슬롯은 채워야 함");
         long meals = day.stream().filter(s -> "점심".equals(s.getCategory()) || "저녁".equals(s.getCategory())).count();
         assertEquals(0, meals);
-        assertTrue(day.stream().noneMatch(s -> s.getContentId() != null && s.getContentId().startsWith("F")));
+        assertTrue(day.stream().noneMatch(s -> "F1".equals(s.getContentId()) || "F2".equals(s.getContentId())),
+                "식당(F1/F2)이 관광 슬롯에 섞이면 안 됨");
     }
 
     @Test
@@ -204,8 +205,11 @@ class SmartPlanTimingTest {
         long cafeCount = day.stream().filter(s -> "카페".equals(s.getCategory())).count();
         assertEquals(0, meals);
         assertEquals(0, cafeCount);
-        assertTrue(day.get(0).getCategory().contains("오전"));
-        assertTrue(day.stream().anyMatch(s -> s.getCategory() != null && s.getCategory().contains("오후")));
+        // 슬롯의 시간대(오전/오후)는 category가 아니라 suggestedTime/oneLiner에 담긴다 -
+        // category에는 장소 본래 유형("관광" 등)을 그대로 둔다(skipsRestaurantsAndClosedDays 참고).
+        assertTrue(day.get(0).getSuggestedTime().compareTo("12:00") < 0, "첫 슬롯은 오전");
+        assertTrue(day.stream().anyMatch(s -> s.getSuggestedTime() != null
+                && s.getSuggestedTime().compareTo("12:00") >= 0), "오후 슬롯이 있어야 함");
     }
 
     @Test

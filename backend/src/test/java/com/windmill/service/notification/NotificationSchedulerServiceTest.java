@@ -218,7 +218,9 @@ class NotificationSchedulerServiceTest {
 
         verify(pushSenderService, never()).send(anyString(), anyString(), anyString(), anyMap());
         assertEquals(TriggerLevel.NORMAL, itinerary.getLastKnownTriggerLevel());
-        assertFalse(itinerary.isDayStartNotified());
+        // MID_TRIP(10:05)은 첫 일정 10:00 기준 순풍 리드 창(09:30~10:00)을 이미 지난 시각이라,
+        // 발송은 없지만 다음 틱에서 재평가하지 않도록 dayStartNotified만 마킹된다(scheduler line 187-188).
+        assertTrue(itinerary.isDayStartNotified());
         assertFalse(itinerary.isDayEndNotified());
     }
 
