@@ -121,7 +121,74 @@ public class RecommendationPipeline {
                         .filter(c -> withinBudget(c, request.getMaxBudgetPerPerson()))
                         .collect(Collectors.toList()))
                 .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint(), request.getChildAges()))
+                .flatMap(list -> !list.isEmpty() || request.getAvoidanceHint() == null
+                        ? Mono.just(list)
+                        : alternativesFallback(request))
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
+    }
+
+    /**
+     * 트리거 대응 대안(avoidanceHint != null)은 <b>절대 빈 목록으로 끝나지 않는다.</b> 연관/실내 경로가
+     * 0건이면 그 지역 인기 관광지(관광지 12·문화시설 14·레포츠 28)를 같은 4단계로 보강해 채우고,
+     * 그래도 0건이면(이미 담긴 곳 제외로 전부 빠진 경우) exclude 필터를 풀고, 최후에는 인기목록
+     * 원본이라도 돌려준다. 순서는 여전히 applyAvoidanceOrdering가 "제일 좋은 것부터"로 잡는다.
+     */
+    private Mono<List<RecommendationCandidate>> alternativesFallback(RecommendationRequest request) {
+        RegionCode region = regionCodeService.find(request.getRegionCode())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지역코드: " + request.getRegionCode()));
+        Set<String> exclude = request.getExcludeContentIds() == null
+                ? Set.of() : Set.copyOf(request.getExcludeContentIds());
+        Set<String> excludeNames = request.getExcludePlaceNames() == null
+                ? Set.of() : Set.copyOf(request.getExcludePlaceNames());
+        log.warn("[Pipeline] 대안 0건 - 인기 스팟 폴백 시작 (avoid={}, region={})",
+                request.getAvoidanceHint(), request.getRegionCode());
+
+        return Mono.zip(resolveOrigin(request), resolveCondition(region))
+                .flatMap(tuple -> {
+                    TourAttractionDetail origin = tuple.getT1();
+                    RegionCondition condition = tuple.getT2();
+                    return stage1.fetchPopularSights(region)
+                            .map(list -> list.stream()
+                                    .filter(c -> !exclude.contains(c.getContentId()))
+                                    .collect(Collectors.toList()))
+                            .flatMap(list -> stage2.filter(list, request.getVisitDate()))
+                            .map(list -> attachDistance(list, origin))
+                            .flatMap(list -> stage3.filter(list, region))
+                            .map(list -> CompanionCategoryRanking.rank(list, request.getCompanionType()))
+                            .map(list -> AccessibilityRanking.rank(list, request.isStrollerFriendly(), request.isAccessibleFriendly()))
+                            .map(list -> AgeGroupRanking.rank(list, request.getAdultAgeGroup(), request.getChildAges()))
+                            .map(ProximityRanking::rank)
+                            .map(PopularityRanking::rank)
+                            .flatMap(list -> stage4.matchWithoutLlm(list, request.getTags(), request.getChildAges()))
+                            .doOnNext(list -> badgeAssembler.attach(list, condition, request.getVisitDate()))
+                            .map(list -> list.stream()
+                                    .filter(c -> !excludeNames.contains(c.getPlaceName()))
+                                    .collect(Collectors.toList()))
+                            .map(list -> applyAvoidanceOrdering(list, request.getAvoidanceHint(), request.getChildAges()));
+                })
+                .flatMap(list -> list.isEmpty() ? rawPopularSpots(region, request) : Mono.just(list))
+                .onErrorResume(e -> {
+                    log.warn("[Pipeline] 폴백 보강 실패 - 인기목록 원본으로 최후 시도", e);
+                    return rawPopularSpots(region, request);
+                });
+    }
+
+    /** 최후 폴백 - Stage2·3 보강 없이 인기목록 원본이라도 대안으로 내보낸다(TourAPI 자체가 0건일 때만 빈 목록). */
+    private Mono<List<RecommendationCandidate>> rawPopularSpots(RegionCode region, RecommendationRequest request) {
+        Set<String> exclude = request.getExcludeContentIds() == null
+                ? Set.of() : Set.copyOf(request.getExcludeContentIds());
+        return stage1.fetchPopularSights(region)
+                .map(list -> {
+                    List<RecommendationCandidate> mapped = list.stream()
+                            .map(RecommendationPipeline::toSearchCandidate)
+                            .collect(Collectors.toList());
+                    List<RecommendationCandidate> filtered = mapped.stream()
+                            .filter(c -> !exclude.contains(c.getContentId()))
+                            .collect(Collectors.toList());
+                    List<RecommendationCandidate> chosen = filtered.isEmpty() ? mapped : filtered;
+                    return applyAvoidanceOrdering(chosen, request.getAvoidanceHint(), request.getChildAges());
+                })
+                .doOnNext(list -> log.warn("[Pipeline] 최후 폴백 - 인기목록 원본 {}건", list.size()));
     }
 
     /** skipLlm(속도 우선) 요청 전용 - Stage2(영업시간 상세조회, 외부 API) 대상 건수를 줄여 속도를
@@ -283,25 +350,36 @@ public class RecommendationPipeline {
                                                                    RecommendationRequest.AvoidanceHint hint,
                                                                    List<Integer> childAges) {
         if (hint == RecommendationRequest.AvoidanceHint.CROWD) {
+            // 혼잡 회피 우선순위(제일 좋은 것부터): ①혼잡 둔감 ②실시간 집중률 낮은 순 ③지역 인기(조회)순
+            // ④썸네일 있는 카드. ②·③이 상충할 때 "지금 덜 붐비는 곳"을 인기보다 앞세운다.
             return candidates.stream()
                     .sorted(Comparator
                             .comparing((RecommendationCandidate c) ->
                                     c.getCongestionSensitivity() == CongestionSensitivity.INSENSITIVE ? 0 : 1)
                             .thenComparing(RecommendationCandidate::getCrowdRate,
-                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                                    Comparator.nullsLast(Comparator.naturalOrder()))
+                            .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank()))
+                            .thenComparing(c -> hasThumbnail(c) ? 0 : 1))
                     .collect(Collectors.toList());
         }
         if (hint == RecommendationRequest.AvoidanceHint.WEATHER
                 || hint == RecommendationRequest.AvoidanceHint.HEAT) {
+            // 비/폭염 우선순위: ①실내 ②우천 둔감 ③(자녀 동반 시)아이가 즐길 실내 ④지역 인기순 ⑤썸네일.
             boolean hasChildren = childAges != null && !childAges.isEmpty();
             return candidates.stream()
                     .sorted(Comparator
                             .comparing((RecommendationCandidate c) -> indoorPreferred(c) ? 0 : 1)
                             .thenComparing(c -> c.getRainSensitivity() == RainSensitivity.INSENSITIVE ? 0 : 1)
-                            .thenComparing(c -> hasChildren && matchesKidsIndoorKeyword(c) ? 0 : 1))
+                            .thenComparing(c -> hasChildren && matchesKidsIndoorKeyword(c) ? 0 : 1)
+                            .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank()))
+                            .thenComparing(c -> hasThumbnail(c) ? 0 : 1))
                     .collect(Collectors.toList());
         }
         return candidates;
+    }
+
+    private static boolean hasThumbnail(RecommendationCandidate c) {
+        return c.getThumbnailUrl() != null && !c.getThumbnailUrl().isBlank();
     }
 
     /** 실내 스냅샷이 있으면 그걸 쓰고, 없으면 Stage4가 붙인 #실내 태그를 본다. */

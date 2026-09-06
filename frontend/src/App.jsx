@@ -854,9 +854,37 @@ export default function App() {
     setAddingContentId(candidate.contentId);
     try {
       const result = await addCandidateToItinerary(candidate, activeDate, true);
-      if (result) setRerouteCount((n) => n + 1);
+      if (result) {
+        setRerouteCount((n) => n + 1);
+        await replanTimelineAfterAlternative(result);
+        refreshTrigger();
+      }
     } finally {
       setAddingContentId(null);
+    }
+  }
+
+  /**
+   * 대안을 담거나 교체한 뒤, 스마트/자동 일정 확정 때(confirmSmartPlanCore)와 똑같이
+   * 실제 이동시간 기준으로 그날 동선·시간표를 다시 잡는다. 고정(pin)한 앵커는 백엔드가
+   * 자리·시각을 그대로 유지한다.
+   */
+  async function replanTimelineAfterAlternative(current) {
+    const day = activeDate || current?.startDate;
+    const dayItemCount = (current?.items || []).filter(
+      (i) => (i.visitDate || current.startDate) === day,
+    ).length;
+    if (dayItemCount < 2) return current;
+    try {
+      const replanned = await api.optimizeRoute(itineraryId, day);
+      setItinerary(replanned);
+      setAutoReplaceNotice(
+        replanned.routeHint || '대안을 반영해 이동시간·체류 기준으로 시간표를 다시 짰어요.',
+      );
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+      return replanned;
+    } catch {
+      return current;
     }
   }
 
@@ -1027,8 +1055,25 @@ export default function App() {
 
       setItinerary(result);
       setRerouteCount((n) => n + targets.length);
-      setAutoReplaceNotice(`${note} (${used.size}곳 교체)`);
       refreshTrigger();
+
+      // 교체가 끝나면 실제 이동시간 기준으로 그날 동선·시간표를 다시 잡는다(고정 앵커는 유지).
+      const day = activeDate || result.startDate;
+      const dayCount = (result.items || []).filter(
+        (i) => (i.visitDate || result.startDate) === day,
+      ).length;
+      let replanned = result;
+      if (dayCount >= 2) {
+        try {
+          replanned = await api.optimizeRoute(itineraryId, day);
+          setItinerary(replanned);
+        } catch {
+          /* keep swapped order if 동선 재계산 실패 */
+        }
+      }
+      setAutoReplaceNotice(
+        `${note} (${used.size}곳 교체) ${replanned.routeHint || '이동시간 기준으로 시간표도 다시 짰어요.'}`,
+      );
     } catch (e) {
       setAutoReplaceNotice(`일정 교체 실패: ${e.message}`);
     } finally {

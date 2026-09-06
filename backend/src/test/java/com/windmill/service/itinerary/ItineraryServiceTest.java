@@ -135,6 +135,56 @@ class ItineraryServiceTest {
     }
 
     @Test
+    void optimizeRoute_keepsPinnedAnchorOutOfRecalculationAndMergesByTime() {
+        ItineraryItem before = ItineraryItem.builder().id(1L).displayOrder(0).visitDate(TOMORROW)
+                .scheduledTime("12:00").build();
+        ItineraryItem anchor = ItineraryItem.builder().id(2L).displayOrder(1).visitDate(TOMORROW)
+                .scheduledTime("12:30").isPinned(true).pinnedReason("19:00 공연").build();
+        ItineraryItem after = ItineraryItem.builder().id(3L).displayOrder(2).visitDate(TOMORROW)
+                .scheduledTime("13:00").build();
+        Itinerary itinerary = Itinerary.builder()
+                .id(7L).sessionUuid(SESSION).startDate(TOMORROW)
+                .items(new ArrayList<>(List.of(before, anchor, after)))
+                .build();
+        when(itineraryRepository.findById(7L)).thenReturn(Optional.of(itinerary));
+        // 이동 항목만 재계산으로 넘어가고, 스텁은 받은 순서를 그대로 돌려준다
+        when(routeRecalculationService.recalculate(any(), any(), any(), any()))
+                .thenAnswer(inv -> new RouteRecalculationService.Result(inv.getArgument(0), "재계산 완료", 20, true));
+
+        service.optimizeRoute(7L, TOMORROW, null, null, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ItineraryItem>> passed = ArgumentCaptor.forClass(List.class);
+        verify(routeRecalculationService).recalculate(passed.capture(), any(), any(), any());
+        assertEquals(List.of(1L, 3L), passed.getValue().stream().map(ItineraryItem::getId).toList());
+
+        // 고정 앵커(12:30)는 시각순으로 before(12:00)와 after(13:00) 사이에 병합되고 displayOrder도 그 순서
+        assertEquals(0, before.getDisplayOrder());
+        assertEquals(1, anchor.getDisplayOrder());
+        assertEquals(2, after.getDisplayOrder());
+        assertEquals("12:30", anchor.getScheduledTime());
+    }
+
+    @Test
+    void optimizeRoute_allItemsPinned_skipsRecalculationAndKeepsOrder() {
+        ItineraryItem p1 = ItineraryItem.builder().id(1L).displayOrder(0).visitDate(TOMORROW)
+                .scheduledTime("10:00").isPinned(true).build();
+        ItineraryItem p2 = ItineraryItem.builder().id(2L).displayOrder(1).visitDate(TOMORROW)
+                .scheduledTime("14:00").isPinned(true).build();
+        Itinerary itinerary = Itinerary.builder()
+                .id(8L).sessionUuid(SESSION).startDate(TOMORROW)
+                .items(new ArrayList<>(List.of(p1, p2)))
+                .build();
+        when(itineraryRepository.findById(8L)).thenReturn(Optional.of(itinerary));
+
+        service.optimizeRoute(8L, TOMORROW, null, null, null);
+
+        verify(routeRecalculationService, never()).recalculate(any(), any(), any(), any());
+        assertEquals("10:00", p1.getScheduledTime());
+        assertEquals("14:00", p2.getScheduledTime());
+    }
+
+    @Test
     void optimizeRoute_blankStartTime_passesNullOverride() {
         ItineraryItem item1 = ItineraryItem.builder().id(1L).displayOrder(0).visitDate(TOMORROW).build();
         ItineraryItem item2 = ItineraryItem.builder().id(2L).displayOrder(1).visitDate(TOMORROW).build();

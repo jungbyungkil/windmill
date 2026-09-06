@@ -857,22 +857,45 @@ public class ItineraryService {
     public OptimizeRouteResult optimizeRoute(Long itineraryId, LocalDate date,
                                              Double originLon, Double originLat, String startTime) {
         Itinerary itinerary = get(itineraryId);
-        List<ItineraryItem> targets = itinerary.getItems().stream()
+        List<ItineraryItem> dayItems = itinerary.getItems().stream()
                 .filter(i -> date == null
                         || date.equals(i.getVisitDate())
                         || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
+                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
                 .collect(Collectors.toList());
-        if (targets.size() < 2) {
+        if (dayItems.size() < 2) {
             return new OptimizeRouteResult(itinerary, null, null);
         }
 
+        // 고정(pin)한 앵커 - 시각이 박혀 있으면 자리·시각을 그대로 두고, 나머지만 최단 순서로 다시 잡는다.
+        List<ItineraryItem> pinned = dayItems.stream()
+                .filter(i -> i.isPinned() && ClosingTimeGate.parseHhMm(i.getScheduledTime()) != null)
+                .collect(Collectors.toList());
+        List<ItineraryItem> movable = dayItems.stream()
+                .filter(i -> !pinned.contains(i))
+                .collect(Collectors.toList());
+
         LocalTime overrideStartTime = ClosingTimeGate.parseHhMm(startTime);
-        RouteRecalculationService.Result recalc =
-                routeRecalculationService.recalculate(targets, originLon, originLat, overrideStartTime);
-        List<ItineraryItem> finalOrder = recalc.ordered();
+        List<ItineraryItem> finalOrder;
+        String message;
+        if (movable.size() < 2) {
+            // 다시 잡을 게 없다(전부 고정이거나 이동 가능 1곳뿐) - 순서만 유지
+            finalOrder = dayItems;
+            message = null;
+        } else {
+            RouteRecalculationService.Result recalc =
+                    routeRecalculationService.recalculate(movable, originLon, originLat, overrideStartTime);
+            finalOrder = pinned.isEmpty()
+                    ? recalc.ordered()
+                    : mergeByScheduledTime(recalc.ordered(), pinned);
+            message = recalc.message();
+            if (message != null && !pinned.isEmpty()) {
+                message = message + " 고정한 일정은 그대로 뒀어요.";
+            }
+        }
 
         int orderBase = itinerary.getItems().stream()
-                .filter(i -> targets.stream().noneMatch(t -> t.getId().equals(i.getId())))
+                .filter(i -> dayItems.stream().noneMatch(t -> t.getId().equals(i.getId())))
                 .mapToInt(ItineraryItem::getDisplayOrder)
                 .max()
                 .orElse(-1) + 1;
@@ -887,7 +910,29 @@ public class ItineraryService {
                 finalOrder.stream().filter(this::itemHasCoords).toList(),
                 oLon, oLat,
                 ItineraryItem::getMapX, ItineraryItem::getMapY);
-        return new OptimizeRouteResult(saved, recalc.message(), km);
+        return new OptimizeRouteResult(saved, message, km);
+    }
+
+    /**
+     * 최단 순서로 다시 잡힌 이동 항목들(recalculated) 사이사이에 고정 앵커를 <b>제 시각 위치</b>로
+     * 끼워 넣는다 - 앵커의 scheduledTime보다 늦은 첫 항목 앞에 둔다. 앵커의 시각·체류는 손대지 않는다.
+     */
+    private static List<ItineraryItem> mergeByScheduledTime(List<ItineraryItem> recalculated,
+                                                            List<ItineraryItem> pinned) {
+        List<ItineraryItem> merged = new ArrayList<>(recalculated);
+        for (ItineraryItem anchor : pinned) {
+            LocalTime at = ClosingTimeGate.parseHhMm(anchor.getScheduledTime());
+            int pos = 0;
+            while (pos < merged.size()) {
+                LocalTime t = ClosingTimeGate.parseHhMm(merged.get(pos).getScheduledTime());
+                if (t != null && at != null && t.isAfter(at)) {
+                    break;
+                }
+                pos++;
+            }
+            merged.add(pos, anchor);
+        }
+        return merged;
     }
 
     /**
