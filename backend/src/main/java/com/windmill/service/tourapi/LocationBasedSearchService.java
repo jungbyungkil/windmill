@@ -83,7 +83,14 @@ public class LocationBasedSearchService {
         String qy = LocationCacheKeys.formatCoord(mapY);
         return korServiceClient.locationBasedList(qx, qy, r, contentTypeId, rows, page)
                 .map(this::toPlaces)
-                .doOnNext(list -> cache.put(key, list));
+                .doOnNext(list -> {
+                    cache.put(key, list);
+                    if (list.isEmpty()) {
+                        log.warn("[KorService2] locationBasedList2 0건 key={} - 좌표/반경/타입을 확인", key);
+                    } else {
+                        log.info("[KorService2] locationBasedList2 {}건 key={}", list.size(), key);
+                    }
+                });
     }
 
     private List<NearbyPlaceResponse> toPlaces(List<JsonNode> items) {

@@ -74,7 +74,11 @@ export default function ItineraryList({
   const closedDayIds = toIdSet(closedDayAffectedItemIds);
   const hoursEndedIds = toIdSet(hoursEndedAffectedItemIds);
   const crowdIds = toIdSet(crowdAffectedItemIds);
-  const heroHasCta = Boolean(trigger && trigger.level && trigger.level !== 'NORMAL');
+  const heroHasRouteCta = Boolean(
+    trigger?.travelTimeTrigger
+    || trigger?.routeTangleTrigger
+    || (trigger?.hoursEndedTrigger && !trigger?.closedDayTrigger),
+  );
 
   return (
     <div className="itinerary-list">
@@ -105,7 +109,7 @@ export default function ItineraryList({
           crowdAffectedItemIds={[...crowdIds]}
           onOptimizeFromGps={onOptimizeFromGps}
           gpsOptimizing={gpsOptimizing}
-          showRouteActions={!heroHasCta}
+          showRouteActions={!heroHasRouteCta}
         />
       )}
 

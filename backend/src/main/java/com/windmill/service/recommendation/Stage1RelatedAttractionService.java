@@ -9,6 +9,7 @@ import com.windmill.client.TourApiArrange;
 import com.windmill.domain.RecommendThemeTag;
 import com.windmill.dto.RegionCode;
 import com.windmill.dto.RelatedCandidate;
+import com.windmill.util.GeoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -35,6 +37,10 @@ public class Stage1RelatedAttractionService {
     private static final int MAX_CANDIDATES = 20;
     /** TourAPI contentTypeId 14 = 문화시설(박물관/미술관/전시관 등) - 우천 시 실내 대체 코스 재검색 기준 */
     private static final int INDOOR_CONTENT_TYPE_ID = 14;
+    /** 이름 조인 시 인기순 1건만 쓰면 "DDP"가 먼 동명이인/다른 시설로 붙을 수 있어 여러 건을 보고 고른다 */
+    private static final int RESOLVE_KEYWORD_ROWS = 10;
+    /** 카카오/지도에서 고른 좌표와 TourAPI 후보를 같은 장소로 인정하는 최대 거리 */
+    static final double RESOLVE_MAX_DISTANCE_KM = 1.5;
 
     private final RelatedAttractionClient relatedAttractionClient;
     private final KorServiceClient korServiceClient;
@@ -485,28 +491,105 @@ public class Stage1RelatedAttractionService {
             // 반려동물동반 소스(fetchPetFriendly)는 이미 contentId가 채워져 있어 재조회 불필요
             return Mono.just(candidate);
         }
-        return korServiceClient.searchKeyword(candidate.getPlaceName(), null, regnCd, signguCd, 1, 1)
-                .map(items -> {
-                    if (items.isEmpty()) {
-                        log.warn("[Stage1] '{}' KorService2 이름매칭 실패 - 후보에서 제외", candidate.getPlaceName());
-                        return candidate;
-                    }
-                    JsonNode match = items.get(0);
-                    candidate.setContentId(match.path("contentid").asText(null));
-                    String typeId = match.path("contenttypeid").asText(null);
-                    candidate.setContentTypeId(typeId == null ? null : Integer.valueOf(typeId));
-                    String thumbnail = match.path("firstimage").asText(null);
-                    candidate.setThumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail);
-                    if (blankToNull(candidate.getMapX()) == null) {
-                        candidate.setMapX(blankToNull(match.path("mapx").asText(null)));
-                    }
-                    if (blankToNull(candidate.getMapY()) == null) {
-                        candidate.setMapY(blankToNull(match.path("mapy").asText(null)));
-                    }
-                    return candidate;
-                })
+        return korServiceClient.searchKeyword(candidate.getPlaceName(), null, regnCd, signguCd,
+                        RESOLVE_KEYWORD_ROWS, 1)
+                .map(items -> applyKorMatch(candidate, items))
                 .defaultIfEmpty(candidate)
                 .onErrorReturn(candidate);
+    }
+
+    private RelatedCandidate applyKorMatch(RelatedCandidate candidate, List<JsonNode> items) {
+        if (items == null || items.isEmpty()) {
+            log.warn("[Stage1] '{}' KorService2 이름매칭 실패 - 후보에서 제외", candidate.getPlaceName());
+            return candidate;
+        }
+        JsonNode match = pickKorMatch(candidate, items);
+        if (match == null) {
+            log.warn("[Stage1] '{}' KorService2 후보 {}건 중 좌표/이름 불일치 - 후보에서 제외",
+                    candidate.getPlaceName(), items.size());
+            return candidate;
+        }
+        String pickedName = candidate.getPlaceName();
+        candidate.setContentId(match.path("contentid").asText(null));
+        String typeId = match.path("contenttypeid").asText(null);
+        candidate.setContentTypeId(typeId == null ? null : Integer.valueOf(typeId));
+        String thumbnail = match.path("firstimage").asText(null);
+        candidate.setThumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail);
+        if (blankToNull(candidate.getMapX()) == null) {
+            candidate.setMapX(blankToNull(match.path("mapx").asText(null)));
+        }
+        if (blankToNull(candidate.getMapY()) == null) {
+            candidate.setMapY(blankToNull(match.path("mapy").asText(null)));
+        }
+        String official = blankToNull(match.path("title").asText(null));
+        if (official != null) {
+            if (!official.equals(pickedName)) {
+                log.info("[Stage1] '{}' → '{}' contentId={} 로 확정",
+                        pickedName, official, candidate.getContentId());
+            }
+            candidate.setPlaceName(official);
+        }
+        return candidate;
+    }
+
+    /**
+     * 인기순 1등 대신, 고른 좌표에 가깝고 이름이 맞는 후보를 고른다.
+     * 좌표가 있는데 모두 멀면 null(잘못된 첫 건을 조용히 붙이지 않음).
+     * 좌표가 없으면 이름 점수가 있는 후보를 우선하고, 없으면 기존처럼 1등을 쓴다.
+     */
+    static JsonNode pickKorMatch(RelatedCandidate candidate, List<JsonNode> items) {
+        boolean hasOrigin = blankToNull(candidate.getMapX()) != null && blankToNull(candidate.getMapY()) != null;
+        JsonNode best = null;
+        int bestNameScore = -1;
+        double bestDistance = Double.POSITIVE_INFINITY;
+        for (JsonNode item : items) {
+            int nameScore = nameScore(candidate.getPlaceName(), item.path("title").asText(""));
+            Double dist = null;
+            if (hasOrigin) {
+                dist = GeoUtils.distanceKmSafe(
+                        candidate.getMapX(), candidate.getMapY(),
+                        blankToNull(item.path("mapx").asText(null)),
+                        blankToNull(item.path("mapy").asText(null)));
+                if (dist == null || dist > RESOLVE_MAX_DISTANCE_KM) {
+                    continue;
+                }
+            } else if (nameScore <= 0) {
+                continue;
+            }
+            double distance = dist == null ? Double.POSITIVE_INFINITY : dist;
+            if (best == null || nameScore > bestNameScore
+                    || (nameScore == bestNameScore && distance < bestDistance)) {
+                best = item;
+                bestNameScore = nameScore;
+                bestDistance = distance;
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        if (!hasOrigin && !items.isEmpty()) {
+            return items.get(0);
+        }
+        return null;
+    }
+
+    static int nameScore(String query, String title) {
+        String q = normalizePlaceName(query);
+        String t = normalizePlaceName(title);
+        if (q.isEmpty() || t.isEmpty()) {
+            return 0;
+        }
+        if (q.equals(t) || q.contains(t) || t.contains(q)) {
+            return 2;
+        }
+        return 0;
+    }
+
+    static String normalizePlaceName(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.replaceAll("[\\s()\\[\\]{}·.,/\\-]", "").toLowerCase(Locale.ROOT);
     }
 
     private static String blankToNull(String value) {

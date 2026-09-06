@@ -230,4 +230,19 @@ class ItineraryServiceTimeConflictTest {
 
         assertEquals("17:00", result.getItems().get(0).getScheduledTime());
     }
+
+    @Test
+    void addItem_sameContentIdSameDay_isIdempotent() {
+        ItineraryItem ddp = existing(1, 0, "동대문디자인플라자", "14:00");
+        ddp.setContentId("ddp-1");
+        itineraryWith(ddp);
+
+        AddItineraryItemRequest request = candidate("DDP", null, null);
+        request.setContentId("ddp-1");
+
+        Itinerary result = service.addItem(ITINERARY_ID, request);
+
+        assertEquals(1, result.getItems().size());
+        assertEquals("동대문디자인플라자", result.getItems().get(0).getPlaceName());
+    }
 }

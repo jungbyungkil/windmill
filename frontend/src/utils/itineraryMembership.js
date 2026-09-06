@@ -20,13 +20,6 @@ export function normalizePlaceName(name) {
   return String(name || '').replace(/\s+/g, '').toLowerCase();
 }
 
-function namesCompatible(placeName, itemName) {
-  const a = normalizePlaceName(placeName);
-  const b = normalizePlaceName(itemName);
-  if (!a || !b) return true;
-  return a === b || a.includes(b) || b.includes(a);
-}
-
 /**
  * @param {object} place 검색 결과 또는 일정 항목
  * @param {object[]} itineraryItems
@@ -39,11 +32,9 @@ export function isPlaceInItinerary(place, itineraryItems = [], pendingAddedIds, 
   if (pendingRemovedIds?.has(id)) return false;
   if (pendingAddedIds?.has(id)) return true;
 
-  const name = place?.placeName || place?.title;
-  return (itineraryItems || []).some((item) => {
-    if (readContentId(item) !== id) return false;
-    return namesCompatible(name, item.placeName);
-  });
+  // 같은 contentId면 같은 장소다. "DDP" vs "동대문디자인플라자"처럼 표기가 달라도
+  // 이름으로 다시 걸러 내면 지도는 미담김, 목록은 담김으로 어긋난다.
+  return (itineraryItems || []).some((item) => readContentId(item) === id);
 }
 
 export function itineraryContentIdSet(itineraryItems = []) {

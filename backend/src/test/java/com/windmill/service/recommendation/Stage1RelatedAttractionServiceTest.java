@@ -58,12 +58,16 @@ class Stage1RelatedAttractionServiceTest {
     }
 
     private static JsonNode korItem(String contentId, String contentTypeId) {
+        return korItem(contentId, contentTypeId, "속초중앙시장", "128.5918", "38.2058");
+    }
+
+    private static JsonNode korItem(String contentId, String contentTypeId, String title, String mapX, String mapY) {
         return MAPPER.createObjectNode()
-                .put("title", "속초중앙시장")
+                .put("title", title)
                 .put("contentid", contentId)
                 .put("contenttypeid", contentTypeId)
-                .put("mapx", "128.5918")
-                .put("mapy", "38.2058");
+                .put("mapx", mapX)
+                .put("mapy", mapY);
     }
 
     @Test
@@ -92,11 +96,11 @@ class Stage1RelatedAttractionServiceTest {
     @Test
     void resolveByNameCascading_widensFromSignguToSidoToNationwideUntilMatchFound() {
         RelatedCandidate picked = RelatedCandidate.builder().placeName("속초중앙시장").mapX("128.591").mapY("38.205").build();
-        when(korServiceClient.searchKeyword(eq("속초중앙시장"), isNull(), eq("51"), eq("51210"), eq(1), eq(1)))
+        when(korServiceClient.searchKeyword(eq("속초중앙시장"), isNull(), eq("51"), eq("51210"), anyInt(), eq(1)))
                 .thenReturn(Mono.just(List.of()));
-        when(korServiceClient.searchKeyword(eq("속초중앙시장"), isNull(), eq("51"), isNull(), eq(1), eq(1)))
+        when(korServiceClient.searchKeyword(eq("속초중앙시장"), isNull(), eq("51"), isNull(), anyInt(), eq(1)))
                 .thenReturn(Mono.just(List.of()));
-        when(korServiceClient.searchKeyword(eq("속초중앙시장"), isNull(), isNull(), isNull(), eq(1), eq(1)))
+        when(korServiceClient.searchKeyword(eq("속초중앙시장"), isNull(), isNull(), isNull(), anyInt(), eq(1)))
                 .thenReturn(Mono.just(List.of(korItem("126508", "12"))));
 
         RelatedCandidate resolved = service.resolveByNameCascading(picked, region).block();
@@ -106,13 +110,47 @@ class Stage1RelatedAttractionServiceTest {
         // 카카오가 이미 준 좌표는 유지된다(narrow-scope 매칭 실패해도 원본 후보 객체를 계속 사용)
         assertEquals("128.591", resolved.getMapX());
         verify(korServiceClient, times(3))
-                .searchKeyword(eq("속초중앙시장"), isNull(), any(), any(), eq(1), eq(1));
+                .searchKeyword(eq("속초중앙시장"), isNull(), any(), any(), anyInt(), eq(1));
+    }
+
+    @Test
+    void resolveByNameCascading_picksNearestOverPopularFirstHit() {
+        RelatedCandidate picked = RelatedCandidate.builder()
+                .placeName("DDP")
+                .mapX("127.009")
+                .mapY("37.566")
+                .build();
+        when(korServiceClient.searchKeyword(eq("DDP"), isNull(), eq("51"), eq("51210"), anyInt(), eq(1)))
+                .thenReturn(Mono.just(List.of(
+                        korItem("gae-1", "12", "개화", "126.794", "37.578"),
+                        korItem("ddp-1", "14", "동대문디자인플라자", "127.0094", "37.5665"))));
+
+        RelatedCandidate resolved = service.resolveByNameCascading(picked, region).block();
+
+        assertEquals("ddp-1", resolved.getContentId());
+        assertEquals("동대문디자인플라자", resolved.getPlaceName());
+        assertEquals(14, resolved.getContentTypeId());
+    }
+
+    @Test
+    void resolveByNameCascading_rejectsFarFirstHitWhenCoordsPresent() {
+        RelatedCandidate picked = RelatedCandidate.builder()
+                .placeName("DDP")
+                .mapX("127.009")
+                .mapY("37.566")
+                .build();
+        when(korServiceClient.searchKeyword(eq("DDP"), isNull(), any(), any(), anyInt(), eq(1)))
+                .thenReturn(Mono.just(List.of(korItem("gae-1", "12", "개화", "126.794", "37.578"))));
+
+        RelatedCandidate resolved = service.resolveByNameCascading(picked, region).block();
+
+        assertNull(resolved.getContentId());
     }
 
     @Test
     void resolveByNameCascading_noMatchAnywhere_leavesContentIdNull() {
         RelatedCandidate picked = RelatedCandidate.builder().placeName("존재하지않는곳").build();
-        when(korServiceClient.searchKeyword(eq("존재하지않는곳"), isNull(), any(), any(), eq(1), eq(1)))
+        when(korServiceClient.searchKeyword(eq("존재하지않는곳"), isNull(), any(), any(), anyInt(), eq(1)))
                 .thenReturn(Mono.just(List.of()));
 
         RelatedCandidate resolved = service.resolveByNameCascading(picked, region).block();

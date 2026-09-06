@@ -102,7 +102,7 @@ class ItineraryServiceDeleteReplaceTest {
                 .build();
         when(tourAttractionService.getDetail("backup-1", 12)).thenReturn(Mono.just(detail));
 
-        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L);
+        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L, true, true);
 
         assertEquals("창덕궁", result.autoReplacedPlaceName());
         assertEquals(1, result.itinerary().getItems().size());
@@ -111,6 +111,22 @@ class ItineraryServiceDeleteReplaceTest {
         assertEquals("backup-1", replaced.getContentId());
         assertEquals("10:00", replaced.getScheduledTime());
         assertTrue(replaced.isAlternate());
+    }
+
+    @Test
+    void deleteWithBackup_defaultDoesNotReplace() {
+        itineraryWith(itemWithBackup(1, 0, "경복궁", "10:00", "backup-1"));
+        TourAttractionDetail detail = TourAttractionDetail.builder()
+                .contentId("backup-1")
+                .title("창덕궁")
+                .introFields(Map.of("usetime", "09:00~18:00"))
+                .build();
+        when(tourAttractionService.getDetail("backup-1", 12)).thenReturn(Mono.just(detail));
+
+        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L);
+
+        assertNull(result.autoReplacedPlaceName());
+        assertTrue(result.itinerary().getItems().isEmpty());
     }
 
     /** 예비 후보가 그 사이 마감시간이 당겨져 지금은 무효 - 재조회 폴백 없이 그냥 빈 자리로 남는다 */
@@ -124,7 +140,7 @@ class ItineraryServiceDeleteReplaceTest {
                 .build();
         when(tourAttractionService.getDetail("backup-1", 12)).thenReturn(Mono.just(detail));
 
-        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L);
+        ItineraryService.DeleteItemResult result = service.deleteItem(ITINERARY_ID, 1L, true, true);
 
         assertNull(result.autoReplacedPlaceName());
         assertTrue(result.itinerary().getItems().isEmpty());
@@ -165,8 +181,8 @@ class ItineraryServiceDeleteReplaceTest {
                 .toList();
         assertEquals(2, remaining.size());
         assertEquals("10:00", remaining.get(0).getScheduledTime());
-        // 경복궁 10:00 + 75분 체류 + 기본 이동 20분 = 11:35
-        assertEquals("11:35", remaining.get(1).getScheduledTime());
+        // 경복궁 10:00 + 관광 기본 체류 45분 + 좌표 없을 때 기본 이동 10분 = 10:55
+        assertEquals("10:55", remaining.get(1).getScheduledTime());
         assertEquals("북촌한옥마을", remaining.get(1).getPlaceName());
     }
 

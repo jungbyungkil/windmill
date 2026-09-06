@@ -340,7 +340,14 @@ function DayRouteMapCanvas({
       return next;
     });
     try {
-      await onAddPlace?.(place);
+      const saved = await onAddPlace?.(place);
+      if (saved === null || saved === false) {
+        setOptimisticAdded((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
     } catch {
       setOptimisticAdded((prev) => {
         const next = new Set(prev);

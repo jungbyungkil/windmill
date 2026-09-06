@@ -111,7 +111,7 @@ export default function SmartPlanScreen({
                 <span className="leg-chip">{stop.category}</span>
               )}
               {stop.backupPlaceName && (
-                <span className="leg-chip" title={`삭제하면 "${stop.backupPlaceName}"로 자동 교체돼요`}>
+                <span className="leg-chip" title={`예비: ${stop.backupPlaceName}`}>
                   🔁 예비 후보 있음
                 </span>
               )}

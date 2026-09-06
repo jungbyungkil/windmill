@@ -140,8 +140,9 @@ public class ItineraryController {
     public Mono<ResponseEntity<ItineraryResponse>> deleteItem(
             @PathVariable Long id,
             @PathVariable Long itemId,
-            @RequestParam(defaultValue = "true") boolean reflow) {
-        return Mono.fromCallable(() -> itineraryService.deleteItem(id, itemId, reflow))
+            @RequestParam(defaultValue = "true") boolean reflow,
+            @RequestParam(defaultValue = "false") boolean replaceBackup) {
+        return Mono.fromCallable(() -> itineraryService.deleteItem(id, itemId, reflow, replaceBackup))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(result -> {
                     ItineraryResponse body = toResponse(result.itinerary());

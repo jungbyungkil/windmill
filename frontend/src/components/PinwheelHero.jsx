@@ -29,31 +29,39 @@ function primaryAvoidHint(trigger) {
   return undefined;
 }
 
-/** 펼친 히어로에 원인당 버튼 하나. 우선순위는 caption()과 같다. */
-function resolvePrimaryCta(trigger) {
-  if (!trigger) return null;
-  if (trigger.travelTimeTrigger) {
-    return { kind: 'route', label: '동선 다시' };
-  }
-  if (trigger.heatTrigger) {
-    return { kind: 'reroute', hint: 'HEAT', label: '실내로 바꾸기' };
-  }
-  if (trigger.weatherTrigger) {
-    return { kind: 'reroute', hint: 'WEATHER', label: '실내로 바꾸기' };
-  }
-  if (trigger.hoursEndedTrigger && !trigger.closedDayTrigger) {
-    return { kind: 'route', label: '동선 다시' };
-  }
+function hasRouteCta(trigger) {
+  return Boolean(
+    trigger?.travelTimeTrigger
+    || trigger?.routeTangleTrigger
+    || (trigger?.hoursEndedTrigger && !trigger?.closedDayTrigger),
+  );
+}
+
+/**
+ * 펼친 히어로 CTA. 첫 버튼은 caption()과 같은 우선순위.
+ * 휴무+동선 꼬임처럼 원인이 겹치면 버튼을 같이 보여 준다 — 예전엔 휴무가
+ * 「다른 장소 보기」만 남기고 「동선 다시」를 가렸다.
+ */
+function resolveCtas(trigger) {
+  if (!trigger) return [];
+  const ctas = [];
+  const add = (cta) => {
+    if (!cta) return;
+    if (ctas.some((c) => c.kind === cta.kind && c.hint === cta.hint)) return;
+    ctas.push(cta);
+  };
+  if (trigger.travelTimeTrigger) add({ kind: 'route', label: '동선 다시' });
+  if (trigger.heatTrigger) add({ kind: 'reroute', hint: 'HEAT', label: '실내로 바꾸기' });
+  if (trigger.weatherTrigger) add({ kind: 'reroute', hint: 'WEATHER', label: '실내로 바꾸기' });
+  if (trigger.crowdTrigger) add({ kind: 'reroute', hint: 'CROWD', label: '한산한 곳으로' });
+  if (hasRouteCta(trigger)) add({ kind: 'route', label: '동선 다시' });
   if (trigger.closedDayTrigger) {
-    return { kind: 'alternatives', hint: 'BUSINESS', label: '다른 장소 보기' };
+    add({ kind: 'alternatives', hint: 'BUSINESS', label: '다른 장소 보기' });
   }
-  if (trigger.crowdTrigger) {
-    return { kind: 'reroute', hint: 'CROWD', label: '한산한 곳으로' };
+  if (ctas.length === 0) {
+    add({ kind: 'alternatives', hint: primaryAvoidHint(trigger), label: '다른 장소 보기' });
   }
-  if (trigger.routeTangleTrigger) {
-    return { kind: 'route', label: '동선 다시' };
-  }
-  return { kind: 'alternatives', hint: primaryAvoidHint(trigger), label: '다른 장소 보기' };
+  return ctas;
 }
 
 /**
@@ -85,29 +93,32 @@ export default function PinwheelHero({
   const weatherAlert = heatMode || rainMode;
   const calm = (Boolean(trigger) && !interactive) || (compactWhenIdle && !interactive);
 
-  const primaryCta = interactive ? resolvePrimaryCta(trigger) : null;
-  const ctaBusy = Boolean(
-    (primaryCta?.kind === 'route' && optimizeLoading)
-    || (primaryCta?.kind === 'reroute' && rerouteLoading)
-    || (primaryCta?.kind === 'alternatives' && loading),
-  );
+  const ctas = interactive ? resolveCtas(trigger) : [];
+  const primaryCta = ctas[0] || null;
 
-  function runPrimaryCta() {
-    if (!primaryCta || ctaBusy) return;
-    if (primaryCta.kind === 'route') {
+  function ctaBusy(cta) {
+    if (!cta) return false;
+    if (cta.kind === 'route') return Boolean(optimizeLoading);
+    if (cta.kind === 'reroute') return Boolean(rerouteLoading);
+    return Boolean(loading);
+  }
+
+  function runCta(cta) {
+    if (!cta || ctaBusy(cta)) return;
+    if (cta.kind === 'route') {
       onOptimizeRoute?.();
       return;
     }
-    if (primaryCta.kind === 'reroute') {
-      onRerouteSchedule?.(primaryCta.hint);
+    if (cta.kind === 'reroute') {
+      onRerouteSchedule?.(cta.hint);
       return;
     }
-    onRequestAlternatives?.(primaryCta.hint);
+    onRequestAlternatives?.(cta.hint);
   }
 
   function handleActivate() {
     if (!interactive) return;
-    runPrimaryCta();
+    runCta(primaryCta);
   }
 
   function caption() {
@@ -197,18 +208,21 @@ export default function PinwheelHero({
             </ul>
           )}
 
-          {interactive && primaryCta && (
+          {interactive && ctas.length > 0 && (
             <div className="pinwheel-cta-row">
-              <button
-                type="button"
-                className="btn-pinwheel-cta"
-                onClick={runPrimaryCta}
-                disabled={ctaBusy}
-              >
-                {ctaBusy
-                  ? (primaryCta.kind === 'route' ? '동선 다시 짜는 중...' : primaryCta.kind === 'reroute' ? '바꾸는 중...' : '찾는 중...')
-                  : primaryCta.label}
-              </button>
+              {ctas.map((cta, index) => (
+                <button
+                  key={`${cta.kind}-${cta.hint || 'none'}`}
+                  type="button"
+                  className={`btn-pinwheel-cta${index > 0 ? ' secondary' : ''}`}
+                  onClick={() => runCta(cta)}
+                  disabled={ctaBusy(cta)}
+                >
+                  {ctaBusy(cta)
+                    ? (cta.kind === 'route' ? '동선 다시 짜는 중...' : cta.kind === 'reroute' ? '바꾸는 중...' : '찾는 중...')
+                    : cta.label}
+                </button>
+              ))}
             </div>
           )}
 

@@ -280,6 +280,11 @@ public class ItineraryService {
     public Itinerary addItem(Long itineraryId, AddItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);
         LocalDate visitDate = request.getVisitDate() != null ? request.getVisitDate() : itinerary.getStartDate();
+        if (alreadyHasPlace(itinerary, request.getContentId(), visitDate)) {
+            log.info("[addItem] 이미 담긴 장소 재추가 무시 itineraryId={} contentId={} place={}",
+                    itineraryId, request.getContentId(), request.getPlaceName());
+            return itinerary;
+        }
         List<String> tags = PlaceTagSanitizer.sanitizeStored(
                 request.getTags(), request.getContentTypeId(), request.getPlaceName(), request.getCategory());
         PlaceSituationalTags situational = situationalTagService.ensureInferred(
@@ -360,7 +365,23 @@ public class ItineraryService {
             item.setDisplayOrder(itinerary.getItems().size());
         }
         itinerary.getItems().add(item);
+        log.info("[addItem] 저장 itineraryId={} place={} contentId={} time={}",
+                itineraryId, item.getPlaceName(), item.getContentId(), scheduledTime);
         return itineraryRepository.save(itinerary);
+    }
+
+    /** 같은 날 같은 contentId가 이미 있으면 중복 행을 만들지 않는다. */
+    private static boolean alreadyHasPlace(Itinerary itinerary, String contentId, LocalDate visitDate) {
+        if (contentId == null || contentId.isBlank()) {
+            return false;
+        }
+        return itinerary.getItems().stream().anyMatch(item -> {
+            if (!contentId.equals(item.getContentId())) {
+                return false;
+            }
+            LocalDate itemDate = item.getVisitDate() != null ? item.getVisitDate() : itinerary.getStartDate();
+            return visitDate.equals(itemDate);
+        });
     }
 
     /**
@@ -617,7 +638,7 @@ public class ItineraryService {
      */
     @Transactional
     public DeleteItemResult deleteItem(Long itineraryId, Long itemId) {
-        return deleteItem(itineraryId, itemId, true);
+        return deleteItem(itineraryId, itemId, true, false);
     }
 
     /**
@@ -625,6 +646,15 @@ public class ItineraryService {
      */
     @Transactional
     public DeleteItemResult deleteItem(Long itineraryId, Long itemId, boolean reflowTimes) {
+        return deleteItem(itineraryId, itemId, reflowTimes, false);
+    }
+
+    /**
+     * @param replaceBackup true일 때만 예비 후보로 자리를 채운다. 기본 삭제는 빈 자리로 둔다 —
+     *                      자리를 비워 DDP 같은 장소를 넣으려다 예비 장소로 다시 채워지는 오해를 막기 위함.
+     */
+    @Transactional
+    public DeleteItemResult deleteItem(Long itineraryId, Long itemId, boolean reflowTimes, boolean replaceBackup) {
         Itinerary itinerary = get(itineraryId);
         ItineraryItem removed = itinerary.getItems().stream()
                 .filter(i -> i.getId().equals(itemId))
@@ -641,7 +671,7 @@ public class ItineraryService {
         itinerary.getItems().removeIf(i -> i.getId().equals(itemId));
 
         ItineraryItem replacement = null;
-        if (backupContentId != null && backupContentTypeId != null) {
+        if (replaceBackup && backupContentId != null && backupContentTypeId != null) {
             replacement = tryBackupReplacement(itinerary, backupContentId, backupContentTypeId,
                     scheduledTime, visitDate, displayOrder);
         }

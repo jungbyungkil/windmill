@@ -94,8 +94,8 @@ export function updateItem(itineraryId, itemId, patch) {
   return request(`/itineraries/${itineraryId}/items/${itemId}`, { method: 'PATCH', body: patch });
 }
 
-export function deleteItem(itineraryId, itemId, { reflow = true } = {}) {
-  return request(`/itineraries/${itineraryId}/items/${itemId}${qs({ reflow })}`, { method: 'DELETE' });
+export function deleteItem(itineraryId, itemId, { reflow = true, replaceBackup = false } = {}) {
+  return request(`/itineraries/${itineraryId}/items/${itemId}${qs({ reflow, replaceBackup })}`, { method: 'DELETE' });
 }
 
 /** origin이 있으면 "다음 장소까지 이동시간" 트리거도 함께 판정됨 (위치 권한 없으면 생략) */

@@ -799,7 +799,7 @@ export default function App() {
   async function handleMapAddPlace(place) {
     setAddingContentId(place.contentId);
     try {
-      await addCandidateToItinerary({
+      const result = await addCandidateToItinerary({
         contentId: place.contentId,
         contentTypeId: Number.isFinite(Number(place.contentTypeId)) ? Number(place.contentTypeId) : undefined,
         placeName: place.placeName,
@@ -811,6 +811,11 @@ export default function App() {
         category: place.category,
         cat3: place.cat3,
       });
+      // 휴무 경고를 취소하면 null — 지도 낙관적 "담김"을 되돌려야 해서 throw
+      if (!result) {
+        throw new Error('not-added');
+      }
+      return result;
     } finally {
       setAddingContentId(null);
     }
@@ -963,10 +968,11 @@ export default function App() {
         ? trigger.weatherAffectedItemIds
         : (trigger?.affectedItemIds || [])).map(Number);
       const affectedIds = avoidHint === 'CROWD' ? crowdIds : weatherIds;
-      const affectedItems = itinerary.items.filter((i) => affectedIds.includes(Number(i.itemId)));
+      const affectedItems = itinerary.items.filter((i) => affectedIds.includes(Number(i.itemId)) && !i.pinned);
       const targets = affectedItems.length > 0
         ? affectedItems
         : itinerary.items.filter((i) => {
+            if (i.pinned) return false;
             if ((i.visitDate || itinerary.startDate) !== activeDate) return false;
             if (avoidHint === 'CROWD') return (i.crowdRate ?? 0) >= 70;
             const tags = i.tags || [];
