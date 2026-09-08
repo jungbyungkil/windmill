@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +32,13 @@ class FestivalTriggerServiceTest {
             .signguFullCode("26350")
             .lDongRegnCd("26")
             .lDongSignguCd("350")
+            .build();
+    private static final RegionCode CHUNCHEON = RegionCode.builder()
+            .sidoName("강원특별자치도")
+            .signguName("춘천시")
+            .signguFullCode("51110")
+            .lDongRegnCd("51")
+            .lDongSignguCd("110")
             .build();
     private static final LocalDate TRIP_START = LocalDate.of(2026, 8, 24);
     private static final LocalDate TRIP_END = LocalDate.of(2026, 8, 24);
@@ -72,6 +78,46 @@ class FestivalTriggerServiceTest {
     }
 
     @Test
+    void matchesSigungu_keepsChuncheonAndDropsOtherGangwonCities() {
+        // 같은 강원도라 matchesRegion은 둘 다 통과하지만, 시·군·구가 다르면 제외돼야 한다
+        JsonNode chuncheon = festival("춘천마임축제", "51", "강원특별자치도 춘천시 스포츠타운길");
+        JsonNode donghae = festival("동해무릉제", "51", "강원특별자치도 동해시 무릉로");
+
+        assertTrue(FestivalTriggerService.matchesRegion(chuncheon, CHUNCHEON));
+        assertTrue(FestivalTriggerService.matchesRegion(donghae, CHUNCHEON));
+        assertTrue(FestivalTriggerService.matchesSigungu(chuncheon, CHUNCHEON));
+        assertFalse(FestivalTriggerService.matchesSigungu(donghae, CHUNCHEON));
+    }
+
+    @Test
+    void matchesSigungu_usesStructuredCodeWhenPresent() {
+        ObjectNode byCode = MAPPER.createObjectNode()
+                .put("title", "축제")
+                .put("ldongregncd", "51")
+                .put("ldongsigngucd", "110");
+        ObjectNode otherCity = MAPPER.createObjectNode()
+                .put("title", "축제")
+                .put("ldongregncd", "51")
+                .put("ldongsigngucd", "170");
+
+        assertTrue(FestivalTriggerService.matchesSigungu(byCode, CHUNCHEON));
+        assertFalse(FestivalTriggerService.matchesSigungu(otherCity, CHUNCHEON));
+    }
+
+    @Test
+    void filterAndMap_dropsOtherCityFestivalsInSameProvince() {
+        List<JsonNode> mixed = List.of(
+                festival("동해무릉제", "51", "강원특별자치도 동해시 무릉로 92"),
+                festival("강릉단오제", "51", "강원특별자치도 강릉시 단오장길"),
+                festival("춘천마임축제", "51", "강원특별자치도 춘천시 스포츠타운길 32")
+        );
+
+        List<FestivalSuggestion> result = FestivalTriggerService.filterAndMap(mixed, CHUNCHEON, TRIP_START, TRIP_END);
+
+        assertEquals(List.of("춘천마임축제"), result.stream().map(FestivalSuggestion::getPlaceName).toList());
+    }
+
+    @Test
     void filterAndMap_doesNotSuggestSeoulWhenTripIsBusan() {
         List<JsonNode> mixed = List.of(
                 festival("팔색찬란", "11", "서울특별시 종로구 효자로13길 45"),
@@ -95,7 +141,7 @@ class FestivalTriggerServiceTest {
                 .thenReturn(Mono.just(List.of(seoul)));
         when(kor.searchFestival(anyString(), eq("6"), anyInt(), eq(2)))
                 .thenReturn(Mono.just(List.of()));
-        when(kor.areaBasedList(eq(FestivalTriggerService.FESTIVAL_CONTENT_TYPE_ID), eq("26"), isNull(),
+        when(kor.areaBasedList(eq(FestivalTriggerService.FESTIVAL_CONTENT_TYPE_ID), eq("26"), eq("350"),
                 anyInt(), anyInt(), anyString()))
                 .thenReturn(Mono.just(List.of(busan)));
         when(kor.detailCommon(anyString())).thenReturn(Mono.empty());
@@ -103,7 +149,7 @@ class FestivalTriggerServiceTest {
         List<FestivalSuggestion> result = service.findDuringTrip(BUSAN, TRIP_START, TRIP_END).block();
 
         assertEquals(List.of("부산바다축제"), result.stream().map(FestivalSuggestion::getPlaceName).toList());
-        verify(kor).areaBasedList(eq(FestivalTriggerService.FESTIVAL_CONTENT_TYPE_ID), eq("26"), isNull(),
+        verify(kor).areaBasedList(eq(FestivalTriggerService.FESTIVAL_CONTENT_TYPE_ID), eq("26"), eq("350"),
                 anyInt(), anyInt(), anyString());
     }
 
@@ -111,7 +157,7 @@ class FestivalTriggerServiceTest {
     void findDuringTrip_queriesTourApiAreaCodeNotLDong() {
         KorServiceClient kor = mock(KorServiceClient.class);
         FestivalTriggerService service = new FestivalTriggerService(kor);
-        JsonNode busan = festival("부산바다축제", "26", "부산광역시 중구");
+        JsonNode busan = festival("부산바다축제", "26", "부산광역시 해운대구 중동");
 
         when(kor.searchFestival(anyString(), eq("6"), anyInt(), anyInt()))
                 .thenReturn(Mono.just(List.of(busan)));

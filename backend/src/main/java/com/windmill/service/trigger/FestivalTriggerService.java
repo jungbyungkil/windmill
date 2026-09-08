@@ -48,7 +48,10 @@ public class FestivalTriggerService {
             return Mono.just(List.of());
         }
         String regn = region.getLDongRegnCd();
-        String cacheKey = regn + ":" + tripStart.format(YYYYMMDD) + ":" + tripEnd.format(YYYYMMDD) + ":sido";
+        // 시·군·구 단위로 거르므로(춘천시 여행에 동해 무릉제가 섞이던 문제) 캐시 키도 시군구까지 포함해야
+        // 같은 도의 다른 시·군·구가 서로의 결과를 재사용하지 않는다.
+        String sigunguKey = region.getSignguFullCode() != null ? region.getSignguFullCode() : regn;
+        String cacheKey = sigunguKey + ":" + tripStart.format(YYYYMMDD) + ":" + tripEnd.format(YYYYMMDD) + ":sigungu";
         List<FestivalSuggestion> cached = cache.get(cacheKey);
         if (cached != null) {
             return Mono.just(cached);
@@ -93,9 +96,10 @@ public class FestivalTriggerService {
      */
     private Mono<List<FestivalSuggestion>> fromAreaBasedList(RegionCode region, LocalDate tripStart,
                                                              LocalDate tripEnd) {
-        return korServiceClient.areaBasedList(FESTIVAL_CONTENT_TYPE_ID, region.getLDongRegnCd(), null, 40, 1, "C")
+        return korServiceClient.areaBasedList(FESTIVAL_CONTENT_TYPE_ID, region.getLDongRegnCd(),
+                        region.getLDongSignguCd(), 40, 1, "C")
                 .flatMapMany(Flux::fromIterable)
-                .filter(item -> matchesRegion(item, region))
+                .filter(item -> matchesRegion(item, region) && matchesSigungu(item, region))
                 .concatMap(this::withEventDates)
                 .map(item -> filterAndMap(List.of(item), region, tripStart, tripEnd))
                 .filter(list -> !list.isEmpty())
@@ -142,7 +146,7 @@ public class FestivalTriggerService {
             return result;
         }
         for (JsonNode item : items) {
-            if (!matchesRegion(item, region)) {
+            if (!matchesRegion(item, region) || !matchesSigungu(item, region)) {
                 continue;
             }
             LocalDate eventStart = parseDate(text(item, "eventstartdate", "eventStartDate"));
@@ -199,6 +203,31 @@ public class FestivalTriggerService {
         }
         String addr = text(item, "addr1");
         return matchesSidoAddress(addr, region.getSidoName());
+    }
+
+    /**
+     * 시·군·구 단위 일치. searchFestival2는 시·도(areaCode) 단위로만 걸러 주므로 같은 도의 다른
+     * 시·군·구 축제가 섞인다(강원 춘천시 여행에 동해 무릉제가 담겨 동선이 꼬이던 문제).
+     * 구조화 코드(lDongSignguCd)가 있으면 그걸로, 없으면 주소(addr1)에 시·군·구 이름이 들어있는지로
+     * 판정한다. 둘 다 확인 불가면 제외한다 - 다른 도시 축제로 동선이 꼬이느니 그 지역 인기 장소로
+     * 채우는 편이 낫다(사용자 요구).
+     */
+    static boolean matchesSigungu(JsonNode item, RegionCode region) {
+        if (item == null || region == null) {
+            return false;
+        }
+        String signguName = region.getSignguName();
+        // 시·군·구 구분이 없는 지역(세종특별자치시 등)은 시·도 일치로 충분
+        if (signguName == null || signguName.isBlank()
+                || signguName.equals(region.getSidoName())) {
+            return true;
+        }
+        String itemSigngu = text(item, "ldongsigngucd", "lDongSignguCd");
+        if (itemSigngu != null && !itemSigngu.isBlank() && region.getLDongSignguCd() != null) {
+            return itemSigngu.equals(region.getLDongSignguCd());
+        }
+        String addr = text(item, "addr1");
+        return addr != null && addr.contains(signguName);
     }
 
     static boolean matchesSidoAddress(String addr1, String sidoName) {
