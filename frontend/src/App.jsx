@@ -25,6 +25,7 @@ import ClosingGateModal from './components/ClosingGateModal';
 import HoursWarningModal from './components/HoursWarningModal';
 import SuggestRouteCompare from './components/SuggestRouteCompare';
 import DuplicateItineraryModal from './components/DuplicateItineraryModal';
+import PlanHistoryPanel from './components/PlanHistoryPanel';
 import GlobalMenu from './components/GlobalMenu';
 import AlertFeedScreen from './components/AlertFeedScreen';
 import MyTripsScreen from './components/MyTripsScreen';
@@ -131,6 +132,9 @@ export default function App() {
   const [altLoading, setAltLoading] = useState(false);
   const [altReason, setAltReason] = useState(null);
   const [altError, setAltError] = useState(null);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [reverting, setReverting] = useState(false);
 
   const [docentOpen, setDocentOpen] = useState(false);
   const [docentItem, setDocentItem] = useState(null);
@@ -912,39 +916,44 @@ export default function App() {
       const affectedItem = affectedId ? itinerary.items.find((i) => i.itemId === affectedId) : null;
 
       if (affectedItem) {
-        await api.deleteItem(itineraryId, affectedItem.itemId, { reflow: false });
-        // 원래 있던 시간대를 그대로 넘기다 보니(마감 임박 등으로) 1순위 후보가 그 시각엔 못
-        // 들어갈 수 있다 - 실패하면 다음 후보로 계속 시도하고, 전부 실패했을 때만 안내한다.
+        // 삭제+추가를 서버 한 트랜잭션으로(applyAlternative) - 실패해도 원본 슬롯이 안 사라지고
+        // 변경 이력이 자동으로 한 건 쌓인다. 원래 시간대에 1순위가 마감 등으로 못 들어가면
+        // 다음 후보로 계속 시도하고, 전부 실패했을 때만 안내한다.
         let result = null;
         let replacedWith = null;
         for (const candidate of candidates) {
           try {
-            result = await api.addItem(itineraryId, {
-              contentId: candidate.contentId,
-              contentTypeId: candidate.contentTypeId,
-              placeName: candidate.placeName,
-              thumbnailUrl: candidate.thumbnailUrl,
-              scheduledTime: affectedItem.scheduledTime,
-              tags: candidate.matchedTags,
-              crowdRate: candidate.crowdRate,
-              // 교체 대상이었던 항목이 속했던 날짜를 그대로 유지
-              visitDate: affectedItem.visitDate || itinerary.startDate,
-              addr1: candidate.addr1,
-              tel: candidate.tel,
-              useFeeText: candidate.useFeeText,
-              isFree: candidate.isFree,
-              estimatedCostPerPerson: candidate.estimatedCostPerPerson,
-              restDateText: candidate.restDateText,
-              closeTime: candidate.closeTime,
-              useTimeText: candidate.useTimeText,
-              homepageUrl: candidate.homepageUrl,
-              strollerFriendly: candidate.strollerFriendly,
-              accessibleFriendly: candidate.accessibleFriendly,
-              category: candidate.category,
-              mapX: candidate.mapX,
-              mapY: candidate.mapY,
-              isAlternate: true,
-              ...placeSnapshotFields(candidate),
+            result = await api.applyAlternative(itineraryId, {
+              removedItemId: affectedItem.itemId,
+              newPlace: {
+                contentId: candidate.contentId,
+                contentTypeId: candidate.contentTypeId,
+                placeName: candidate.placeName,
+                thumbnailUrl: candidate.thumbnailUrl,
+                scheduledTime: affectedItem.scheduledTime,
+                tags: candidate.matchedTags,
+                crowdRate: candidate.crowdRate,
+                // 교체 대상이었던 항목이 속했던 날짜를 그대로 유지
+                visitDate: affectedItem.visitDate || itinerary.startDate,
+                addr1: candidate.addr1,
+                tel: candidate.tel,
+                useFeeText: candidate.useFeeText,
+                isFree: candidate.isFree,
+                estimatedCostPerPerson: candidate.estimatedCostPerPerson,
+                restDateText: candidate.restDateText,
+                closeTime: candidate.closeTime,
+                useTimeText: candidate.useTimeText,
+                homepageUrl: candidate.homepageUrl,
+                strollerFriendly: candidate.strollerFriendly,
+                accessibleFriendly: candidate.accessibleFriendly,
+                category: candidate.category,
+                mapX: candidate.mapX,
+                mapY: candidate.mapY,
+                isAlternate: true,
+                ...placeSnapshotFields(candidate),
+              },
+              triggerType: avoidHint,
+              reoptimize: false,
             });
             replacedWith = candidate;
             break;
@@ -1021,67 +1030,84 @@ export default function App() {
         return;
       }
 
+      // 각 교체를 applyAlternative로(삭제+추가 원자적). 마지막 교체에 reoptimize=true를 줘서
+      // 이동시간 기준 동선·시간표 재계산까지 서버에서 한 번에 끝낸다. 교체 건마다 변경 이력이 쌓인다.
       let result = itinerary;
       const used = new Set();
-      for (let i = 0; i < targets.length; i++) {
-        const target = targets[i];
+      const plannedTargets = [];
+      for (const target of targets) {
         const next = candidates.find((c) => c.contentId && !used.has(c.contentId)
           && !result.items.some((it) => it.contentId === c.contentId));
         if (!next) break;
         used.add(next.contentId);
-        await api.deleteItem(itineraryId, target.itemId, { reflow: false });
-        result = await api.addItem(itineraryId, {
-          contentId: next.contentId,
-          contentTypeId: next.contentTypeId,
-          placeName: next.placeName,
-          thumbnailUrl: next.thumbnailUrl,
-          scheduledTime: target.scheduledTime,
-          tags: next.matchedTags?.length ? next.matchedTags : ['#실내'],
-          crowdRate: next.crowdRate,
-          visitDate: target.visitDate || itinerary.startDate,
-          addr1: next.addr1,
-          tel: next.tel,
-          useFeeText: next.useFeeText,
-          isFree: next.isFree,
-          estimatedCostPerPerson: next.estimatedCostPerPerson,
-          restDateText: next.restDateText,
-          homepageUrl: next.homepageUrl,
-          strollerFriendly: next.strollerFriendly,
-          accessibleFriendly: next.accessibleFriendly,
-          category: next.category,
-          mapX: next.mapX,
-          mapY: next.mapY,
-          isAlternate: true,
-          ...placeSnapshotFields(next),
+        plannedTargets.push({ target, next });
+      }
+      for (let i = 0; i < plannedTargets.length; i++) {
+        const { target, next } = plannedTargets[i];
+        result = await api.applyAlternative(itineraryId, {
+          removedItemId: target.itemId,
+          newPlace: {
+            contentId: next.contentId,
+            contentTypeId: next.contentTypeId,
+            placeName: next.placeName,
+            thumbnailUrl: next.thumbnailUrl,
+            scheduledTime: target.scheduledTime,
+            tags: next.matchedTags?.length ? next.matchedTags : ['#실내'],
+            crowdRate: next.crowdRate,
+            visitDate: target.visitDate || itinerary.startDate,
+            addr1: next.addr1,
+            tel: next.tel,
+            useFeeText: next.useFeeText,
+            isFree: next.isFree,
+            estimatedCostPerPerson: next.estimatedCostPerPerson,
+            restDateText: next.restDateText,
+            homepageUrl: next.homepageUrl,
+            strollerFriendly: next.strollerFriendly,
+            accessibleFriendly: next.accessibleFriendly,
+            category: next.category,
+            mapX: next.mapX,
+            mapY: next.mapY,
+            isAlternate: true,
+            ...placeSnapshotFields(next),
+          },
+          triggerType: avoidHint,
+          reoptimize: i === plannedTargets.length - 1,
         });
       }
 
       setItinerary(result);
-      setRerouteCount((n) => n + targets.length);
+      setRerouteCount((n) => n + used.size);
       refreshTrigger();
 
-      // 교체가 끝나면 실제 이동시간 기준으로 그날 동선·시간표를 다시 잡는다(고정 앵커는 유지).
-      const day = activeDate || result.startDate;
-      const dayCount = (result.items || []).filter(
-        (i) => (i.visitDate || result.startDate) === day,
-      ).length;
-      let replanned = result;
-      if (dayCount >= 2) {
-        try {
-          replanned = await api.optimizeRoute(itineraryId, day);
-          setItinerary(replanned);
-        } catch {
-          /* keep swapped order if 동선 재계산 실패 */
-        }
-      }
       setAutoReplaceNotice(
-        `${note} (${used.size}곳 교체) ${replanned.routeHint || '이동시간 기준으로 시간표도 다시 짰어요.'}`,
+        `${note} (${used.size}곳 교체) ${result.routeHint || '이동시간 기준으로 시간표도 다시 짰어요.'}`,
       );
     } catch (e) {
       setAutoReplaceNotice(`일정 교체 실패: ${e.message}`);
     } finally {
       setRerouteLoading(false);
       setTimeout(() => setAutoReplaceNotice(null), 6000);
+    }
+  }
+
+  /** 변경 이력 패널에서 "되돌리기" 확인 후 호출 - targetSequence가 null이면 원본으로. */
+  async function handleRevertPlan(targetSequence) {
+    if (!itineraryId || reverting) return;
+    setReverting(true);
+    setAutoReplaceNotice(null);
+    try {
+      const result = await api.revertPlan(itineraryId, targetSequence);
+      setItinerary(result);
+      setHistoryOpen(false);
+      refreshTrigger();
+      setAutoReplaceNotice(
+        targetSequence == null ? '원본 일정으로 되돌렸어요.' : `변경 이력 #${targetSequence} 시점으로 되돌렸어요.`,
+      );
+    } catch (e) {
+      setAutoReplaceNotice(`되돌리기 실패: ${e.message}`);
+    } finally {
+      setReverting(false);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
     }
   }
 
@@ -1232,13 +1258,17 @@ export default function App() {
 
   /** 동선 재계산 — GPS 있으면 시작점, 없으면 장소만으로 매트릭스 TSP + 시간표.
    *  startTime("HH:mm")을 주면 첫 장소 시각을 사용자가 지정한 그대로 고정한다. */
-  async function handleOptimizeRoute(origin, startTime) {
+  async function handleOptimizeRoute(origin, startTime, recordHistory = false) {
     if (!itineraryId || optimizeLoading) return;
     autoOptimizedRef.current = true;
     setOptimizeLoading(true);
     setAutoReplaceNotice(null);
     try {
-      const result = await api.optimizeRoute(itineraryId, activeDate, origin, startTime);
+      // 사용자가 명시적으로 누른 "동선 재계산"만 변경 이력(ROUTE)으로 남긴다.
+      // GPS 자동 재계산 등 내부 호출은 optimizeRoute(이력 없음)를 쓴다.
+      const result = recordHistory
+        ? await api.applyReroute(itineraryId, activeDate, origin, startTime, '동선 재계산')
+        : await api.optimizeRoute(itineraryId, activeDate, origin, startTime);
       setItinerary(result);
       setAutoReplaceNotice(
         result.routeHint
@@ -1261,7 +1291,7 @@ export default function App() {
     setOptimizeLoading(true);
     setAutoReplaceNotice('동선 재계산 중…');
     if (!navigator.geolocation) {
-      handleOptimizeRoute(null, startTime);
+      handleOptimizeRoute(null, startTime, true);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -1269,11 +1299,11 @@ export default function App() {
         handleOptimizeRoute({
           lon: pos.coords.longitude,
           lat: pos.coords.latitude,
-        }, startTime);
+        }, startTime, true);
       },
       () => {
         // 위치 거부·실패여도 장소 간 매트릭스로 재계산
-        handleOptimizeRoute(null, startTime);
+        handleOptimizeRoute(null, startTime, true);
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
@@ -1587,6 +1617,15 @@ export default function App() {
                   <span className="daytrip-chip">당일치기</span>
                   {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
                   <span className="daytrip-count">{visibleItems.length}곳</span>
+                  {itinerary.changeHistory?.length > 0 && (
+                    <button
+                      type="button"
+                      className="plan-history-open-btn"
+                      onClick={() => setHistoryOpen(true)}
+                    >
+                      🕓 변경 이력 {itinerary.changeHistory.length}
+                    </button>
+                  )}
                 </div>
 
                 <ItineraryList
@@ -1605,6 +1644,7 @@ export default function App() {
                   onTogglePin={handleTogglePin}
                   onDelete={handleDeleteItem}
                   onOpenDocent={handleOpenDocent}
+                  onOpenHistory={itinerary.changeHistory?.length > 0 ? () => setHistoryOpen(true) : undefined}
                   onSortByTime={handleSortByTime}
                   sortByTimeLoading={sortByTimeLoading}
                   onOptimizeFromGps={handleOptimizeFromGps}
@@ -1682,6 +1722,15 @@ export default function App() {
               </main>
 
               <BottomTabBar active={tripSection} onSelect={selectTripSection} />
+
+              <PlanHistoryPanel
+                open={historyOpen}
+                originalPlan={itinerary.originalPlan}
+                changeHistory={itinerary.changeHistory}
+                reverting={reverting}
+                onRevert={handleRevertPlan}
+                onClose={() => setHistoryOpen(false)}
+              />
 
               <AlternativesPanel
                 open={altOpen}

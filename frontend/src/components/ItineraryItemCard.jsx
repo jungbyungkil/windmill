@@ -51,6 +51,7 @@ export default function ItineraryItemCard({
   onTogglePin,
   onDelete,
   onOpenDocent,
+  onOpenHistory,
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -175,7 +176,15 @@ export default function ItineraryItemCard({
       <div className="item-body">
         {!editing ? (
           <>
-            {item.isAlternate && <span className="alt-badge">추천으로 담은 장소</span>}
+            {item.isAlternate && (
+              onOpenHistory ? (
+                <button type="button" className="item-changed-badge" onClick={onOpenHistory}>
+                  🟡 변경됨 · 이력 보기
+                </button>
+              ) : (
+                <span className="alt-badge">추천으로 담은 장소</span>
+              )
+            )}
 
             {item.tags?.length > 0 && (
               <div className="item-tags">

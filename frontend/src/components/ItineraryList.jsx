@@ -38,6 +38,7 @@ export default function ItineraryList({
   onTogglePin,
   onDelete,
   onOpenDocent,
+  onOpenHistory,
   onSortByTime,
   sortByTimeLoading = false,
 }) {
@@ -97,6 +98,7 @@ export default function ItineraryList({
                 onTogglePin={onTogglePin}
                 onDelete={onDelete}
                 onOpenDocent={onOpenDocent}
+                onOpenHistory={onOpenHistory}
               />
             );
           })}

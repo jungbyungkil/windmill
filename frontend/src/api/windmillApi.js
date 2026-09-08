@@ -208,6 +208,36 @@ export function optimizeRoute(itineraryId, date, origin, startTime) {
   return request(`/itineraries/${itineraryId}/optimize-route${qs(params)}`, { method: 'POST' });
 }
 
+/**
+ * 대안 채택 통합 - 삭제+추가(+선택적 동선 재계산)를 서버 한 트랜잭션으로 하고 변경 이력을 한 건
+ * 남긴다. 응답에 originalPlan/changeHistory 포함. 실패(마감·시간겹침) 시 전체 롤백된다.
+ */
+export function applyAlternative(itineraryId, { removedItemId, newPlace, triggerType, reason, reoptimize = false }) {
+  return request(`/itineraries/${itineraryId}/apply-alternative`, {
+    method: 'POST',
+    body: { removedItemId, newPlace, triggerType, reason, reoptimize },
+  });
+}
+
+/** "동선 다시" 전용 - 동선 재계산 + 변경 이력(ROUTE) 기록. 이력 없는 재계산은 optimizeRoute. */
+export function applyReroute(itineraryId, date, origin, startTime, reason) {
+  const params = { date, reason };
+  if (origin?.lon != null && origin?.lat != null) {
+    params.originLon = origin.lon;
+    params.originLat = origin.lat;
+  }
+  if (startTime) params.startTime = startTime;
+  return request(`/itineraries/${itineraryId}/apply-reroute${qs(params)}`, { method: 'POST' });
+}
+
+/** 되돌리기 - targetSequence가 없으면 원본으로. 되돌리기 자체도 새 이력(REVERT)으로 쌓인다. */
+export function revertPlan(itineraryId, targetSequence) {
+  return request(`/itineraries/${itineraryId}/revert-plan`, {
+    method: 'POST',
+    body: { targetSequence: targetSequence ?? null },
+  });
+}
+
 /** 현재 위치·시각 기준 그리디 재배열 제안. 일정에는 쓰지 않음. */
 export function suggestRoute(itineraryId, date, origin) {
   const params = { date };
