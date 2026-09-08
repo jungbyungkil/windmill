@@ -1616,10 +1616,6 @@ export default function App() {
                   onAdd={handleAddFestival}
                   addingId={addingFestivalId}
                 />
-
-                <WeatherBanner items={weatherItems} />
-
-                <MidWeatherBanner forecast={midWeather} />
                 </section>
                 )}
 
@@ -1665,6 +1661,8 @@ export default function App() {
                   <header className="trip-section-head">
                     <h2>알림</h2>
                   </header>
+                  <WeatherBanner items={weatherItems} />
+                  <MidWeatherBanner forecast={midWeather} />
                   <AlertFeedScreen itineraryId={itineraryId} showTitle={false} />
                 </section>
                 )}
