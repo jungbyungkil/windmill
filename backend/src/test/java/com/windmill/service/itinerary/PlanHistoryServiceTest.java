@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,6 +118,19 @@ class PlanHistoryServiceTest {
         assertNull(service.revert(it, null));
         assertNull(service.revert(it, 5));
         assertTrue(it.getChangeHistory().isEmpty());
+    }
+
+    @Test
+    void sameStops_trueOnlyWhenOrderAndTimesMatch() {
+        Itinerary it = itineraryWith("A", "B", "C");
+        PlanSnapshot s1 = service.snapshotOf(it);
+        assertTrue(service.sameStops(s1, service.snapshotOf(it)), "안 바뀌면 같음");
+
+        it.getItems().get(2).setScheduledTime("21:30"); // 시각 변경
+        assertFalse(service.sameStops(s1, service.snapshotOf(it)));
+
+        Itinerary reordered = itineraryWith("A", "C", "B"); // 순서 변경
+        assertFalse(service.sameStops(s1, service.snapshotOf(reordered)));
     }
 
     @Test

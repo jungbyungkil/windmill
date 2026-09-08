@@ -164,6 +164,27 @@ public class PlanHistoryService {
         }
     }
 
+    /**
+     * 두 스냅샷의 정차 구성이 같은지 - 장소(contentId) 순서와 방문 시각이 모두 같으면 true.
+     * "바람이가 동선 최적화"를 여러 번 눌러도 바뀐 게 없으면 이력에 안 쌓기 위함.
+     */
+    public boolean sameStops(PlanSnapshot a, PlanSnapshot b) {
+        List<PlanSnapshot.Stop> sa = a == null || a.getStops() == null ? List.of() : a.getStops();
+        List<PlanSnapshot.Stop> sb = b == null || b.getStops() == null ? List.of() : b.getStops();
+        if (sa.size() != sb.size()) {
+            return false;
+        }
+        for (int i = 0; i < sa.size(); i++) {
+            PlanSnapshot.Stop x = sa.get(i);
+            PlanSnapshot.Stop y = sb.get(i);
+            if (!java.util.Objects.equals(x.getContentId(), y.getContentId())
+                    || !java.util.Objects.equals(x.getScheduledTime(), y.getScheduledTime())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static int nextSequence(List<PlanChangeEntry> history) {
         int max = 0;
         for (PlanChangeEntry e : history) {

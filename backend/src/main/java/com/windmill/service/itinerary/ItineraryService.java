@@ -1067,9 +1067,9 @@ public class ItineraryService {
     }
 
     /**
-     * "동선 다시" 전용 - 동선을 재계산하고 그 자체를 변경 이력(triggerType=ROUTE)으로 남긴다.
-     * optimize-route는 GPS 시작·일자 확정 등 여러 곳에서 불려서 이력을 남기지 않는다 - 사용자가
-     * 명시적으로 누른 이 경로만 이력에 쌓는다.
+     * "바람이가 동선 최적화" 전용 - 동선을 재계산하고, 실제로 순서·시각이 바뀐 경우에만 변경 이력
+     * (triggerType=ROUTE)으로 남긴다. optimize-route는 GPS 시작·일자 확정 등 여러 곳에서 불려서
+     * 이력을 남기지 않는다. 사용자가 여러 번 눌러도 바뀐 게 없으면 이력이 쌓이지 않는다.
      */
     @Transactional
     public OptimizeRouteResult applyReroute(Long itineraryId, LocalDate date,
@@ -1079,10 +1079,14 @@ public class ItineraryService {
         PlanSnapshot before = planHistoryService.snapshotOf(itinerary);
         OptimizeRouteResult r = optimizeRoute(itineraryId, date, originLon, originLat, startTime);
         Itinerary after = r.itinerary();
-        planHistoryService.recordChange(after, before, "ROUTE",
-                reason != null && !reason.isBlank() ? reason : "동선 재계산", null, null);
+        boolean changed = !planHistoryService.sameStops(before, planHistoryService.snapshotOf(after));
+        if (changed) {
+            planHistoryService.recordChange(after, before, "ROUTE",
+                    reason != null && !reason.isBlank() ? reason : "동선 재계산", null, null);
+        }
         Itinerary saved = itineraryRepository.save(after);
-        return new OptimizeRouteResult(saved, r.message(), r.totalDistanceKm());
+        String msg = changed ? r.message() : "이미 이동을 최소화한 순서예요. 그대로 두었어요.";
+        return new OptimizeRouteResult(saved, msg, r.totalDistanceKm());
     }
 
     /**
