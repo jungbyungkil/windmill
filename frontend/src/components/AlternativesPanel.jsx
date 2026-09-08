@@ -30,6 +30,8 @@ export default function AlternativesPanel({
   reason,
   onApplyAll,
   applyLoading,
+  error,
+  onRetry,
 }) {
   useModalHistory(open, onClose);
   if (!open) return null;
@@ -68,8 +70,24 @@ export default function AlternativesPanel({
             <div className="skeleton-card" />
             <div className="skeleton-card" />
           </div>
+        ) : error ? (
+          <div className="empty-state">
+            <p>{error}</p>
+            {onRetry && (
+              <button type="button" className="btn-secondary" onClick={onRetry}>
+                다시 시도
+              </button>
+            )}
+          </div>
         ) : candidates.length === 0 ? (
-          <p className="empty-state">지금은 추천할 대안이 없어요. 잠시 후 다시 시도해보세요.</p>
+          <div className="empty-state">
+            <p>이 지역에서 지금 보여줄 대안을 찾지 못했어요.</p>
+            {onRetry && (
+              <button type="button" className="btn-secondary" onClick={onRetry}>
+                다시 시도
+              </button>
+            )}
+          </div>
         ) : (
           <div className="reco-grid">
             {candidates.map((c) => (

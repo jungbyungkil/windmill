@@ -70,10 +70,18 @@ public class RecommendationPipeline {
                     String seed = firstNonBlank(request.getSeedPlaceName(), request.getNaturalLanguageQuery());
                     List<RecommendThemeTag> themes = RecommendThemeTag.resolve(request.getTags(), seed);
                     Mono<List<RelatedCandidate>> stage1Result;
+                    boolean routeOrBusinessAlternative =
+                            request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.BUSINESS
+                                    || request.getAvoidanceHint() == RecommendationRequest.AvoidanceHint.ROUTE;
                     if (heatAlternative) {
                         stage1Result = stage1.fetchIndoorForHeat(region);
                     } else if (rainAlternative) {
                         stage1Result = stage1.fetchIndoor(region);
+                    } else if (routeOrBusinessAlternative) {
+                        // 휴무/마감/이동시간 대안: 연관관광지+이름매칭 조인(느리고 소규모 지역에선 잘 빔) 대신
+                        // contentId가 이미 채워진 지역 인기 스팟(관광지12·문화시설14·레포츠28)을 바로 쓴다.
+                        // "휴무 아닌 곳 몇 군데"만 있으면 되는 요청이라 이 소스가 빠르고 대도시에서 안 빈다.
+                        stage1Result = stage1.fetchPopularSights(region);
                     } else if (request.isPopularSights()) {
                         Mono<List<RelatedCandidate>> sights = stage1.fetchPopularSights(region);
                         stage1Result = request.isWithPet()
@@ -124,6 +132,15 @@ public class RecommendationPipeline {
                 .flatMap(list -> !list.isEmpty() || request.getAvoidanceHint() == null
                         ? Mono.just(list)
                         : alternativesFallback(request))
+                .onErrorResume(e -> {
+                    // 트리거 대안은 파이프라인이 도중에 터져도(외부 API 오류 등) 빈손으로 끝나지 않는다.
+                    if (request.getAvoidanceHint() == null) {
+                        return Mono.error(e);
+                    }
+                    log.warn("[Pipeline] 대안 파이프라인 오류 - 인기 스팟 폴백", e);
+                    return Mono.defer(() -> alternativesFallback(request))
+                            .onErrorReturn(List.of());
+                })
                 .doOnNext(list -> log.info("[Pipeline] 최종 추천 {}건", list.size()));
     }
 
@@ -148,9 +165,9 @@ public class RecommendationPipeline {
                     TourAttractionDetail origin = tuple.getT1();
                     RegionCondition condition = tuple.getT2();
                     return stage1.fetchPopularSights(region)
-                            .map(list -> list.stream()
+                            .map(list -> capForSpeed(list.stream()
                                     .filter(c -> !exclude.contains(c.getContentId()))
-                                    .collect(Collectors.toList()))
+                                    .collect(Collectors.toList())))
                             .flatMap(list -> stage2.filter(list, request.getVisitDate()))
                             .map(list -> attachDistance(list, origin))
                             .flatMap(list -> stage3.filter(list, region))
@@ -364,10 +381,12 @@ public class RecommendationPipeline {
         }
         if (hint == RecommendationRequest.AvoidanceHint.ROUTE
                 || hint == RecommendationRequest.AvoidanceHint.BUSINESS) {
-            // 이동시간 빠듯/마감 임박 대응: 가까운 곳부터(있으면), 그다음 지역 인기순.
+            // 휴무/마감/이동시간 대응 우선순위: ①방문일에 문 여는 곳(정기휴무 아님) ②가까운 곳
+            // ③지역 인기순. 휴무 때문에 대안을 찾는 건데 대안도 휴무면 뒤로 보낸다.
             return candidates.stream()
                     .sorted(Comparator
-                            .comparing(RecommendationCandidate::getDistanceKm,
+                            .comparingInt((RecommendationCandidate c) -> isVisitableOnDay(c) ? 0 : 1)
+                            .thenComparing(RecommendationCandidate::getDistanceKm,
                                     Comparator.nullsLast(Comparator.naturalOrder()))
                             .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank())))
                     .collect(Collectors.toList());
@@ -390,6 +409,11 @@ public class RecommendationPipeline {
 
     private static boolean hasThumbnail(RecommendationCandidate c) {
         return c.getThumbnailUrl() != null && !c.getThumbnailUrl().isBlank();
+    }
+
+    /** 방문일 기준 정기휴무가 아닌지(Stage2가 채운 businessStatus). 모르면 방문 가능으로 본다. */
+    private static boolean isVisitableOnDay(RecommendationCandidate c) {
+        return c.getBusinessStatus() != com.windmill.dto.BusinessStatus.CLOSED_DAY;
     }
 
     /** 실내 스냅샷이 있으면 그걸 쓰고, 없으면 Stage4가 붙인 #실내 태그를 본다. */

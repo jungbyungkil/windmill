@@ -130,6 +130,7 @@ export default function App() {
   const [altCandidates, setAltCandidates] = useState([]);
   const [altLoading, setAltLoading] = useState(false);
   const [altReason, setAltReason] = useState(null);
+  const [altError, setAltError] = useState(null);
 
   const [docentOpen, setDocentOpen] = useState(false);
   const [docentItem, setDocentItem] = useState(null);
@@ -839,12 +840,14 @@ export default function App() {
     setAltOpen(true);
     setAltLoading(true);
     setAltReason(null);
+    setAltError(null);
     try {
       const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
-      setAltCandidates(candidates);
+      setAltCandidates(candidates || []);
       setAltReason(reason || (avoidHint === 'HEAT' ? 'HEAT_ALTERNATIVE' : avoidHint === 'WEATHER' ? 'RAIN_ALTERNATIVE' : avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : avoidHint === 'ROUTE' ? 'ROUTE_ALTERNATIVE' : null));
-    } catch {
+    } catch (e) {
       setAltCandidates([]);
+      setAltError(e?.message || '대안을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     } finally {
       setAltLoading(false);
     }
@@ -1687,6 +1690,15 @@ export default function App() {
                 candidates={altCandidates}
                 loading={altLoading}
                 reason={altReason}
+                error={altError}
+                onRetry={() => handleRequestAlternatives(
+                  trigger?.heatTrigger ? 'HEAT'
+                    : trigger?.weatherTrigger ? 'WEATHER'
+                    : trigger?.crowdTrigger ? 'CROWD'
+                    : trigger?.travelTimeTrigger ? 'ROUTE'
+                    : (trigger?.closedDayTrigger || trigger?.hoursEndedTrigger) ? 'BUSINESS'
+                    : undefined
+                )}
                 onAdd={handleAddAlternative}
                 addingId={addingContentId}
                 onApplyAll={() => handleRerouteSchedule(

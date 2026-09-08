@@ -389,6 +389,9 @@ public class ItineraryController {
                 .excludeContentIds(excludeContentIds)
                 .excludePlaceNames(excludePlaceNames)
                 .avoidanceHint(avoid)
+                // 대안은 "휴무 아닌 곳 몇 군데 빨리" 보여주면 되는 액션이라, 검색과 동일하게 LLM(Stage4)
+                // 문장 생성을 건너뛰고 후보 수도 Stage2/3 전에 잘라 응답을 빠르게 한다.
+                .skipLlm(true)
                 .originContentId(origin == null ? null : origin.getContentId())
                 .originContentTypeId(origin == null ? null : origin.getContentTypeId())
                 .build();
