@@ -855,18 +855,60 @@ export default function App() {
     }
   }
 
+  /** 파이프라인 대안이 비면 근처 아무 장소(맛집·카페·쇼핑·관광)로라도 채운다 - "무조건 보여주기". */
+  async function nearbyAnyCandidates() {
+    const items = itinerary?.items || [];
+    const origin = [...items].reverse().find((i) => i.mapX && i.mapY);
+    if (!origin) return [];
+    const nearby = await api
+      .searchNearbyPlaces({ mapX: origin.mapX, mapY: origin.mapY, radius: 3000, numOfRows: 15 })
+      .catch(() => []);
+    const have = new Set(items.map((i) => String(i.contentId)));
+    return (nearby || [])
+      .filter((p) => p.contentId && !have.has(String(p.contentId)) && p.placeName)
+      .slice(0, 8)
+      .map((p) => ({
+        contentId: p.contentId,
+        contentTypeId: p.contentTypeId,
+        placeName: p.placeName,
+        thumbnailUrl: p.thumbnailUrl,
+        addr1: p.addr1,
+        tel: p.tel,
+        mapX: p.mapX,
+        mapY: p.mapY,
+        category: p.category || '장소',
+        matchedTags: p.category ? [`#${p.category}`] : [],
+        oneLiner: p.dist != null ? `여기서 약 ${Math.round(p.dist)}m` : '근처에서 바로 갈 수 있어요',
+        crowdRate: null,
+      }));
+  }
+
   async function handleRequestAlternatives(avoidHint) {
     setAltOpen(true);
     setAltLoading(true);
     setAltReason(null);
     setAltError(null);
     try {
-      const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
+      let { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
+      let resolvedReason = reason || (avoidHint === 'HEAT' ? 'HEAT_ALTERNATIVE' : avoidHint === 'WEATHER' ? 'RAIN_ALTERNATIVE' : avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : avoidHint === 'ROUTE' ? 'ROUTE_ALTERNATIVE' : null);
+      if (!candidates?.length) {
+        const nearby = await nearbyAnyCandidates();
+        if (nearby.length) {
+          candidates = nearby;
+          resolvedReason = 'NEARBY_ANY';
+        }
+      }
       setAltCandidates(candidates || []);
-      setAltReason(reason || (avoidHint === 'HEAT' ? 'HEAT_ALTERNATIVE' : avoidHint === 'WEATHER' ? 'RAIN_ALTERNATIVE' : avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : avoidHint === 'ROUTE' ? 'ROUTE_ALTERNATIVE' : null));
+      setAltReason(resolvedReason);
     } catch (e) {
-      setAltCandidates([]);
-      setAltError(e?.message || '대안을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+      const nearby = await nearbyAnyCandidates().catch(() => []);
+      if (nearby.length) {
+        setAltCandidates(nearby);
+        setAltReason('NEARBY_ANY');
+      } else {
+        setAltCandidates([]);
+        setAltError(e?.message || '대안을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+      }
     } finally {
       setAltLoading(false);
     }

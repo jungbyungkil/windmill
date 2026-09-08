@@ -29,18 +29,10 @@ function primaryAvoidHint(trigger) {
   return undefined;
 }
 
-function hasRouteCta(trigger) {
-  return Boolean(
-    trigger?.travelTimeTrigger
-    || trigger?.routeTangleTrigger
-    || (trigger?.hoursEndedTrigger && !trigger?.closedDayTrigger),
-  );
-}
-
 /**
- * 펼친 히어로 CTA. 첫 버튼은 caption()과 같은 우선순위.
- * 휴무+동선 꼬임처럼 원인이 겹치면 버튼을 같이 보여 준다 — 예전엔 휴무가
- * 「다른 장소 보기」만 남기고 「동선 다시」를 가렸다.
+ * 펼친 히어로 CTA. 첫 버튼(primary)은 caption()과 같은 우선순위 = 바람이 말풍선 탭 동작.
+ * 동선 관련 변수는 「바람이가 동선 최적화」(현재 순서 다시 짜기)와 「이 순서 어때요?」(근처 다른
+ * 장소로 바꾸기, 대안이 무조건 뜸) 두 갈래를 함께 보여 준다.
  */
 function resolveCtas(trigger) {
   if (!trigger) return [];
@@ -50,15 +42,25 @@ function resolveCtas(trigger) {
     if (ctas.some((c) => c.kind === cta.kind && c.hint === cta.hint)) return;
     ctas.push(cta);
   };
+  const optimize = { kind: 'route', label: '바람이가 동선 최적화' };
+  const nearbyAlt = { kind: 'alternatives', hint: 'ROUTE', label: '이 순서 어때요?' };
+
+  // 뭔가 못 가게 된 상황(이동시간 부족·영업종료)은 "다른 장소"가 먼저, 순수 동선 꼬임은 "최적화"가 먼저
   if (trigger.travelTimeTrigger) {
-    add({ kind: 'route', label: '동선 다시' });
-    // 바람이 코멘트가 "대안을 확인해볼까요?"라고 말하므로 대안 보기 버튼도 같이 노출
-    add({ kind: 'alternatives', hint: 'ROUTE', label: '다른 장소 보기' });
+    add(nearbyAlt);
+    add(optimize);
   }
   if (trigger.heatTrigger) add({ kind: 'reroute', hint: 'HEAT', label: '실내로 바꾸기' });
   if (trigger.weatherTrigger) add({ kind: 'reroute', hint: 'WEATHER', label: '실내로 바꾸기' });
   if (trigger.crowdTrigger) add({ kind: 'reroute', hint: 'CROWD', label: '한산한 곳으로' });
-  if (hasRouteCta(trigger)) add({ kind: 'route', label: '동선 다시' });
+  if (trigger.routeTangleTrigger) {
+    add(optimize);
+    add(nearbyAlt);
+  }
+  if (trigger.hoursEndedTrigger && !trigger.closedDayTrigger) {
+    add(nearbyAlt);
+    add(optimize);
+  }
   if (trigger.closedDayTrigger) {
     add({ kind: 'alternatives', hint: 'BUSINESS', label: '다른 장소 보기' });
   }
@@ -223,7 +225,7 @@ export default function PinwheelHero({
                   disabled={ctaBusy(cta)}
                 >
                   {ctaBusy(cta)
-                    ? (cta.kind === 'route' ? '동선 다시 짜는 중...' : cta.kind === 'reroute' ? '바꾸는 중...' : '찾는 중...')
+                    ? (cta.kind === 'route' ? '동선 최적화 중...' : cta.kind === 'reroute' ? '바꾸는 중...' : '대안 찾는 중...')
                     : cta.label}
                 </button>
               ))}

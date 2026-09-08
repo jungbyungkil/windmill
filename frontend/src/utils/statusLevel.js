@@ -94,7 +94,7 @@ export function baramiCommentFromTrigger(trigger) {
     return '오늘은 순풍이 불고 있어요. 이 코스대로 다녀도 좋아요!';
   }
   if (trigger.travelTimeTrigger) {
-    return '다음 장소까지 이동시간이 빠듯해요. 지금 바로 대안을 확인해볼까요?';
+    return '다음 장소까지 이동시간이 빠듯해요. 바람이가 근처 대안을 찾아왔어요 — 눌러 보세요!';
   }
   if (trigger.heatTrigger) {
     return '더위가 세네요. 이 코스에서 야외만 실내로 바꾸면 훨씬 편해질 거예요.';
@@ -103,7 +103,7 @@ export function baramiCommentFromTrigger(trigger) {
     return '비 소식이 있어요. 이 코스대로 가되 실내 대안을 옆에 둬 볼까요?';
   }
   if (trigger.routeTangleTrigger) {
-    return '동선이 조금 꼬였어요. 순서만 다시 잡으면 대표 코스를 알차게 돌 수 있어요.';
+    return '동선이 조금 꼬였어요. 바람이가 순서를 다시 잡아줄게요 — 눌러 보세요!';
   }
   if (trigger.crowdTrigger) {
     return '붐비는 곳이 있어요. 시간만 살짝 옮기면 여유롭게 즐길 수 있어요.';
@@ -112,7 +112,7 @@ export function baramiCommentFromTrigger(trigger) {
     return '쉬는 날이 끼어 있어요. 대체 장소만 챙기면 이 코스 그대로 좋아요!';
   }
   if (trigger.hoursEndedTrigger) {
-    return '영업이 끝난 곳이 있어요. 「이 순서 어때요?」로 순서를 바꿔 오늘 일정을 살려 보세요.';
+    return '영업이 끝난 곳이 있어요. 바람이가 근처 갈 만한 곳을 찾아왔어요 — 눌러 보세요!';
   }
   if (trigger.level === 'WARNING') {
     return '변수가 조금 보여요. 미리 대안만 봐 두면 안심이에요.';

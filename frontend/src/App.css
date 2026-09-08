@@ -3019,6 +3019,18 @@
   margin-bottom: 14px;
 }
 
+/* 대안 패널: 바람이 말풍선을 설명 아래 강조 배치 */
+.alternatives-panel .modal-desc {
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+.alternatives-panel .barami-bubble {
+  margin: 0 0 14px;
+}
+.alternatives-panel .alt-apply-all {
+  margin-bottom: 14px;
+}
+
 /* ---------- Docent ---------- */
 
 .docent-card {
