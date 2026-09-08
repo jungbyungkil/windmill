@@ -506,21 +506,21 @@ export default function CreateTripScreen({
             <input type="checkbox" checked={withPet} onChange={(e) => setWithPet(e.target.checked)} />
             🐾 반려동물과 함께해요
           </label>
-          <label className="trip-form-checkbox">
+          <label className="trip-form-checkbox" title="유모차 이용 가능한 곳을 우선 추천해요">
             <input
               type="checkbox"
               checked={strollerFriendly}
               onChange={(e) => setStrollerFriendly(e.target.checked)}
             />
-            🍼 유모차 동반 (유모차 이용 가능한 곳 우선 추천)
+            🍼 유모차 동반
           </label>
-          <label className="trip-form-checkbox">
+          <label className="trip-form-checkbox" title="장애인 동반 - 무장애 시설을 우선 추천해요">
             <input
               type="checkbox"
               checked={accessibleFriendly}
               onChange={(e) => setAccessibleFriendly(e.target.checked)}
             />
-            ♿ 무장애 이동 (장애인 동반 - 무장애 시설 우선 추천)
+            ♿ 무장애 이동
           </label>
         </div>
 

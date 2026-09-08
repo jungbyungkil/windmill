@@ -16,11 +16,11 @@ export const TAG_OPTIONS = TAG_GROUPS.flatMap((group) => group.tags);
 
 // 첫 화면 동반유형 단일선택 옵션 - 반려동물 동반 여부는 별도 체크박스(withPet)
 export const COMPANION_TYPE_OPTIONS = [
-  { value: 'SOLO', label: '1인 여행' },
-  { value: 'COUPLE', label: '2인 여행' },
-  { value: 'TRIO', label: '3인 여행' },
-  { value: 'FAMILY_4', label: '4인 가족 여행' },
-  { value: 'EXTENDED_FAMILY', label: '대가족 여행' },
+  { value: 'SOLO', label: '1인' },
+  { value: 'COUPLE', label: '2인' },
+  { value: 'TRIO', label: '3인' },
+  { value: 'FAMILY_4', label: '4인 가족' },
+  { value: 'EXTENDED_FAMILY', label: '대가족' },
 ];
 
 // 동반유형별 고정 총 인원수 - EXTENDED_FAMILY(대가족)는 없음(사용자 직접 입력, 5~9명)
@@ -35,13 +35,13 @@ export const EXTENDED_FAMILY_MIN_SIZE = 5;
 export const EXTENDED_FAMILY_MAX_SIZE = 9;
 
 // 첫 화면 성인 연령대 단일선택(필수) - 동반 자녀는 개별 만 나이로 별도 입력(CHILD_AGE_OPTIONS)
+// 한 줄에 들어오도록 50대 이상은 FIFTIES 하나로 통합(백엔드 AgeGroup enum의 SIXTIES/SEVENTIES_PLUS는
+// 기존 저장값 호환을 위해 유지, 신규 선택만 FIFTIES로 수렴).
 export const AGE_GROUP_OPTIONS = [
   { value: 'TWENTIES', label: '20대' },
   { value: 'THIRTIES', label: '30대' },
   { value: 'FORTIES', label: '40대' },
-  { value: 'FIFTIES', label: '50대' },
-  { value: 'SIXTIES', label: '60대' },
-  { value: 'SEVENTIES_PLUS', label: '70대 이상' },
+  { value: 'FIFTIES', label: '50대 이상' },
 ];
 
 // 식당·카페 고를 때 1인 식사 참고 필터(이하). 일정 합계용이 아님. 값 없음(null)이면 필터 없음
