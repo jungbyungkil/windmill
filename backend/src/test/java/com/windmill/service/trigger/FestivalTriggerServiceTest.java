@@ -40,6 +40,13 @@ class FestivalTriggerServiceTest {
             .lDongRegnCd("51")
             .lDongSignguCd("110")
             .build();
+    private static final RegionCode SEOUL_JONGNO = RegionCode.builder()
+            .sidoName("서울특별시")
+            .signguName("종로구")
+            .signguFullCode("11110")
+            .lDongRegnCd("11")
+            .lDongSignguCd("110")
+            .build();
     private static final LocalDate TRIP_START = LocalDate.of(2026, 8, 24);
     private static final LocalDate TRIP_END = LocalDate.of(2026, 8, 24);
 
@@ -115,6 +122,60 @@ class FestivalTriggerServiceTest {
         List<FestivalSuggestion> result = FestivalTriggerService.filterAndMap(mixed, CHUNCHEON, TRIP_START, TRIP_END);
 
         assertEquals(List.of("춘천마임축제"), result.stream().map(FestivalSuggestion::getPlaceName).toList());
+    }
+
+    @Test
+    void matchesSigungu_seoul_keepsJongnoAndDropsOtherDistricts() {
+        // 서울 안에서도 자치구가 다르면 제외 - matchesRegion(시·도)은 셋 다 통과
+        JsonNode jongno = festival("종로한복축제", "11", "서울특별시 종로구 사직로 161");
+        JsonNode gangnam = festival("강남페스티벌", "11", "서울특별시 강남구 영동대로 513");
+        JsonNode ydp = festival("여의도불꽃축제", "11", "서울특별시 영등포구 여의동로 330");
+
+        assertTrue(FestivalTriggerService.matchesRegion(jongno, SEOUL_JONGNO));
+        assertTrue(FestivalTriggerService.matchesRegion(gangnam, SEOUL_JONGNO));
+
+        assertTrue(FestivalTriggerService.matchesSigungu(jongno, SEOUL_JONGNO));
+        assertFalse(FestivalTriggerService.matchesSigungu(gangnam, SEOUL_JONGNO));
+        assertFalse(FestivalTriggerService.matchesSigungu(ydp, SEOUL_JONGNO));
+    }
+
+    @Test
+    void matchesSigungu_seoul_usesStructuredCodeWhenPresent() {
+        ObjectNode jongnoByCode = MAPPER.createObjectNode()
+                .put("title", "축제").put("ldongregncd", "11").put("ldongsigngucd", "110");
+        ObjectNode gangnamByCode = MAPPER.createObjectNode()
+                .put("title", "축제").put("ldongregncd", "11").put("ldongsigngucd", "680");
+
+        assertTrue(FestivalTriggerService.matchesSigungu(jongnoByCode, SEOUL_JONGNO));
+        assertFalse(FestivalTriggerService.matchesSigungu(gangnamByCode, SEOUL_JONGNO));
+    }
+
+    @Test
+    void filterAndMap_seoul_keepsOnlyJongnoFestival() {
+        List<JsonNode> mixed = List.of(
+                festival("강남페스티벌", "11", "서울특별시 강남구 영동대로 513"),
+                festival("여의도봄꽃축제", "11", "서울특별시 영등포구 여의동로 330"),
+                festival("종로한복축제", "11", "서울특별시 종로구 사직로 161"),
+                festival("성수동거리축제", "11", "서울특별시 성동구 아차산로 100")
+        );
+
+        List<FestivalSuggestion> result = FestivalTriggerService.filterAndMap(mixed, SEOUL_JONGNO, TRIP_START, TRIP_END);
+
+        assertEquals(List.of("종로한복축제"), result.stream().map(FestivalSuggestion::getPlaceName).toList());
+    }
+
+    @Test
+    void filterAndMap_seoul_fallsBackToEmptyWhenNoJongnoFestival() {
+        // 그 자치구에 축제가 없으면 빈 목록 - SmartPlanService가 인기 장소로 채운다
+        List<JsonNode> otherDistrictsOnly = List.of(
+                festival("강남페스티벌", "11", "서울특별시 강남구 영동대로 513"),
+                festival("여의도봄꽃축제", "11", "서울특별시 영등포구 여의동로 330")
+        );
+
+        List<FestivalSuggestion> result =
+                FestivalTriggerService.filterAndMap(otherDistrictsOnly, SEOUL_JONGNO, TRIP_START, TRIP_END);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test
