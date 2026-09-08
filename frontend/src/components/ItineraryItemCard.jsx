@@ -4,6 +4,7 @@ import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
+import PlaceThumb from './PlaceThumb';
 import TagGroupPicker from './TagGroupPicker';
 import PlaceOverview from './PlaceOverview';
 import PlaceDetailFacts from './PlaceDetailFacts';
@@ -150,6 +151,8 @@ export default function ItineraryItemCard({
         />
       )}
 
+      <PlaceThumb item={item} className="item-thumb-sm" />
+
       <button
         type="button"
         className="item-card-summary"
@@ -169,10 +172,6 @@ export default function ItineraryItemCard({
 
       {showDetail && (
       <div className="item-detail">
-      {item.thumbnailUrl ? (
-        <img className="item-thumb" src={item.thumbnailUrl} alt="" loading="lazy" />
-      ) : null}
-
       <div className="item-body">
         {!editing ? (
           <>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import BrandMark from './BrandMark';
 import PinwheelLoader from './PinwheelLoader';
 import VisitTimePicker from './VisitTimePicker';
 import TripStoryFeed from './TripStoryFeed';
@@ -330,7 +331,7 @@ export default function CreateTripScreen({
     <div className="draft-resume-panel">
       <div className="draft-resume-panel-head">
         <strong>진행 중인 여행이 있어요</strong>
-        <p>이어서 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
+        <p>이어서 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
       </div>
       <ul className="draft-resume-list">
         {ongoingTrips.map((trip, index) => {
@@ -383,7 +384,7 @@ export default function CreateTripScreen({
     <div className="draft-resume-banner">
       <div>
         <strong>진행 중인 여행이 있어요</strong>
-        <p>이어서 일정을 보거나, 아래에서 새 여행을 시작할 수 있어요.</p>
+        <p>이어서 일정을 보거나, 위에서 새 여행을 시작할 수 있어요.</p>
       </div>
       <button type="button" className="btn-primary" onClick={() => onResumeDraft(draftItineraryId)}>
         이어하기
@@ -403,28 +404,8 @@ export default function CreateTripScreen({
           }
         />
       )}
-      <h1 className="brand-mark">
-        <img
-          src="/baramttara-logo.png"
-          alt="바람따라"
-          width={512}
-          height={512}
-        />
-      </h1>
-      <p className="brand-tagline">당일치기 휴무·마감은 미리, 날씨·혼잡은 여행 당일에 먼저 알려 바로 바꿔 드려요</p>
 
-      {resumeBlock}
-
-      {!situationDismissed && (
-        <NudgeCard
-          situation={situation}
-          loading={situationLoading}
-          onDismiss={() => setSituationDismissed(true)}
-          onAction={() => {
-            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
-      )}
+      <BrandMark />
 
       <form id="trip-form" className="trip-form" onSubmit={handleSubmit}>
         <div className="trip-form-row">
@@ -721,6 +702,19 @@ export default function CreateTripScreen({
 
         {error && <div className="error-msg">❌ {error}</div>}
       </form>
+
+      {resumeBlock}
+
+      {!situationDismissed && (
+        <NudgeCard
+          situation={situation}
+          loading={situationLoading}
+          onDismiss={() => setSituationDismissed(true)}
+          onAction={() => {
+            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      )}
     </div>
   );
 }

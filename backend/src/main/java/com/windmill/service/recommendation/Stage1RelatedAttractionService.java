@@ -150,12 +150,11 @@ public class Stage1RelatedAttractionService {
                 if (name == null || name.isBlank()) {
                     continue;
                 }
-                String thumbnail = item.path("firstimage").asText(null);
                 result.add(RelatedCandidate.builder()
                         .placeName(name)
                         .contentId(item.path("contentid").asText(null))
                         .contentTypeId(parseContentTypeId(item))
-                        .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
+                        .thumbnailUrl(firstImageUrl(item))
                         .categoryLcls("반려동물동반")
                         .rank(rank++)
                         .build());
@@ -443,14 +442,13 @@ public class Stage1RelatedAttractionService {
             if (name == null || name.isBlank()) {
                 continue;
             }
-            String thumbnail = item.path("firstimage").asText(null);
             String mapX = blankToNull(item.path("mapx").asText(null));
             String mapY = blankToNull(item.path("mapy").asText(null));
             result.add(RelatedCandidate.builder()
                     .placeName(name)
                     .contentId(item.path("contentid").asText(null))
                     .contentTypeId(parseContentTypeId(item))
-                    .thumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail)
+                    .thumbnailUrl(firstImageUrl(item))
                     .mapX(mapX)
                     .mapY(mapY)
                     .categoryLcls(categoryLcls)
@@ -523,8 +521,7 @@ public class Stage1RelatedAttractionService {
         candidate.setContentId(match.path("contentid").asText(null));
         String typeId = match.path("contenttypeid").asText(null);
         candidate.setContentTypeId(typeId == null ? null : Integer.valueOf(typeId));
-        String thumbnail = match.path("firstimage").asText(null);
-        candidate.setThumbnailUrl(thumbnail == null || thumbnail.isBlank() ? null : thumbnail);
+        candidate.setThumbnailUrl(firstImageUrl(match));
         if (blankToNull(candidate.getMapX()) == null) {
             candidate.setMapX(blankToNull(match.path("mapx").asText(null)));
         }
@@ -604,5 +601,15 @@ public class Stage1RelatedAttractionService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** firstimage 우선, 없으면 firstimage2 (KorService2·연관관광지 공통 스키마). 둘 다 없으면 null. */
+    private static String firstImageUrl(JsonNode node) {
+        String primary = node.path("firstimage").asText(null);
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        String secondary = node.path("firstimage2").asText(null);
+        return secondary == null || secondary.isBlank() ? null : secondary;
     }
 }
