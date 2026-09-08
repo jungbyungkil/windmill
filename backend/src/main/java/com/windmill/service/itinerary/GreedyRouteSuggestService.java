@@ -94,7 +94,7 @@ public class GreedyRouteSuggestService {
             here = MapRouteRequest.MapPoint.builder().lon(0).lat(0).name("unknown").build();
         }
 
-        List<Planned> planned = greedy(withCoords, without, here, cursor, visitDate, when);
+        List<Planned> planned = snapArrivals(greedy(withCoords, without, here, cursor, visitDate, when));
         List<SuggestedRouteStop> suggestedStops = planned.stream().map(this::toStop).toList();
 
         int hardCount = (int) planned.stream().filter(Planned::hard).count();
@@ -411,6 +411,19 @@ public class GreedyRouteSuggestService {
                 .stayMinutes(VisitTiming.stayMinutes(item))
                 .contentTypeId(item.getContentTypeId())
                 .build();
+    }
+
+    /** 저장되는 스케줄이 30분 단위이므로 "이 순서 어때요?" 미리보기 도착 시각도 같은 규칙으로 스냅한다. */
+    private static List<Planned> snapArrivals(List<Planned> planned) {
+        List<LocalTime> snapped = VisitTiming.snapSequential(
+                planned.stream().map(p -> p.arrival).toList());
+        List<Planned> out = new ArrayList<>(planned.size());
+        for (int i = 0; i < planned.size(); i++) {
+            Planned p = planned.get(i);
+            LocalTime a = snapped.get(i) != null ? snapped.get(i) : p.arrival;
+            out.add(new Planned(p.item, a, p.travelFromPrev, p.hard, p.hardReason));
+        }
+        return out;
     }
 
     private SuggestedRouteStop toStop(Planned planned) {

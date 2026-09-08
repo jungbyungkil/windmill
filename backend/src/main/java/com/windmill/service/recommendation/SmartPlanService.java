@@ -122,6 +122,7 @@ public class SmartPlanService {
         attrPool = new ArrayList<>(sortPopular(attrPool));
 
         List<RecommendationCandidate> day = assembleStandardDaySlots(attrPool, date);
+        snapStopTimes(day);
 
         fillDistances(day);
         double dayKm = RouteOptimizer.totalDistanceKm(day);
@@ -458,6 +459,7 @@ public class SmartPlanService {
             LocalTime dayStart = resolveDayStart(date);
             List<RecommendationCandidate> routed = buildDayRhythm(
                     attrPool, foodPool, dayStart, familyPace, placeCap, date);
+            snapStopTimes(routed);
 
             fillDistances(routed);
             double dayKm = RouteOptimizer.totalDistanceKm(routed);
@@ -959,6 +961,23 @@ public class SmartPlanService {
 
     private static LocalTime maxTime(LocalTime a, LocalTime b) {
         return a.isAfter(b) ? a : b;
+    }
+
+    /**
+     * 스마트 동선 정차 시각을 저장 규칙과 동일하게 30분 단위로 올림 스냅한다(중복·역전은 +30분).
+     * suggestedTime이 없는(null) 슬롯은 건드리지 않는다.
+     */
+    private static void snapStopTimes(List<RecommendationCandidate> orderedStops) {
+        List<LocalTime> raw = orderedStops.stream()
+                .map(s -> parseTime(s.getSuggestedTime()))
+                .collect(Collectors.toList());
+        List<LocalTime> snapped = VisitTiming.snapSequential(raw);
+        for (int i = 0; i < orderedStops.size(); i++) {
+            LocalTime t = snapped.get(i);
+            if (t != null) {
+                orderedStops.get(i).setSuggestedTime(t.format(TIME_FORMAT));
+            }
+        }
     }
 
     private static LocalTime parseTime(String hhmm) {

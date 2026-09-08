@@ -7,6 +7,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VisitTimingTest {
@@ -140,5 +141,50 @@ class VisitTimingTest {
                 LocalTime.of(22, 10), LocalTime.of(18, 30), 22, occupied, LocalTime.of(9, 0), 2L, 60);
 
         assertEquals(List.of("12:00", "13:00", "14:00"), times);
+    }
+
+    @Test
+    void snapToNext30Min_followsRuleTable() {
+        assertEquals(LocalTime.of(14, 0), VisitTiming.snapToNext30Min(LocalTime.of(14, 0)));
+        assertEquals(LocalTime.of(14, 30), VisitTiming.snapToNext30Min(LocalTime.of(14, 1)));
+        assertEquals(LocalTime.of(14, 30), VisitTiming.snapToNext30Min(LocalTime.of(14, 30)));
+        assertEquals(LocalTime.of(15, 0), VisitTiming.snapToNext30Min(LocalTime.of(14, 31)));
+        assertEquals(LocalTime.of(15, 0), VisitTiming.snapToNext30Min(LocalTime.of(15, 0)));
+    }
+
+    @Test
+    void snapToNext30Min_pastMidnightClampsTo2330() {
+        assertEquals(LocalTime.of(23, 30), VisitTiming.snapToNext30Min(LocalTime.of(23, 31)));
+        assertEquals(LocalTime.of(23, 30), VisitTiming.snapToNext30Min(LocalTime.of(23, 59)));
+    }
+
+    @Test
+    void snapToNext30Min_stringOverload_passesThroughUnparseable() {
+        assertEquals("09:30", VisitTiming.snapToNext30Min("09:05"));
+        assertEquals("", VisitTiming.snapToNext30Min(""));
+        assertNull(VisitTiming.snapToNext30Min((String) null));
+    }
+
+    @Test
+    void snapSequential_bumpsDuplicatesAndReversalsByThirtyMinutes() {
+        // 14:10→14:30, 14:20→14:30(중복)→15:00, 14:05→14:30(역전)→15:30
+        List<LocalTime> out = VisitTiming.snapSequential(List.of(
+                LocalTime.of(14, 10), LocalTime.of(14, 20), LocalTime.of(14, 5)));
+        assertEquals(List.of(LocalTime.of(14, 30), LocalTime.of(15, 0), LocalTime.of(15, 30)), out);
+    }
+
+    @Test
+    void snapSequential_alreadyOnGridAndAscendingIsUnchanged() {
+        List<LocalTime> in = List.of(LocalTime.of(9, 0), LocalTime.of(10, 30), LocalTime.of(12, 0));
+        assertEquals(in, VisitTiming.snapSequential(in));
+    }
+
+    @Test
+    void snapSequential_keepsNullEntries() {
+        List<LocalTime> out = VisitTiming.snapSequential(java.util.Arrays.asList(
+                LocalTime.of(9, 5), null, LocalTime.of(9, 40)));
+        assertEquals(LocalTime.of(9, 30), out.get(0));
+        assertNull(out.get(1));
+        assertEquals(LocalTime.of(10, 0), out.get(2));
     }
 }

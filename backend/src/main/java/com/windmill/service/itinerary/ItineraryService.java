@@ -321,7 +321,8 @@ public class ItineraryService {
                                 close, closeBuffer);
                 if (plan != null) {
                     insertBeforeDayIndex = plan.index();
-                    scheduledTime = plan.arrival().format(TIME_FMT);
+                    // 자동으로 끼워 넣은 도착 시각도 30분 단위로 스냅해 저장(신규 스마트 일정 규칙과 동일)
+                    scheduledTime = VisitTiming.snapToNext30Min(plan.arrival()).format(TIME_FMT);
                 }
             }
         }
@@ -516,6 +517,19 @@ public class ItineraryService {
     }
 
     /**
+     * 재계산된(자동 추정) 시각을 저장 규칙과 동일하게 30분 단위로 올림 스냅한다. 스냅 결과가 직전
+     * 배정 시각과 같거나 이르면(중복·역전) 직전+30분으로 민다. 호출부는 반환값을 다음 계산의
+     * 커서로 이어 써서 스냅된 값 기준으로 체류·이동을 누적한다.
+     */
+    private static LocalTime snapForward(LocalTime computed, LocalTime prevAssigned) {
+        LocalTime snapped = VisitTiming.snapToNext30Min(computed);
+        if (snapped != null && prevAssigned != null && !snapped.isAfter(prevAssigned)) {
+            snapped = prevAssigned.plusMinutes(VisitTiming.SCHEDULE_SNAP_MINUTES);
+        }
+        return snapped;
+    }
+
+    /**
      * index 위치(그 자리에 있던 항목부터) 뒤로 밀며 표시순서·시각을 다시 계산한다(같은 Haversine
      * 추정 공식). 실제 도로 이동시간까지 반영하려면 사용자가 별도로 "동선 재계산"을 돌려야 한다.
      */
@@ -525,14 +539,18 @@ public class ItineraryService {
         }
         newItem.setDisplayOrder(index);
         LocalTime cursor = start;
+        LocalTime prevAssigned = start;
         ItineraryItem prev = newItem;
         for (int i = index; i < dayItems.size(); i++) {
             ItineraryItem next = dayItems.get(i);
             int travel = travelMinutes(prev.getMapX(), prev.getMapY(), next.getMapX(), next.getMapY());
             cursor = VisitTiming.occupancyEnd(cursor, VisitTiming.stayMinutes(prev), VisitTiming.resolveCloseTime(prev))
                     .plusMinutes(travel);
-            next.setScheduledTime(cursor.format(TIME_FMT));
+            LocalTime assigned = snapForward(cursor, prevAssigned);
+            next.setScheduledTime(assigned.format(TIME_FMT));
             next.setDisplayOrder(i + 1);
+            prevAssigned = assigned;
+            cursor = assigned;
             prev = next;
         }
     }
@@ -717,16 +735,19 @@ public class ItineraryService {
         }
         LocalTime cursor;
         ItineraryItem prev;
+        LocalTime prevAssigned;
         if (before.isEmpty()) {
             cursor = ClosingTimeGate.parseHhMm(removedTime);
             if (cursor == null) {
                 cursor = resolveDayStart(visitDate);
             }
             prev = null;
+            prevAssigned = null;
         } else {
             prev = before.get(before.size() - 1);
             LocalTime prevEnd = VisitTiming.occupancyEnd(prev);
             cursor = prevEnd != null ? prevEnd : parseOrDefault(prev.getScheduledTime());
+            prevAssigned = parseOrDefault(prev.getScheduledTime());
         }
         for (int i = 0; i < after.size(); i++) {
             ItineraryItem next = after.get(i);
@@ -734,10 +755,12 @@ public class ItineraryService {
                 cursor = cursor.plusMinutes(travelMinutes(prev.getMapX(), prev.getMapY(),
                         next.getMapX(), next.getMapY()));
             }
-            next.setScheduledTime(cursor.format(TIME_FMT));
+            LocalTime assigned = snapForward(cursor, prevAssigned);
+            next.setScheduledTime(assigned.format(TIME_FMT));
             next.setDisplayOrder(order++);
+            prevAssigned = assigned;
             LocalTime end = VisitTiming.occupancyEnd(next);
-            cursor = end != null ? end : cursor.plusMinutes(VisitTiming.stayMinutes(next));
+            cursor = end != null ? end : assigned.plusMinutes(VisitTiming.stayMinutes(next));
             prev = next;
         }
     }

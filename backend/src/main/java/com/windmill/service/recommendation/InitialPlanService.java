@@ -6,6 +6,7 @@ import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.service.ai.OpenAiService;
 import com.windmill.util.ClosingTimeGate;
+import com.windmill.util.VisitTiming;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,11 +54,30 @@ public class InitialPlanService {
             return Mono.just(List.of());
         }
         if (!openAiService.isConfigured()) {
-            return Mono.just(autoScheduleRespectingClose(candidates, placeCount));
+            return Mono.just(snapCandidateTimes(autoScheduleRespectingClose(candidates, placeCount)));
         }
         return openAiService.complete(buildPrompt(candidates))
-                .map(response -> finalizeWithCloseGate(applySuggestedTimes(response, candidates), candidates, placeCount))
-                .onErrorReturn(autoScheduleRespectingClose(candidates, placeCount));
+                .map(response -> snapCandidateTimes(
+                        finalizeWithCloseGate(applySuggestedTimes(response, candidates), candidates, placeCount)))
+                .onErrorReturn(snapCandidateTimes(autoScheduleRespectingClose(candidates, placeCount)));
+    }
+
+    /**
+     * 배정된 방문 시각을 저장 규칙과 동일하게 30분 단위로 올림 스냅한다(중복·역전은 +30분).
+     * 순서는 이미 sortByTime으로 정렬된 상태로 들어온다.
+     */
+    private static List<RecommendationCandidate> snapCandidateTimes(List<RecommendationCandidate> ordered) {
+        List<LocalTime> raw = ordered.stream()
+                .map(c -> ClosingTimeGate.parseHhMm(c.getSuggestedTime()))
+                .collect(Collectors.toList());
+        List<LocalTime> snapped = VisitTiming.snapSequential(raw);
+        for (int i = 0; i < ordered.size(); i++) {
+            LocalTime t = snapped.get(i);
+            if (t != null) {
+                ordered.get(i).setSuggestedTime(t.format(TIME_FORMAT));
+            }
+        }
+        return ordered;
     }
 
     private String buildPrompt(List<RecommendationCandidate> candidates) {

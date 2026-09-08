@@ -181,8 +181,8 @@ class ItineraryServiceDeleteReplaceTest {
                 .toList();
         assertEquals(2, remaining.size());
         assertEquals("10:00", remaining.get(0).getScheduledTime());
-        // 경복궁 10:00 + 관광 기본 체류 45분 + 좌표 없을 때 기본 이동 10분 = 10:55
-        assertEquals("10:55", remaining.get(1).getScheduledTime());
+        // 경복궁 10:00 + 체류 45분 + 기본 이동 10분 = 10:55 → 30분 단위 올림 스냅 → 11:00
+        assertEquals("11:00", remaining.get(1).getScheduledTime());
         assertEquals("북촌한옥마을", remaining.get(1).getPlaceName());
     }
 

@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -155,9 +156,15 @@ public class RouteRecalculationService {
                                int[] fromOrigin,
                                LocalTime overrideStartTime) {
         LocalTime[] arrivals = simulateArrivals(ordered, minutes, idToIdx, overrideStartTime);
+        // 저장되는 스케줄 값은 30분 단위 올림 스냅(중복·역전은 +30분). 사용자가 지정한 첫 도착
+        // 시각(overrideStartTime)은 정확히 유지하고 이후 장소만 스냅 결과를 쓴다.
+        List<LocalTime> snapped = VisitTiming.snapSequential(Arrays.asList(arrivals));
+        if (overrideStartTime != null && !snapped.isEmpty()) {
+            snapped.set(0, arrivals[0]);
+        }
         int totalTravel = 0;
         for (int i = 0; i < ordered.size(); i++) {
-            ordered.get(i).setScheduledTime(arrivals[i].format(TIME_FMT));
+            ordered.get(i).setScheduledTime(snapped.get(i).format(TIME_FMT));
             totalTravel += travelBetween(ordered, i, minutes, idToIdx);
         }
 

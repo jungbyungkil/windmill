@@ -219,7 +219,8 @@ public class AnchorPlanService {
     }
 
     private void tag(RecommendationCandidate c, LocalTime time, String note) {
-        c.setSuggestedTime(time.format(TIME_FORMAT));
+        // 앵커(사용자가 직접 정한 고정 시각)를 뺀 자동 채움 슬롯은 30분 단위로 올림 스냅한다.
+        c.setSuggestedTime(VisitTiming.snapToNext30Min(time).format(TIME_FORMAT));
         c.setOneLiner(withSlotNote(c.getOneLiner(), note));
     }
 

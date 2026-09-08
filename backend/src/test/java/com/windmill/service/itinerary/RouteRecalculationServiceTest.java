@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 표준 4단계 일정을 optimizeRoute로 재계산할 때, 관광·맛집 풀이 별도 API 호출로 채워지다 보니
@@ -78,10 +79,11 @@ class RouteRecalculationServiceTest {
 
         service.assignSchedule(clumped, null, null, null);
 
+        // 저장 값은 30분 단위 올림 스냅 (11:00 / 17:00 / 17:50→18:00 / 18:45→19:00)
         assertEquals("11:00", clumped.get(0).getScheduledTime());
         assertEquals("17:00", clumped.get(1).getScheduledTime());
-        assertEquals("17:50", clumped.get(2).getScheduledTime());
-        assertEquals("18:45", clumped.get(3).getScheduledTime());
+        assertEquals("18:00", clumped.get(2).getScheduledTime());
+        assertEquals("19:00", clumped.get(3).getScheduledTime());
     }
 
     @Test
@@ -95,10 +97,11 @@ class RouteRecalculationServiceTest {
         List<ItineraryItem> declumped = RouteRecalculationService.declumpAdjacentMeals(clumped);
         service.assignSchedule(declumped, null, null, null);
 
+        // 30분 단위 올림 스냅 적용
         assertEquals("11:00", declumped.get(0).getScheduledTime()); // 새봄떡국국수 (점심)
-        assertEquals("11:50", declumped.get(1).getScheduledTime()); // 농업박물관 (오후)
+        assertEquals("12:00", declumped.get(1).getScheduledTime()); // 농업박물관 11:50→12:00
         assertEquals("17:00", declumped.get(2).getScheduledTime()); // 한암동 정동점 (저녁)
-        assertEquals("17:50", declumped.get(3).getScheduledTime()); // 국도발전전시관
+        assertEquals("18:00", declumped.get(3).getScheduledTime()); // 국도발전전시관 17:50→18:00
     }
 
     @Test
@@ -111,11 +114,12 @@ class RouteRecalculationServiceTest {
 
         service.assignSchedule(List.of(attr1, attr2, food), null, null, null);
 
+        // 30분 단위 올림 스냅: 09:00 / 09:55→10:00 / 11:05→11:30
         assertEquals("09:00", attr1.getScheduledTime());
-        assertEquals("09:55", attr2.getScheduledTime());
-        // 09:55 + 60(국도발전"전시관" 체류) + 10(이동) = 11:05 → 이미 점심 창(11:00~14:00) 안이라
-        // 정각(12:00)으로 당기지 않고 그대로 둔다
-        assertEquals("11:05", food.getScheduledTime());
+        assertEquals("10:00", attr2.getScheduledTime());
+        // 자연 도착 11:05가 이미 점심 창(11:00~14:00) 안이라 정각 12:00으로 당기지 않고,
+        // 스냅만 적용해 11:30이 된다
+        assertEquals("11:30", food.getScheduledTime());
     }
 
     @Test
@@ -135,11 +139,12 @@ class RouteRecalculationServiceTest {
         assertEquals(List.of(food1, attr1, stampMuseum, food2, attr2), repaired);
 
         service.assignSchedule(repaired, null, null, null);
+        // 30분 단위 올림 스냅 적용
         assertEquals("11:00", food1.getScheduledTime());
-        assertEquals("11:50", attr1.getScheduledTime());
-        assertEquals("12:45", stampMuseum.getScheduledTime()); // 마감(16:50-60=15:50) 안에 도착
+        assertEquals("12:00", attr1.getScheduledTime()); // 11:50→12:00
+        assertEquals("13:00", stampMuseum.getScheduledTime()); // 12:45→13:00, 마감(15:50) 안에 도착
         assertEquals("17:00", food2.getScheduledTime());
-        assertEquals("17:50", attr2.getScheduledTime());
+        assertEquals("18:00", attr2.getScheduledTime()); // 17:50→18:00
     }
 
     @Test
@@ -162,9 +167,32 @@ class RouteRecalculationServiceTest {
 
         service.assignSchedule(List.of(attr1, attr2), null, null, null, LocalTime.of(17, 0));
 
+        // 사용자가 지정한 첫 도착 시각은 스냅하지 않고 정확히 유지
         assertEquals("17:00", attr1.getScheduledTime());
-        // 17:00 + 45(체류) + 10(이동) = 17:55
-        assertEquals("17:55", attr2.getScheduledTime());
+        // 17:00 + 45(체류) + 10(이동) = 17:55 → 30분 스냅 → 18:00
+        assertEquals("18:00", attr2.getScheduledTime());
+    }
+
+    @Test
+    void assignSchedule_everyEmittedTimeIsOn30MinGridAndStrictlyIncreasing() {
+        List<ItineraryItem> items = List.of(
+                place(1, "새봄떡국국수", true),
+                place(2, "농업박물관", false),
+                place(3, "한암동 정동점", true),
+                place(4, "국도발전전시관", false),
+                placeWithClose(5, "우표박물관", "16:50"));
+
+        service.assignSchedule(new ArrayList<>(items), null, null, null);
+
+        LocalTime prev = null;
+        for (ItineraryItem item : items) {
+            LocalTime t = LocalTime.parse(item.getScheduledTime());
+            assertEquals(0, t.getMinute() % 30, item.getPlaceName() + " 는 30분 격자 위여야 함: " + t);
+            if (prev != null) {
+                assertTrue(t.isAfter(prev), "시각이 역전되지 않아야 함: " + prev + " → " + t);
+            }
+            prev = t;
+        }
     }
 
     @Test

@@ -107,12 +107,13 @@ class ItineraryServiceClosingGateInsertionTest {
         assertEquals("11:00", byOrder.get(0).getScheduledTime());
         assertEquals("농업박물관", byOrder.get(1).getPlaceName());
         assertEquals("12:20", byOrder.get(1).getScheduledTime());
-        // 마감(16:50-60분=15:50) 안에 드는 가장 늦은 자리 - 농업박물관(12:20+45+10=13:15) 뒤
+        // 마감(16:50-60분=15:50) 안에 드는 가장 늦은 자리 - 농업박물관(12:20+45+10=13:15) 뒤,
+        // 자동 배정 시각도 30분 단위로 스냅 → 13:30
         assertEquals("우표박물관", byOrder.get(2).getPlaceName());
-        assertEquals("13:15", byOrder.get(2).getScheduledTime());
-        // 뒤로 밀린 국도발전전시관은 새 위치 기준으로 시각이 재계산된다
+        assertEquals("13:30", byOrder.get(2).getScheduledTime());
+        // 뒤로 밀린 국도발전전시관은 새 위치 기준으로 재계산 후 스냅 (13:30+45+10=14:25 → 14:30)
         assertEquals("국도발전전시관", byOrder.get(3).getPlaceName());
-        assertEquals("14:10", byOrder.get(3).getScheduledTime());
+        assertEquals("14:30", byOrder.get(3).getScheduledTime());
     }
 
     /**

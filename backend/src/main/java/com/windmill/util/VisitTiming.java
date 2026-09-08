@@ -495,6 +495,54 @@ public final class VisitTiming {
         return time.getHour() * 60 + time.getMinute();
     }
 
+    /** 스마트(자동 생성) 일정 시각의 정렬 단위. 이동시간 계산 결과를 이 단위로 올림 스냅한다. */
+    public static final int SCHEDULE_SNAP_MINUTES = 30;
+
+    /**
+     * 스마트 일정 시각을 30분 단위로 올림(ceil). 이미 정각/30분이면 그대로 둔다.
+     * 14:00→14:00, 14:01~14:30→14:30, 14:31~15:00→15:00. 자정을 넘기면 23:30으로 고정.
+     */
+    public static LocalTime snapToNext30Min(LocalTime time) {
+        if (time == null) {
+            return null;
+        }
+        int m = minutesOf(time);
+        int rounded = ((m + SCHEDULE_SNAP_MINUTES - 1) / SCHEDULE_SNAP_MINUTES) * SCHEDULE_SNAP_MINUTES;
+        if (rounded >= 24 * 60) {
+            return LocalTime.of(23, 30);
+        }
+        return LocalTime.of(rounded / 60, rounded % 60);
+    }
+
+    /** {@link #snapToNext30Min(LocalTime)}의 "HH:mm" 문자열 버전. 파싱 불가면 원본을 그대로 반환. */
+    public static String snapToNext30Min(String hhmm) {
+        LocalTime t = ClosingTimeGate.parseHhMm(hhmm);
+        return t == null ? hhmm : snapToNext30Min(t).format(HH_MM);
+    }
+
+    /**
+     * 순서대로 30분 스냅을 적용하되, 스냅 결과가 직전 항목과 같거나 이르면(중복·역전) 직전+30분으로
+     * 민다. 신규 스마트 일정 생성과 기존 기록 마이그레이션이 이 규칙을 공유한다. null 원소는 그대로 통과.
+     */
+    public static List<LocalTime> snapSequential(List<LocalTime> times) {
+        List<LocalTime> out = new ArrayList<>(times.size());
+        LocalTime prev = null;
+        for (LocalTime t : times) {
+            LocalTime snapped = snapToNext30Min(t);
+            if (snapped == null) {
+                out.add(null);
+                continue;
+            }
+            if (prev != null && !snapped.isAfter(prev)) {
+                LocalTime bumped = prev.plusMinutes(SCHEDULE_SNAP_MINUTES);
+                snapped = bumped.isAfter(prev) ? bumped : LocalTime.of(23, 30);
+            }
+            out.add(snapped);
+            prev = snapped;
+        }
+        return out;
+    }
+
     public record Occupied(Long itemId, String placeName, LocalTime start, LocalTime end) {
     }
 
