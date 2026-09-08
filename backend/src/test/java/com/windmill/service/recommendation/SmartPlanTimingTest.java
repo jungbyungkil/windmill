@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SmartPlanTimingTest {
 
-    private final SmartPlanService service = new SmartPlanService(null, null, null, null, null);
+    private final SmartPlanService service = new SmartPlanService(null, null, null, null, null, null);
 
     @Test
     void futureDayStartsAtNine() {
@@ -185,7 +185,7 @@ class SmartPlanTimingTest {
     }
 
     @Test
-    void standardDaySlots_fillsMorningAndAfternoonSightsWithoutMeals() {
+    void standardDaySlots_fillsMorningAndAfternoonSights() {
         List<RecommendationCandidate> attrs = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
             attrs.add(RecommendationCandidate.builder()
@@ -198,18 +198,42 @@ class SmartPlanTimingTest {
                     .build());
         }
 
+        // 맛집 풀이 비면 관광만: 오전·오후 관광 2슬롯
         List<RecommendationCandidate> day = service.assembleStandardDaySlots(attrs);
 
-        assertTrue(day.size() >= 3 && day.size() <= 4, "오전·오후 관광이어야 함, got " + day.size());
+        assertEquals(2, day.size(), "맛집 풀이 없으면 오전·오후 관광 2곳, got " + day.size());
         long meals = day.stream().filter(s -> "점심".equals(s.getCategory()) || "저녁".equals(s.getCategory())).count();
-        long cafeCount = day.stream().filter(s -> "카페".equals(s.getCategory())).count();
         assertEquals(0, meals);
-        assertEquals(0, cafeCount);
-        // 슬롯의 시간대(오전/오후)는 category가 아니라 suggestedTime/oneLiner에 담긴다 -
-        // category에는 장소 본래 유형("관광" 등)을 그대로 둔다(skipsRestaurantsAndClosedDays 참고).
         assertTrue(day.get(0).getSuggestedTime().compareTo("12:00") < 0, "첫 슬롯은 오전");
         assertTrue(day.stream().anyMatch(s -> s.getSuggestedTime() != null
                 && s.getSuggestedTime().compareTo("12:00") >= 0), "오후 슬롯이 있어야 함");
+    }
+
+    @Test
+    void standardDaySlots_alwaysIncludesLunchAndDinner() {
+        List<RecommendationCandidate> attrs = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            attrs.add(RecommendationCandidate.builder()
+                    .contentId("A" + i).placeName("관광지" + i).category("관광").contentTypeId(12)
+                    .rank(i + 1).mapX("127.00" + i).mapY("37.00" + i).build());
+        }
+        List<RecommendationCandidate> foods = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            foods.add(RecommendationCandidate.builder()
+                    .contentId("F" + i).placeName("맛집" + i).category("맛집").contentTypeId(39)
+                    .matchedTags(List.of("#맛집")).rank(i + 1).mapX("127.01" + i).mapY("37.01" + i).build());
+        }
+
+        List<RecommendationCandidate> day = service.assembleStandardDaySlots(attrs, foods, LocalDate.of(2026, 9, 9));
+
+        assertEquals(4, day.size(), "오전 일정·점심·오후 일정·저녁 4슬롯이어야 함");
+        assertEquals("점심", day.get(1).getCategory(), "두 번째 슬롯은 점심");
+        assertEquals("저녁", day.get(3).getCategory(), "네 번째 슬롯은 저녁");
+        assertTrue(Integer.valueOf(39).equals(day.get(1).getContentTypeId()), "점심은 맛집(39)");
+        assertTrue(Integer.valueOf(39).equals(day.get(3).getContentTypeId()), "저녁은 맛집(39)");
+        assertTrue(day.get(0).getSuggestedTime().compareTo(day.get(1).getSuggestedTime()) < 0, "시간 오름차순");
+        assertTrue(day.get(1).getSuggestedTime().compareTo(day.get(2).getSuggestedTime()) < 0, "시간 오름차순");
+        assertTrue(day.get(2).getSuggestedTime().compareTo(day.get(3).getSuggestedTime()) < 0, "시간 오름차순");
     }
 
     @Test
