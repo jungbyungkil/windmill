@@ -250,9 +250,27 @@ export default function App() {
     navigate('/');
   }
 
+  /**
+   * 특정 일정을 "항상 최신 상태로" 열어 /trip으로 이동한다.
+   * resumeDraftItinerary만 쓰면 itineraryId가 이미 그 값일 때(재개) [itineraryId] 로드 이펙트가
+   * 재실행되지 않아 이전에 화면에 있던 옛 itinerary가 그대로 보이는 문제가 있었다
+   * (중복 일정 모달 "기존 일정 수정"에서 재현). 여기서 명시적으로 새로 받아 상태를 갱신한다.
+   */
+  async function openItineraryFresh(id) {
+    if (id == null) return;
+    try {
+      const fresh = await api.getItinerary(id);
+      resumeDraftItinerary(id);
+      setItinerary(fresh);
+      setActiveDate(fresh.startDate);
+      navigate('/trip');
+    } catch (e) {
+      setCreateError(e.message || '일정을 불러오지 못했어요');
+    }
+  }
+
   function handleResumeDraft(id) {
-    resumeDraftItinerary(id);
-    navigate('/trip');
+    openItineraryFresh(id);
   }
 
   function handleOpenMyTrips() {
@@ -485,14 +503,11 @@ export default function App() {
     return finalItinerary;
   }
 
-  /** 중복 안내 모달 - "기존 일정 수정" 선택 시 그 일정으로 이동해 편집 */
+  /** 중복 안내 모달 - "기존 일정 수정" 선택 시 그 일정을 최신 상태로 열어 편집 */
   function handleEditExistingItinerary() {
     const id = duplicateConflict?.existing?.itineraryId;
     setDuplicateConflict(null);
-    if (id != null) {
-      resumeDraftItinerary(id);
-      navigate('/trip');
-    }
+    openItineraryFresh(id);
   }
 
   /** 중복 안내 모달 - "새로 만들기" 선택 시 기존 일정을 지우고 같은 입력값으로 재생성 */
@@ -1613,11 +1628,8 @@ export default function App() {
 
                 {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
 
-                <div className="daytrip-chip-row">
-                  <span className="daytrip-chip">당일치기</span>
-                  {tripDate && <span className="daytrip-date">{formatTripDate(tripDate)}</span>}
-                  <span className="daytrip-count">{visibleItems.length}곳</span>
-                  {itinerary.changeHistory?.length > 0 && (
+                {itinerary.changeHistory?.length > 0 && (
+                  <div className="daytrip-chip-row">
                     <button
                       type="button"
                       className="plan-history-open-btn"
@@ -1625,8 +1637,8 @@ export default function App() {
                     >
                       🕓 변경 이력 {itinerary.changeHistory.length}
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <ItineraryList
                   items={visibleItems}
