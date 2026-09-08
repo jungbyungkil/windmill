@@ -42,6 +42,11 @@ public class ItineraryResponse {
     /** 삭제 직후 자동 대체된 장소명(선택) - 프론트가 "OO로 자동 채워드렸어요" 안내에 사용 */
     private String autoReplacedPlaceName;
 
+    /** 원본 일정(Plan A) 스냅샷 - 첫 변경이 있기 전엔 null. 이력 패널 맨 위 고정 카드. */
+    private PlanSnapshot originalPlan;
+    /** 변경 이력 - 시간순, 최대 9개. 마지막 항목이 현재 적용 중인 상태. */
+    private List<PlanChangeEntry> changeHistory;
+
     public static ItineraryResponse from(Itinerary itinerary, ItineraryStatus status) {
         ItineraryResponse response = from(itinerary);
         response.setStatus(status);
@@ -81,6 +86,8 @@ public class ItineraryResponse {
                         .map(ItineraryItemResponse::from)
                         .collect(Collectors.toList()))
                 .confirmedDates(itinerary.getConfirmedDates())
+                .originalPlan(itinerary.getOriginalSnapshot())
+                .changeHistory(itinerary.getChangeHistory())
                 .build();
     }
 }

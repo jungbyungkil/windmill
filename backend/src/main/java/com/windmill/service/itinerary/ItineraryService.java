@@ -5,8 +5,10 @@ import com.windmill.domain.ItineraryItem;
 import com.windmill.domain.PlaceSituationalTags;
 import com.windmill.domain.TripRecord;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.ApplyAlternativeRequest;
 import com.windmill.dto.ApplySuggestedRouteRequest;
 import com.windmill.dto.CreateItineraryRequest;
+import com.windmill.dto.PlanSnapshot;
 import com.windmill.dto.ItineraryItemResponse;
 import com.windmill.dto.ItineraryListItemResponse;
 import com.windmill.dto.ItineraryResponse;
@@ -64,6 +66,7 @@ public class ItineraryService {
     private final RouteRecalculationService routeRecalculationService;
     private final TourAttractionService tourAttractionService;
     private final SituationalTagService situationalTagService;
+    private final PlanHistoryService planHistoryService;
 
     @Transactional
     public Itinerary create(String sessionUuid, CreateItineraryRequest request) {
@@ -1017,6 +1020,108 @@ public class ItineraryService {
     }
 
     public record OptimizeRouteResult(Itinerary itinerary, String message, Double totalDistanceKm) {
+    }
+
+    // ── 대안 일정(원본 + 변경 이력) ──────────────────────────────────────────────
+
+    /**
+     * 대안 채택 통합 처리 - 기존 항목 삭제 + 대안 추가(+ 선택적 동선 재계산)를 한 트랜잭션으로 하고
+     * 변경 이력을 한 건만 남긴다. 실패(시간겹침·마감불가 등) 시 전체 롤백 - 예전 프론트 3단계 호출은
+     * 삭제만 되고 추가가 실패하면 빈 슬롯이 남던 문제가 있었다.
+     */
+    @Transactional
+    public ApplyAlternativeResult applyAlternative(Long itineraryId, ApplyAlternativeRequest req) {
+        Itinerary itinerary = get(itineraryId);
+        PlanSnapshot before = planHistoryService.snapshotOf(itinerary);
+
+        if (req.getRemovedItemId() != null) {
+            itinerary.getItems().removeIf(i -> i.getId().equals(req.getRemovedItemId()));
+        }
+
+        AddItineraryItemRequest add = req.getNewPlace();
+        add.setIsAlternate(Boolean.TRUE);
+        Itinerary withNew = addItem(itineraryId, add);
+
+        String routeHint = null;
+        Double km = null;
+        if (req.isReoptimize()) {
+            LocalDate date = add.getVisitDate() != null ? add.getVisitDate() : withNew.getStartDate();
+            OptimizeRouteResult r = optimizeRoute(itineraryId, date, null, null, null);
+            withNew = r.itinerary();
+            routeHint = r.message();
+            km = r.totalDistanceKm();
+        }
+
+        String trigger = normalizeTrigger(req.getTriggerType());
+        String reason = req.getReason() != null && !req.getReason().isBlank()
+                ? req.getReason()
+                : defaultChangeReason(trigger);
+        planHistoryService.recordChange(withNew, before, trigger, reason,
+                add.getContentId(), add.getPlaceName());
+        Itinerary saved = itineraryRepository.save(withNew);
+        return new ApplyAlternativeResult(saved, add.getPlaceName(), routeHint, km);
+    }
+
+    public record ApplyAlternativeResult(Itinerary itinerary, String newPlaceName,
+                                         String routeHint, Double totalDistanceKm) {
+    }
+
+    /**
+     * "동선 다시" 전용 - 동선을 재계산하고 그 자체를 변경 이력(triggerType=ROUTE)으로 남긴다.
+     * optimize-route는 GPS 시작·일자 확정 등 여러 곳에서 불려서 이력을 남기지 않는다 - 사용자가
+     * 명시적으로 누른 이 경로만 이력에 쌓는다.
+     */
+    @Transactional
+    public OptimizeRouteResult applyReroute(Long itineraryId, LocalDate date,
+                                            Double originLon, Double originLat, String startTime,
+                                            String reason) {
+        Itinerary itinerary = get(itineraryId);
+        PlanSnapshot before = planHistoryService.snapshotOf(itinerary);
+        OptimizeRouteResult r = optimizeRoute(itineraryId, date, originLon, originLat, startTime);
+        Itinerary after = r.itinerary();
+        planHistoryService.recordChange(after, before, "ROUTE",
+                reason != null && !reason.isBlank() ? reason : "동선 재계산", null, null);
+        Itinerary saved = itineraryRepository.save(after);
+        return new OptimizeRouteResult(saved, r.message(), r.totalDistanceKm());
+    }
+
+    /**
+     * 원본 또는 특정 변경 이력 시점으로 되돌린다. 되돌리기 자체도 새 변경 이력(REVERT)으로 남는다.
+     * @param targetSequence null이면 원본으로
+     */
+    @Transactional
+    public Itinerary revertPlan(Long itineraryId, Integer targetSequence) {
+        Itinerary itinerary = get(itineraryId);
+        PlanSnapshot reverted = planHistoryService.revert(itinerary, targetSequence);
+        if (reverted == null) {
+            throw new IllegalArgumentException(targetSequence == null
+                    ? "되돌릴 원본이 아직 없어요"
+                    : "변경 이력 #" + targetSequence + "을(를) 찾을 수 없어요");
+        }
+        return itineraryRepository.save(itinerary);
+    }
+
+    private static String normalizeTrigger(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "MANUAL";
+        }
+        return switch (raw.trim().toUpperCase()) {
+            case "WEATHER", "RAIN" -> "WEATHER";
+            case "HEAT" -> "HEAT";
+            case "CROWD" -> "CROWD";
+            case "ROUTE" -> "ROUTE";
+            default -> "MANUAL";
+        };
+    }
+
+    private static String defaultChangeReason(String trigger) {
+        return switch (trigger) {
+            case "WEATHER" -> "비 예보로 실내 코스로 대체";
+            case "HEAT" -> "폭염으로 실내 코스로 대체";
+            case "CROWD" -> "혼잡으로 한산한 곳으로 대체";
+            case "ROUTE" -> "동선을 줄이려 장소 교체";
+            default -> "장소 교체";
+        };
     }
 
     private boolean itemHasCoords(ItineraryItem item) {

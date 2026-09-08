@@ -57,7 +57,7 @@ class ItineraryServiceDeleteReplaceTest {
                         .updatedAt(java.time.LocalDateTime.now())
                         .build());
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService, situationalTagService);
+                routeRecalculationService, tourAttractionService, situationalTagService, new PlanHistoryService());
         when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 

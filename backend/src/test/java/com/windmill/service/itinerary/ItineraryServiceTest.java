@@ -61,7 +61,7 @@ class ItineraryServiceTest {
                         .updatedAt(java.time.LocalDateTime.now())
                         .build());
         service = new ItineraryService(itineraryRepository, tripRecordRepository, regionCodeService,
-                routeRecalculationService, tourAttractionService, situationalTagService);
+                routeRecalculationService, tourAttractionService, situationalTagService, new PlanHistoryService());
 
         when(regionCodeService.find("51210")).thenReturn(Optional.of(RegionCode.builder()
                 .sidoName("강원특별자치도").signguName("속초시").signguFullCode("51210")

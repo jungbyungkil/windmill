@@ -6,6 +6,7 @@ import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.AlertEventResponse;
 import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.AnchorPlanRequest;
+import com.windmill.dto.ApplyAlternativeRequest;
 import com.windmill.dto.ApplySuggestedRouteRequest;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
@@ -15,6 +16,7 @@ import com.windmill.dto.ItineraryStatus;
 import com.windmill.dto.OngoingItineraryResponse;
 import com.windmill.dto.PlaceHoursCheckRequest;
 import com.windmill.dto.PlaceHoursCheckResponse;
+import com.windmill.dto.RevertPlanRequest;
 import com.windmill.dto.RecommendationCandidate;
 import com.windmill.dto.RecommendationRequest;
 import com.windmill.dto.SmartPlanResponse;
@@ -255,6 +257,65 @@ public class ItineraryController {
                     body.setOptimizedDistanceKm(result.totalDistanceKm());
                     return body;
                 })
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 대안 채택 통합 - 기존 항목 삭제 + 대안 추가(+ 선택적 동선 재계산)를 한 트랜잭션으로 하고
+     * 변경 이력 한 건을 남긴다. 응답의 originalPlan/changeHistory로 이력 패널을 그린다.
+     */
+    @PostMapping("/{id}/apply-alternative")
+    public Mono<ResponseEntity<ItineraryResponse>> applyAlternative(
+            @PathVariable Long id,
+            @Valid @RequestBody ApplyAlternativeRequest request) {
+        return Mono.fromCallable(() -> {
+                    ItineraryService.ApplyAlternativeResult result =
+                            itineraryService.applyAlternative(id, request);
+                    ItineraryResponse body = toResponse(result.itinerary());
+                    body.setAutoReplacedPlaceName(result.newPlaceName());
+                    body.setRouteHint(result.routeHint());
+                    body.setOptimizedDistanceKm(result.totalDistanceKm());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * "동선 다시" 전용 - 동선을 재계산하고 그 자체를 변경 이력(ROUTE)으로 남긴다.
+     * 이력을 남기지 않는 일반 재계산은 {@code /optimize-route}를 쓴다.
+     */
+    @PostMapping("/{id}/apply-reroute")
+    public Mono<ResponseEntity<ItineraryResponse>> applyReroute(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) Double originLon,
+            @RequestParam(required = false) Double originLat,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String reason) {
+        return Mono.fromCallable(() -> {
+                    ItineraryService.OptimizeRouteResult result =
+                            itineraryService.applyReroute(id, date, originLon, originLat, startTime, reason);
+                    ItineraryResponse body = toResponse(result.itinerary());
+                    body.setRouteHint(result.message());
+                    body.setOptimizedDistanceKm(result.totalDistanceKm());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 되돌리기 - targetSequence가 null이면 원본으로, 아니면 그 번호의 변경 이력으로. 되돌리기 자체도
+     * 새 변경 이력(REVERT)으로 쌓인다. 프론트는 확인 모달 후 호출한다.
+     */
+    @PostMapping("/{id}/revert-plan")
+    public Mono<ResponseEntity<ItineraryResponse>> revertPlan(
+            @PathVariable Long id,
+            @RequestBody(required = false) RevertPlanRequest request) {
+        Integer targetSequence = request == null ? null : request.getTargetSequence();
+        return Mono.fromCallable(() -> toResponse(itineraryService.revertPlan(id, targetSequence)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
     }

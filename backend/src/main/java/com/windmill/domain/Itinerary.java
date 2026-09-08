@@ -1,5 +1,7 @@
 package com.windmill.domain;
 
+import com.windmill.dto.PlanChangeEntry;
+import com.windmill.dto.PlanSnapshot;
 import com.windmill.dto.TriggerLevel;
 import jakarta.persistence.*;
 import lombok.*;
@@ -146,6 +148,25 @@ public class Itinerary {
 
     /** 예전 30분 주기 하트비트 시각. 새 스케줄러는 쓰지 않지만 기존 컬럼을 유지한다. */
     private LocalDateTime lastPeriodicNotifiedAt;
+
+    /**
+     * 원본 일정(Plan A) 스냅샷 - 최초 확정된 일정. 첫 변경(대안 채택·동선 재계산)이 발생할 때
+     * PlanHistoryService가 "변경 직전" 상태로 한 번만 채운다(지연 캡처). 이후 불변, FIFO 대상 아님.
+     * nullable JSON이라 이미 행이 있는 prod 테이블에 ALTER ADD COLUMN이 실패하지 않는다
+     * (@ColumnDefault 불필요 - "prod DB 컬럼 누락 사고" 교훈은 NOT NULL 컬럼 한정).
+     */
+    @Convert(converter = PlanSnapshotConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private PlanSnapshot originalSnapshot;
+
+    /**
+     * 변경 이력 - 원본 이후 발생한 변경을 시간순으로. 최대 9개 FIFO(원본 1 + 이력 9 = 10).
+     * 각 항목은 그 변경 직후의 일정 전체 스냅샷을 품어 되돌리기의 대상이 된다.
+     */
+    @Builder.Default
+    @Convert(converter = PlanChangeHistoryConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private List<PlanChangeEntry> changeHistory = new ArrayList<>();
 
     @PrePersist
     void onCreate() {
