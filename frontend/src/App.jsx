@@ -1701,9 +1701,9 @@ export default function App() {
                   <header className="trip-section-head">
                     <h2>알림</h2>
                   </header>
+                  <AlertFeedScreen itineraryId={itineraryId} showTitle={false} />
                   <WeatherBanner items={weatherItems} />
                   <MidWeatherBanner forecast={midWeather} />
-                  <AlertFeedScreen itineraryId={itineraryId} showTitle={false} />
                 </section>
                 )}
 
