@@ -1,5 +1,4 @@
 import ItineraryItemCard from './ItineraryItemCard';
-import DayRouteStrip from './DayRouteStrip';
 import { isIndoorPlace } from '../utils/statusLevel';
 
 function toIdSet(ids) {
@@ -25,30 +24,14 @@ function resolveWeatherIds(weatherAffectedItemIds, weatherAlert, affectedItemIds
   });
 }
 
-function resolveBusinessIds(businessAffectedItemIds, trigger, affectedItemIds, weatherIds) {
-  if (Array.isArray(businessAffectedItemIds)) {
-    return businessAffectedItemIds;
-  }
-  // 구버전: 휴무 트리거만 있고 야외 ID가 아니면 affected를 휴무로 취급
-  if (trigger?.businessTrigger && !trigger?.weatherTrigger && !trigger?.heatTrigger) {
-    return affectedItemIds || [];
-  }
-  if (trigger?.businessTrigger) {
-    return (affectedItemIds || []).filter((id) => !weatherIds.has(Number(id)));
-  }
-  return [];
-}
-
 export default function ItineraryList({
   items,
   affectedItemIds = [],
   weatherAffectedItemIds,
-  businessAffectedItemIds,
   closedDayAffectedItemIds,
   hoursEndedAffectedItemIds,
   crowdAffectedItemIds,
   weatherAlert = false,
-  trigger = null,
   dayLabel,
   onUpdateTime,
   onUpdateItem,
@@ -57,8 +40,6 @@ export default function ItineraryList({
   onOpenDocent,
   onSortByTime,
   sortByTimeLoading = false,
-  onOptimizeFromGps,
-  gpsOptimizing = false,
 }) {
   const weatherIdList = resolveWeatherIds(
     weatherAffectedItemIds,
@@ -67,18 +48,10 @@ export default function ItineraryList({
     items,
   );
   const weatherIds = toIdSet(weatherIdList);
-  const businessIds = toIdSet(
-    resolveBusinessIds(businessAffectedItemIds, trigger, affectedItemIds, weatherIds),
-  );
   // 휴무(정기휴무 요일)·영업종료(영업시간 밖) 구분 - 신규 필드라 구버전 폴백 없이 그대로 사용
   const closedDayIds = toIdSet(closedDayAffectedItemIds);
   const hoursEndedIds = toIdSet(hoursEndedAffectedItemIds);
   const crowdIds = toIdSet(crowdAffectedItemIds);
-  const heroHasRouteCta = Boolean(
-    trigger?.travelTimeTrigger
-    || trigger?.routeTangleTrigger
-    || (trigger?.hoursEndedTrigger && !trigger?.closedDayTrigger),
-  );
 
   return (
     <div className="itinerary-list">
@@ -100,18 +73,6 @@ export default function ItineraryList({
           )}
         </div>
       </div>
-
-      {items.length > 0 && (
-        <DayRouteStrip
-          items={items}
-          weatherAffectedItemIds={[...weatherIds]}
-          businessAffectedItemIds={[...businessIds]}
-          crowdAffectedItemIds={[...crowdIds]}
-          onOptimizeFromGps={onOptimizeFromGps}
-          gpsOptimizing={gpsOptimizing}
-          showRouteActions={!heroHasRouteCta}
-        />
-      )}
 
       {items.length === 0 ? (
         <div className="itinerary-empty">

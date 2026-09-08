@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import RecommendationCard from './RecommendationCard';
-import TrustBadge from './TrustBadge';
 import TagGroupPicker from './TagGroupPicker';
 import { BUDGET_OPTIONS, isFoodSearch } from '../constants';
 
@@ -56,7 +55,6 @@ export default function RecommendationSearch({
   return (
     <div className="reco-search">
       <h2 className="section-title">새로운 장소 추천받기</h2>
-      <TrustBadge />
       <p className="place-name-search-hint">
         {selectedOrigin
           ? `${selectedOrigin.placeName} 근처를 우선해요. 아래 기준 장소를 바꾸면 다른 곳 근처를 볼 수 있어요.`
