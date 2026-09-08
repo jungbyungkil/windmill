@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import useModalHistory from '../hooks/useModalHistory';
 import { formatRelativeTime } from './AlertFeedScreen';
+import BaramiBubble from './BaramiBubble';
 
 const TRIGGER_ICON = {
   WEATHER: '🌧️',
@@ -15,6 +16,25 @@ function stopsSummary(snapshot) {
   const stops = snapshot?.stops || [];
   if (stops.length === 0) return '담긴 장소 없음';
   return stops.map((s) => s.placeName).filter(Boolean).join(' · ');
+}
+
+/** 이력 카드에 붙는 "바람이" 한마디 - triggerType 기준 톤 있는 코멘트 */
+function baramiComment(entry) {
+  const place = entry.changedPlaceName;
+  switch (entry.triggerType) {
+    case 'WEATHER':
+      return place ? `비 소식이 있어서 ${place}(으)로 바꿨어요!` : '비 소식이 있어서 실내 코스로 바꿨어요!';
+    case 'HEAT':
+      return place ? `너무 더워서 ${place}(으)로 바꿨어요!` : '너무 더워서 실내 코스로 바꿨어요!';
+    case 'CROWD':
+      return place ? `사람이 많아서 한산한 ${place}(으)로 바꿨어요!` : '사람이 많은 곳 대신 한산한 데로 바꿨어요!';
+    case 'ROUTE':
+      return '덜 걷도록 동선을 다시 짰어요!';
+    case 'REVERT':
+      return '말씀대로 예전 일정으로 되돌렸어요!';
+    default:
+      return place ? `${place}(으)로 바꿔서 일정을 다시 맞췄어요!` : '장소를 바꿔서 일정을 새로 맞췄어요!';
+  }
 }
 
 /**
@@ -76,6 +96,7 @@ export default function PlanHistoryPanel({
               {currentSequence == null && <span className="plan-history-current-tag">현재 적용 중</span>}
             </div>
             <p className="plan-history-stops">{stopsSummary(originalPlan)}</p>
+            <BaramiBubble compact comment="이게 맨 처음 짠 일정이에요." />
             {currentSequence != null && (
               <button
                 type="button"
@@ -107,6 +128,7 @@ export default function PlanHistoryPanel({
                   <p className="plan-history-changed">→ {entry.changedPlaceName}</p>
                 )}
                 <p className="plan-history-stops">{stopsSummary(entry.snapshot)}</p>
+                <BaramiBubble compact comment={baramiComment(entry)} />
                 {!isCurrent && (
                   <button
                     type="button"

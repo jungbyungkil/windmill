@@ -6471,6 +6471,10 @@
   color: var(--muted);
 }
 
+.plan-history-item .barami-bubble {
+  margin-top: 8px;
+}
+
 .plan-history-revert-btn {
   margin-top: 10px;
   border: 1px solid var(--line, #cbd5e1);
