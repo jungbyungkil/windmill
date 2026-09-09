@@ -7,7 +7,6 @@ import com.windmill.dto.AlertEventResponse;
 import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.AnchorPlanRequest;
 import com.windmill.dto.ApplyAlternativeRequest;
-import com.windmill.dto.ItemCompletionRequest;
 import com.windmill.dto.ApplySuggestedRouteRequest;
 import com.windmill.dto.ConfirmDayRequest;
 import com.windmill.dto.CreateItineraryRequest;
@@ -134,17 +133,6 @@ public class ItineraryController {
     public Mono<ResponseEntity<ItineraryResponse>> updateItem(@PathVariable Long id, @PathVariable Long itemId,
                                                                @RequestBody UpdateItineraryItemRequest request) {
         return Mono.fromCallable(() -> itineraryService.updateItem(id, itemId, request))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(this::toResponse)
-                .map(ResponseEntity::ok);
-    }
-
-    /** 지난 일정(완료) 수동 처리 - 스킵·조기 완료, 또는 완료 항목을 다시 "진행 중"으로 되돌리기 */
-    @PatchMapping("/{id}/items/{itemId}/completion")
-    public Mono<ResponseEntity<ItineraryResponse>> setItemCompletion(
-            @PathVariable Long id, @PathVariable Long itemId,
-            @RequestBody ItemCompletionRequest request) {
-        return Mono.fromCallable(() -> itineraryService.setItemCompletion(id, itemId, request.isCompleted()))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(this::toResponse)
                 .map(ResponseEntity::ok);

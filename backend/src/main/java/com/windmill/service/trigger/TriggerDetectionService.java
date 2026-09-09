@@ -16,7 +16,6 @@ import com.windmill.service.region.RegionCodeService;
 import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.CrowdCongestionEvaluator;
-import com.windmill.util.ItineraryItemStatus;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.OutdoorActivityClassifier;
 import com.windmill.util.TriggerThresholds;
@@ -69,15 +68,7 @@ public class TriggerDetectionService {
                 .findDuringTrip(region, itinerary.getStartDate(), itinerary.getEndDate())
                 .onErrorReturn(List.of());
 
-        // 지난 일정(완료) 항목은 pinwheel 산출·영업시간 재평가·혼잡도 조회에서 제외한다 - 이미 지나간
-        // 카페에 "문 닫았어요"를 붙이지 않고, KorService2 등 일일 호출 한도도 아낀다.
-        LocalDate today = KoreaClock.today();
-        LocalTime nowKst = KoreaClock.nowTime();
-        List<ItineraryItem> activeItems = itinerary.getItems().stream()
-                .filter(item -> !ItineraryItemStatus.isCompleted(item, visitDateOf(item, itinerary), today, nowKst))
-                .collect(Collectors.toList());
-
-        if (activeItems.isEmpty()) {
+        if (itinerary.getItems().isEmpty()) {
             return festivalsMono.map(festivals -> TriggerResult.builder()
                     .triggerCount(0).level(TriggerLevel.NORMAL).triggerDetails(List.of())
                     .affectedItemIds(List.of())
@@ -89,13 +80,13 @@ public class TriggerDetectionService {
                     .festivalSuggestions(festivals).build());
         }
         Mono<TriggerResult> baseMono = triggerScheduler.ensureFresh(region)
-                .flatMap(condition -> Flux.fromIterable(activeItems)
+                .flatMap(condition -> Flux.fromIterable(itinerary.getItems())
                         .flatMap(item -> detect(item, condition, visitDateOf(item, itinerary))
                                 .map(result -> Map.entry(item.getId(), result)))
                         .collectList()
                         .map(perItem -> {
                             TriggerResult result = aggregate(perItem);
-                            attachRouteTangle(result, activeItems);
+                            attachRouteTangle(result, itinerary);
                             return result;
                         }))
                 .zipWith(festivalsMono, (result, festivals) -> {
@@ -168,13 +159,12 @@ public class TriggerDetectionService {
         result.setLevel(TriggerLevel.DANGER);
     }
 
-    /** 오늘(방문일) 일정 중 아직 시작 전(scheduledTime이 현재 이후)이고 완료 처리되지 않은 첫 장소 - 없으면 null */
+    /** 오늘(방문일) 일정 중 아직 시작 전(scheduledTime이 현재 이후)인 첫 장소 - 없으면 null */
     private ItineraryItem nextUpcomingItem(Itinerary itinerary) {
         LocalTime now = KoreaClock.nowTime();
         LocalDate today = KoreaClock.today();
         return itinerary.getItems().stream()
                 .filter(item -> today.equals(visitDateOf(item, itinerary)))
-                .filter(item -> !ItineraryItemStatus.isCompleted(item, visitDateOf(item, itinerary), today, now))
                 .filter(item -> {
                     LocalTime scheduled = ClosingTimeGate.parseHhMm(item.getScheduledTime());
                     return scheduled != null && scheduled.isAfter(now);
@@ -190,8 +180,8 @@ public class TriggerDetectionService {
         return itinerary.getStartDate() != null ? itinerary.getStartDate() : KoreaClock.today();
     }
 
-    private void attachRouteTangle(TriggerResult result, List<ItineraryItem> items) {
-        var tangle = com.windmill.service.itinerary.RouteTangleDetector.detect(items);
+    private void attachRouteTangle(TriggerResult result, Itinerary itinerary) {
+        var tangle = com.windmill.service.itinerary.RouteTangleDetector.detect(itinerary.getItems());
         result.setRouteTangle(tangle);
         result.setRouteTangleTrigger(tangle.isTangled());
         if (tangle.isTangled()) {
