@@ -23,6 +23,10 @@ backend/src/main/resources/static/favicon.svg
 backend/src/main/resources/static/icons.svg
 backend/src/main/resources/static/manifest.webmanifest
 backend/src/main/resources/static/sw.js
+backend/src/main/resources/static/pwa-192x192.png
+backend/src/main/resources/static/pwa-512x512.png
+backend/src/main/resources/static/pwa-maskable-512x512.png
+backend/src/main/resources/static/apple-touch-icon.png
 
 # Local toolchains (portable JDK/Maven)
 .tools/

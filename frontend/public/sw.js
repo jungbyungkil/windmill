@@ -58,7 +58,7 @@ self.addEventListener('push', (event) => {
     if (firebaseOn && payload.notification) return;
     await self.registration.showNotification(notification.title || data.title || '바람따라', {
       body: notification.body || data.body || '',
-      icon: '/favicon.svg',
+      icon: '/pwa-192x192.png',
       data: { url: data.url || '/', itineraryId: data.itineraryId || null },
     });
   })());

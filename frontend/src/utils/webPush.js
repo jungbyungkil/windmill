@@ -104,7 +104,7 @@ function hookForegroundMessages(messaging) {
     try {
       const notification = new Notification(title, {
         body,
-        icon: '/favicon.svg',
+        icon: '/pwa-192x192.png',
         tag: d.itineraryId ? `windmill-${d.itineraryId}` : 'windmill',
         data: { url: d.url || '/', itineraryId: d.itineraryId || null },
       });
