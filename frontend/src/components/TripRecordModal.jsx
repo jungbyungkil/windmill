@@ -21,12 +21,17 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
     setRatings((prev) => ({ ...prev, [itemId]: rating }));
   }
 
+  // 다녀온 곳만 태깅 대상, 안 간 곳(스킵)은 목록으로만 보여준다.
+  const visitedItems = items.filter((item) => item.completed);
+  const skippedItems = items.filter((item) => !item.completed);
+  const feedbackItems = visitedItems.length > 0 ? visitedItems : items;
+
   const taggedCount = Object.keys(ratings).length;
   const canSubmit = Boolean(overallRating);
 
   async function handleSubmit() {
     if (!canSubmit) return;
-    const visitFeedback = items
+    const visitFeedback = feedbackItems
       .filter((item) => ratings[item.itemId])
       .map((item) => ({ itemId: item.itemId, placeName: item.placeName, rating: ratings[item.itemId] }));
     skipHistoryRestore();
@@ -91,13 +96,13 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
         />
         <p className="trip-record-note-count">{overallNote.length}/500</p>
 
-        {items.length > 0 && (
+        {feedbackItems.length > 0 && (
           <>
             <p className="modal-desc feedback-section-label">
-              장소별 태깅 <span className="muted">({taggedCount}/{items.length})</span>
+              장소별 태깅 <span className="muted">({taggedCount}/{feedbackItems.length})</span>
             </p>
             <div className="feedback-list">
-              {items.map((item) => (
+              {feedbackItems.map((item) => (
                 <div key={item.itemId} className="feedback-row">
                   <span className="feedback-name">{item.placeName}</span>
                   <div className="feedback-ratings">
@@ -118,6 +123,19 @@ export default function TripRecordModal({ open, items, submitting, onSubmit, onC
               ))}
             </div>
           </>
+        )}
+
+        {visitedItems.length > 0 && skippedItems.length > 0 && (
+          <div className="trip-record-skipped">
+            <p className="modal-desc feedback-section-label">
+              안 간 곳 <span className="muted">({skippedItems.length})</span>
+            </p>
+            <div className="trip-record-skipped-list">
+              {skippedItems.map((item) => (
+                <span key={item.itemId} className="trip-record-skipped-name">{item.placeName}</span>
+              ))}
+            </div>
+          </div>
         )}
 
         <button className="btn-primary" type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}>

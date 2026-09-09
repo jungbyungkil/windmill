@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ItineraryItemCard from './ItineraryItemCard';
 import { isIndoorPlace } from '../utils/statusLevel';
 
@@ -37,11 +38,13 @@ export default function ItineraryList({
   onUpdateItem,
   onTogglePin,
   onDelete,
+  onToggleComplete,
   onOpenDocent,
   onOpenHistory,
   onSortByTime,
   sortByTimeLoading = false,
 }) {
+  const [pastOpen, setPastOpen] = useState(false);
   const weatherIdList = resolveWeatherIds(
     weatherAffectedItemIds,
     weatherAlert,
@@ -54,12 +57,39 @@ export default function ItineraryList({
   const hoursEndedIds = toIdSet(hoursEndedAffectedItemIds);
   const crowdIds = toIdSet(crowdAffectedItemIds);
 
+  // 지난 일정(완료)은 별도 접이식 섹션으로 분리해 "남은 일정"에 집중시킨다.
+  const activeItems = items.filter((i) => !i.completed);
+  const pastItems = items.filter((i) => i.completed);
+
+  function renderCard(item) {
+    const id = Number(item.itemId);
+    const indoor = isIndoorPlace(item);
+    return (
+      <ItineraryItemCard
+        key={item.itemId}
+        item={item}
+        completed={Boolean(item.completed)}
+        weatherAlerted={!item.completed && weatherIds.has(id) && !indoor}
+        closedDayAlerted={!item.completed && closedDayIds.has(id)}
+        hoursEndedAlerted={!item.completed && hoursEndedIds.has(id)}
+        crowdAlerted={!item.completed && crowdIds.has(id)}
+        onUpdateTime={onUpdateTime}
+        onUpdateItem={onUpdateItem}
+        onTogglePin={onTogglePin}
+        onDelete={onDelete}
+        onToggleComplete={onToggleComplete}
+        onOpenDocent={onOpenDocent}
+        onOpenHistory={onOpenHistory}
+      />
+    );
+  }
+
   return (
     <div className="itinerary-list">
       <div className="itinerary-list-head">
         <h2 className="section-title">{dayLabel ? `${dayLabel} 일정` : '담은 일정'}</h2>
         <div className="itinerary-list-actions">
-          {items.length > 1 && onSortByTime && (
+          {activeItems.length > 1 && onSortByTime && (
             <button
               type="button"
               className="btn-sort-time"
@@ -69,8 +99,8 @@ export default function ItineraryList({
               {sortByTimeLoading ? '정렬 중…' : '⏱ 시간순 정렬'}
             </button>
           )}
-          {items.length > 0 && (
-            <span className="itinerary-count">{items.length}곳</span>
+          {activeItems.length > 0 && (
+            <span className="itinerary-count">{activeItems.length}곳 남음</span>
           )}
         </div>
       </div>
@@ -81,28 +111,36 @@ export default function ItineraryList({
           <p className="itinerary-empty-hint">검색 탭에서 장소를 찾아 담을 수 있어요.</p>
         </div>
       ) : (
-        <div className="item-cards">
-          {items.map((item) => {
-            const id = Number(item.itemId);
-            const indoor = isIndoorPlace(item);
-            return (
-              <ItineraryItemCard
-                key={item.itemId}
-                item={item}
-                weatherAlerted={weatherIds.has(id) && !indoor}
-                closedDayAlerted={closedDayIds.has(id)}
-                hoursEndedAlerted={hoursEndedIds.has(id)}
-                crowdAlerted={crowdIds.has(id)}
-                onUpdateTime={onUpdateTime}
-                onUpdateItem={onUpdateItem}
-                onTogglePin={onTogglePin}
-                onDelete={onDelete}
-                onOpenDocent={onOpenDocent}
-                onOpenHistory={onOpenHistory}
-              />
-            );
-          })}
-        </div>
+        <>
+          {activeItems.length > 0 ? (
+            <div className="item-cards">
+              {activeItems.map(renderCard)}
+            </div>
+          ) : (
+            <div className="itinerary-empty">
+              <p className="empty-state">오늘 일정을 모두 다녀왔어요. 수고하셨어요! 🎉</p>
+            </div>
+          )}
+
+          {pastItems.length > 0 && (
+            <div className="itinerary-past-section">
+              <button
+                type="button"
+                className="itinerary-past-toggle"
+                onClick={() => setPastOpen((v) => !v)}
+                aria-expanded={pastOpen}
+              >
+                <span>✓ 지난 일정 {pastItems.length}곳</span>
+                <span className="itinerary-past-chevron" aria-hidden="true">{pastOpen ? '▾' : '▸'}</span>
+              </button>
+              {pastOpen && (
+                <div className="item-cards item-cards-past">
+                  {pastItems.map(renderCard)}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1952,6 +1952,101 @@
   background: color-mix(in srgb, var(--sea) 4%, white);
 }
 
+/* ---------- 지난 일정(완료) ---------- */
+.item-card.is-completed {
+  opacity: 0.62;
+  filter: grayscale(0.55);
+  background: color-mix(in srgb, var(--sand) 60%, var(--sand-card));
+  box-shadow: none;
+}
+
+.item-card.is-completed:hover {
+  opacity: 0.9;
+  filter: grayscale(0.15);
+}
+
+.item-card.is-completed .item-status-rail {
+  background: var(--muted);
+}
+
+.item-complete-toggle {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--sea) 32%, var(--sand-border));
+  background: var(--sand-card);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.item-complete-toggle:hover {
+  border-color: var(--sea);
+  background: color-mix(in srgb, var(--sea) 12%, white);
+}
+
+.item-complete-toggle.is-done {
+  background: var(--status-normal, #1a7f5a);
+  border-color: var(--status-normal, #1a7f5a);
+}
+
+.itinerary-past-section {
+  margin-top: 14px;
+}
+
+.itinerary-past-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--sand) 55%, var(--sand-card));
+  border: 1px solid var(--sand-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.itinerary-past-toggle:hover {
+  border-color: color-mix(in srgb, var(--sea) 22%, var(--sand-border));
+}
+
+.item-cards-past {
+  margin-top: 10px;
+}
+
+.trip-record-skipped {
+  margin-top: 6px;
+}
+
+.trip-record-skipped-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trip-record-skipped-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--sand) 50%, var(--sand-card));
+  border: 1px solid var(--sand-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  text-decoration: line-through;
+}
+
 .item-time {
   border: 1px solid color-mix(in srgb, var(--status-normal) 28%, var(--sand-border));
   border-radius: 10px;

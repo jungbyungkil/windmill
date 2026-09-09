@@ -568,6 +568,27 @@ public class ItineraryService {
         }
     }
 
+    /**
+     * 지난 일정(완료) 수동 오버라이드. 자동(시각 경과) 판정은 그대로 두고, 사용자가 명시적으로
+     * 완료 처리(스킵·조기 완료)하거나 다시 "진행 중"으로 되돌릴 때만 호출한다.
+     *
+     * @param completed true면 {@code "DONE"}(항상 완료), false면 {@code "ACTIVE"}(시각이 지나도 자동완료 안 함)
+     */
+    @Transactional
+    public Itinerary setItemCompletion(Long itineraryId, Long itemId, boolean completed) {
+        Itinerary itinerary = get(itineraryId);
+        ItineraryItem item = itinerary.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("일정 항목을 찾을 수 없습니다: " + itemId));
+        item.setCompletionOverride(completed
+                ? com.windmill.util.ItineraryItemStatus.OVERRIDE_DONE
+                : com.windmill.util.ItineraryItemStatus.OVERRIDE_ACTIVE);
+        log.info("[setItemCompletion] itineraryId={} itemId={} place={} → {}",
+                itineraryId, itemId, item.getPlaceName(), item.getCompletionOverride());
+        return itineraryRepository.save(itinerary);
+    }
+
     @Transactional
     public Itinerary updateItem(Long itineraryId, Long itemId, UpdateItineraryItemRequest request) {
         Itinerary itinerary = get(itineraryId);

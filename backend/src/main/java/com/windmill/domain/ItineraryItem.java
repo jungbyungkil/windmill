@@ -120,4 +120,17 @@ public class ItineraryItem {
     @ColumnDefault("false")
     @Column(nullable = false)
     private boolean slotNotified = false;
+
+    /**
+     * 지난 일정(완료) 처리 오버라이드. null이면 시각 경과로 자동 판정한다
+     * ({@link com.windmill.util.ItineraryItemStatus#isCompleted}).
+     * <ul>
+     *   <li>{@code null} — 자동: 지금이 점유 종료 시각을 지나면 완료로 본다</li>
+     *   <li>{@code "DONE"} — 사용자가 직접 완료(스킵·조기 완료)로 표시</li>
+     *   <li>{@code "ACTIVE"} — 사용자가 다시 "진행 중"으로 되돌림 → 시각이 지나도 자동완료 안 함</li>
+     * </ul>
+     * nullable이라 기존 행은 그대로 null(=자동)로 남는다.
+     */
+    @Column(length = 8)
+    private String completionOverride;
 }
