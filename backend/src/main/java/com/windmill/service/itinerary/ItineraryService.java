@@ -288,6 +288,9 @@ public class ItineraryService {
                     itineraryId, request.getContentId(), request.getPlaceName());
             return itinerary;
         }
+        // 지도 검색·대안 카드에서 담는 경우만 변경 이력에 남긴다(최초 일정 생성 단계 대량 추가는 제외).
+        boolean logHistory = Boolean.TRUE.equals(request.getLogHistory());
+        PlanSnapshot beforeSnapshot = logHistory ? planHistoryService.snapshotOf(itinerary) : null;
         List<String> tags = PlaceTagSanitizer.sanitizeStored(
                 request.getTags(), request.getContentTypeId(), request.getPlaceName(), request.getCategory());
         PlaceSituationalTags situational = situationalTagService.ensureInferred(
@@ -369,8 +372,15 @@ public class ItineraryService {
             item.setDisplayOrder(itinerary.getItems().size());
         }
         itinerary.getItems().add(item);
-        log.info("[addItem] 저장 itineraryId={} place={} contentId={} time={}",
-                itineraryId, item.getPlaceName(), item.getContentId(), scheduledTime);
+        if (logHistory) {
+            String reason = Boolean.TRUE.equals(request.getIsAlternate())
+                    ? "대안에서 '" + item.getPlaceName() + "' 추가"
+                    : "검색에서 '" + item.getPlaceName() + "' 추가";
+            planHistoryService.recordChange(itinerary, beforeSnapshot, "MANUAL", reason,
+                    item.getContentId(), item.getPlaceName());
+        }
+        log.info("[addItem] 저장 itineraryId={} place={} contentId={} time={} logHistory={}",
+                itineraryId, item.getPlaceName(), item.getContentId(), scheduledTime, logHistory);
         return itineraryRepository.save(itinerary);
     }
 
@@ -684,6 +694,9 @@ public class ItineraryService {
         if (removed == null) {
             return new DeleteItemResult(itineraryRepository.save(itinerary), null);
         }
+        // 사용자의 직접 삭제(개별 삭제·대안 카드 삭제)는 전부 변경 이력에 MANUAL로 남긴다.
+        PlanSnapshot beforeSnapshot = planHistoryService.snapshotOf(itinerary);
+        String removedName = removed.getPlaceName();
         String backupContentId = removed.getBackupContentId();
         Integer backupContentTypeId = removed.getBackupContentTypeId();
         String scheduledTime = removed.getScheduledTime();
@@ -701,6 +714,15 @@ public class ItineraryService {
             itinerary.getItems().add(replacement);
         } else if (reflowTimes) {
             reflowDayAfterRemoval(itinerary, visitDate, displayOrder, scheduledTime);
+        }
+
+        if (replacement != null) {
+            planHistoryService.recordChange(itinerary, beforeSnapshot, "MANUAL",
+                    "'" + removedName + "' → '" + replacement.getPlaceName() + "' 교체",
+                    replacement.getContentId(), replacement.getPlaceName());
+        } else {
+            planHistoryService.recordChange(itinerary, beforeSnapshot, "MANUAL",
+                    "'" + removedName + "' 삭제", null, null);
         }
         Itinerary saved = itineraryRepository.save(itinerary);
         return new DeleteItemResult(saved, replacement == null ? null : replacement.getPlaceName());

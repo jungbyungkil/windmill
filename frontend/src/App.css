@@ -2447,9 +2447,23 @@
   text-shadow: var(--text-shadow-warn);
 }
 
+/* 일괄 "전부 바꾸기"는 카드 브라우징(기본 흐름) 아래 보조 옵션으로 격하 - urgent에서만 노출 */
+.alt-apply-all-wrap {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sand-border);
+}
+
+.alt-apply-all-hint {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+
 .alt-apply-all {
   width: 100%;
-  margin-bottom: 14px;
 }
 
 .item-thumb-placeholder {
@@ -3139,7 +3153,7 @@
   margin: 0 0 14px;
 }
 .alternatives-panel .alt-apply-all {
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 /* ---------- Docent ---------- */

@@ -39,6 +39,8 @@ export default function AlternativesPanel({
   onClose,
   reason,
   onApplyAll,
+  /** 🔴 urgent(DANGER)일 때만 "전부 바꾸기" 일괄 버튼을 목록 하단 보조 옵션으로 노출 */
+  bulkUrgent = false,
   applyLoading,
   error,
   onRetry,
@@ -61,21 +63,6 @@ export default function AlternativesPanel({
         </div>
         <p className="modal-desc">{copy.desc}</p>
         {copy.barami && !loading && !error && <BaramiBubble compact comment={copy.barami} />}
-
-        {onApplyAll && candidates.length > 0 && !loading && (
-          <button
-            type="button"
-            className="btn-primary alt-apply-all"
-            onClick={onApplyAll}
-            disabled={applyLoading}
-          >
-            {applyLoading
-              ? '일정 바꾸는 중...'
-              : reason === 'CROWD_ALTERNATIVE'
-                ? '👥 혼잡한 곳 전부 한산한 곳으로'
-                : '🏠 야외 일정 전부 실내로 바꾸기'}
-          </button>
-        )}
 
         {loading ? (
           <div className="skeleton-list">
@@ -110,6 +97,26 @@ export default function AlternativesPanel({
                 adding={addingId === c.contentId}
               />
             ))}
+          </div>
+        )}
+
+        {bulkUrgent && onApplyAll && candidates.length > 0 && !loading && !error && (
+          <div className="alt-apply-all-wrap">
+            <p className="alt-apply-all-hint">
+              하나씩 고르기 어렵다면, 한 번에 바꿀 수도 있어요.
+            </p>
+            <button
+              type="button"
+              className="btn-secondary alt-apply-all"
+              onClick={onApplyAll}
+              disabled={applyLoading}
+            >
+              {applyLoading
+                ? '일정 바꾸는 중...'
+                : reason === 'CROWD_ALTERNATIVE'
+                  ? '👥 혼잡한 곳 전부 한산한 곳으로'
+                  : '🏠 야외 일정 전부 실내로 바꾸기'}
+            </button>
           </div>
         )}
       </div>

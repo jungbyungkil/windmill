@@ -33,7 +33,7 @@ function baramiComment(entry) {
     case 'REVERT':
       return '말씀대로 예전 일정으로 되돌렸어요!';
     default:
-      return place ? `${place}(으)로 바꿔서 일정을 다시 맞췄어요!` : '장소를 바꿔서 일정을 새로 맞췄어요!';
+      return place ? `${place} 반영해서 일정을 다시 맞췄어요!` : '일정을 직접 정리했어요!';
   }
 }
 

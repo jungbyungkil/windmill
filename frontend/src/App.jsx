@@ -786,6 +786,9 @@ export default function App() {
         backupContentTypeId: candidate.backupContentTypeId,
         backupPlaceName: candidate.backupPlaceName,
         acknowledgeHoursWarning: acknowledgeHoursWarning || undefined,
+        // 최초 일정 생성(스마트/자동 플랜 확정)은 이력에 안 남기고, 지도 검색·대안 카드에서
+        // 사용자가 나중에 담을 때만 change_history(MANUAL)에 기록한다.
+        logHistory: options.logHistory || undefined,
         ...placeSnapshotFields(candidate),
       });
     } catch (e) {
@@ -794,6 +797,7 @@ export default function App() {
         candidate.placeName,
         (time) => addCandidateToItinerary({ ...candidate, scheduledTime: time }, visitDate, isAlternate, {
           acknowledgeHoursWarning: true,
+          logHistory: options.logHistory,
         }),
       );
       if (!reported) {
@@ -819,7 +823,7 @@ export default function App() {
   async function handleAddRecommendation(candidate) {
     setAddingContentId(candidate.contentId);
     try {
-      await addCandidateToItinerary(candidate);
+      await addCandidateToItinerary(candidate, activeDate, false, { logHistory: true });
     } catch {
       /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
     } finally {
@@ -841,7 +845,7 @@ export default function App() {
         mapY: place.mapY,
         category: place.category,
         cat3: place.cat3,
-      });
+      }, activeDate, false, { logHistory: true });
       // 휴무 경고를 취소하면 null — 지도 낙관적 "담김"을 되돌려야 해서 throw
       if (!result) {
         throw new Error('not-added');
@@ -928,7 +932,7 @@ export default function App() {
   async function handleAddAlternative(candidate) {
     setAddingContentId(candidate.contentId);
     try {
-      const result = await addCandidateToItinerary(candidate, activeDate, true);
+      const result = await addCandidateToItinerary(candidate, activeDate, true, { logHistory: true });
       if (result) {
         setRerouteCount((n) => n + 1);
         await replanTimelineAfterAlternative(result);
@@ -1867,6 +1871,9 @@ export default function App() {
                     : trigger?.crowdTrigger ? 'CROWD'
                     : undefined
                 )}
+                /* 일괄 버튼은 🔴 urgent(DANGER: 트리거 2개↑ 또는 비/폭염경보/혼잡긴급)에서만
+                   보조 옵션으로 노출. 🟡 caution 이하에서는 카드 브라우징만. */
+                bulkUrgent={trigger?.level === 'DANGER'}
                 applyLoading={rerouteLoading}
                 onClose={() => setAltOpen(false)}
               />

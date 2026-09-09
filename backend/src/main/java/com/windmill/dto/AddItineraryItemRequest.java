@@ -52,4 +52,10 @@ public class AddItineraryItemRequest {
      * 시간 겹침(TIME_OVERLAP)은 그대로 막는다.
      */
     private Boolean acknowledgeHoursWarning;
+
+    /**
+     * true면 이 추가를 변경 이력(change_history)에 MANUAL로 남긴다. 지도 검색·대안 카드에서
+     * 사용자가 장소를 담을 때만 켠다. 최초 일정 생성 단계의 대량 추가는 끄고 넘어간다.
+     */
+    private Boolean logHistory;
 }
