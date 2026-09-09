@@ -10,6 +10,7 @@ import AutoPlanScreen from './components/AutoPlanScreen';
 import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
 import PinwheelLoader from './components/PinwheelLoader';
+import Toast from './components/Toast';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
@@ -36,6 +37,7 @@ import ExitConfirmModal from './components/ExitConfirmModal';
 import { recordView } from './utils/viewHistory';
 import { placeSnapshotFields } from './utils/placeSnapshot';
 import { syncPushSubscription } from './utils/webPush';
+import { useResolveFeedback } from './hooks/useResolveFeedback';
 import './App.css';
 
 const TRIGGER_POLL_MS = 90 * 1000;
@@ -119,6 +121,8 @@ export default function App() {
   const [smartPlanDate, setSmartPlanDate] = useState(null);
 
   const [trigger, setTrigger] = useState(null);
+  const triggerRef = useRef(null);
+  useEffect(() => { triggerRef.current = trigger; }, [trigger]);
   const [weatherItems, setWeatherItems] = useState(null);
   const [midWeather, setMidWeather] = useState(null);
 
@@ -334,6 +338,13 @@ export default function App() {
     const origin = await getCurrentPositionSafe();
     api.getTriggerStatus(itineraryId, origin).then(setTrigger).catch(() => {});
   }, [itineraryId]);
+
+  // 액션 즉시 피드백(낙관적 UI · 즉시 트리거 해소 · 실패 롤백 · 2초 토스트) 공통 훅.
+  // 동선 최적화 / 혼잡도(비·폭염) 대안이 같은 패턴을 공유한다.
+  const {
+    toast, optimistic: pinwheelOptimistic, rollback: pinwheelRollback,
+    beginOptimistic, commitResolve, rollbackResolve, cancelOptimistic, dismissToast,
+  } = useResolveFeedback({ triggerRef, setTrigger, refreshTrigger });
 
   useEffect(() => {
     if (!itineraryId) return;
@@ -1041,9 +1052,23 @@ export default function App() {
   /**
    * 비/폭염: 야외 → 실내. 혼잡: 붐비는 곳 → 한산한 곳. 기존 방문 시각은 유지.
    */
+  /** 혼잡도/실내 대안 적용 토스트 — 첫 교체 장소 + 외 N곳 */
+  function rerouteToastText(avoidHint, plannedTargets, usedSize) {
+    const first = plannedTargets[0];
+    const verb = avoidHint === 'CROWD'
+      ? '혼잡도 낮은 곳으로 변경했어요'
+      : (avoidHint === 'HEAT' || avoidHint === 'WEATHER')
+        ? '실내로 바꿨어요'
+        : '대체 장소로 바꿨어요';
+    const more = usedSize > 1 ? ` 외 ${usedSize - 1}곳` : '';
+    const where = first?.next?.placeName ? ` — ${first.next.placeName}${more}` : '';
+    return `${verb}${where} ✅`;
+  }
+
   async function handleRerouteSchedule(avoidHint) {
     setRerouteLoading(true);
     setAutoReplaceNotice(null);
+    beginOptimistic(avoidHint); // 클릭 즉시 핀휠 성공 스킨 (대안이 없으면 아래에서 조용히 걷어냄)
     try {
       const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
       const note = reason === 'RAIN_ALTERNATIVE'
@@ -1055,6 +1080,7 @@ export default function App() {
             : '대체 일정으로 바꿨어요.';
 
       if (!candidates?.length) {
+        cancelOptimistic(); // 성공 아님 — 낙관적 스킨만 조용히 걷어냄(원래 트리거 복원)
         setAutoReplaceNotice('지금은 바꿀 대안이 없어요. 후보만 먼저 볼게요.');
         await handleRequestAlternatives(avoidHint);
         return;
@@ -1078,6 +1104,7 @@ export default function App() {
           });
 
       if (targets.length === 0) {
+        cancelOptimistic();
         setAltCandidates(candidates);
         setAltReason(avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : undefined);
         setAltOpen(true);
@@ -1099,6 +1126,17 @@ export default function App() {
         used.add(next.contentId);
         plannedTargets.push({ target, next });
       }
+
+      if (plannedTargets.length === 0) {
+        // 후보는 있었지만 이미 담긴 곳과 겹쳐 실제 교체가 0건 — 성공 아님, 후보만 보여줌
+        cancelOptimistic();
+        setAltCandidates(candidates);
+        setAltReason(avoidHint === 'CROWD' ? 'CROWD_ALTERNATIVE' : undefined);
+        setAltOpen(true);
+        setAutoReplaceNotice('새로 넣을 만한 대안이 없어 후보만 보여드려요.');
+        return;
+      }
+
       for (let i = 0; i < plannedTargets.length; i++) {
         const { target, next } = plannedTargets[i];
         result = await api.applyAlternative(itineraryId, {
@@ -1134,12 +1172,14 @@ export default function App() {
 
       setItinerary(result);
       setRerouteCount((n) => n + used.size);
-      refreshTrigger();
+      // 폴링을 기다리지 않고 방금 해소한 변수를 즉시 제거 + 2초 토스트
+      commitResolve(avoidHint, rerouteToastText(avoidHint, plannedTargets, used.size));
 
       setAutoReplaceNotice(
         `${note} (${used.size}곳 교체) ${result.routeHint || '이동시간 기준으로 시간표도 다시 짰어요.'}`,
       );
     } catch (e) {
+      rollbackResolve(avoidHint); // 성공 상태 → 원래 상태로 되돌리는 트랜지션 + 실패 토스트
       setAutoReplaceNotice(`일정 교체 실패: ${e.message}`);
     } finally {
       setRerouteLoading(false);
@@ -1313,6 +1353,16 @@ export default function App() {
     if (docentItem) await fetchDocent(docentItem, lang);
   }
 
+  /** "3.0km → 1.9km" 스타일 토스트 — 액션 전 routeTangle 스냅샷 + 응답의 최적화 거리 */
+  function routeToastText(tangleSnapshot, result) {
+    const before = tangleSnapshot?.currentDistanceKm;
+    const after = result?.optimizedDistanceKm ?? tangleSnapshot?.optimizedDistanceKm;
+    if (before != null && after != null && before - after > 0.05) {
+      return `동선을 정리했어요! ${before.toFixed(1)}km → ${after.toFixed(1)}km 🍃`;
+    }
+    return result?.routeHint || '동선이 최적화됐어요 🍃';
+  }
+
   /** 동선 재계산 — GPS 있으면 시작점, 없으면 장소만으로 매트릭스 TSP + 시간표.
    *  startTime("HH:mm")을 주면 첫 장소 시각을 사용자가 지정한 그대로 고정한다. */
   async function handleOptimizeRoute(origin, startTime, recordHistory = false) {
@@ -1320,48 +1370,53 @@ export default function App() {
     autoOptimizedRef.current = true;
     setOptimizeLoading(true);
     setAutoReplaceNotice(null);
+    // 사용자가 명시적으로 누른 "동선 재계산"만 변경 이력(ROUTE)으로 남기고, 낙관적 UI·즉시
+    // 트리거 해소·토스트를 붙인다. GPS 자동 재계산 등 내부 호출은 그대로 조용히 처리한다.
+    const tangleSnapshot = recordHistory ? triggerRef.current?.routeTangle : null;
     try {
-      // 사용자가 명시적으로 누른 "동선 재계산"만 변경 이력(ROUTE)으로 남긴다.
-      // GPS 자동 재계산 등 내부 호출은 optimizeRoute(이력 없음)를 쓴다.
       const result = recordHistory
         ? await api.applyReroute(itineraryId, activeDate, origin, startTime, '동선 재계산')
         : await api.optimizeRoute(itineraryId, activeDate, origin, startTime);
       setItinerary(result);
-      setAutoReplaceNotice(
-        result.routeHint
-          || (origin
-            ? '현재 위치를 반영해 동선을 다시 계산했어요.'
-            : '이동시간·체류를 반영해 동선을 다시 계산했어요.'),
-      );
-      refreshTrigger();
+      if (recordHistory) {
+        // 낙관적 스킨은 handleOptimizeFromGps에서 클릭 즉시 켜 둠 → 여기서 확정
+        commitResolve('ROUTE', routeToastText(tangleSnapshot, result));
+      } else {
+        setAutoReplaceNotice(
+          result.routeHint
+            || (origin
+              ? '현재 위치를 반영해 동선을 다시 계산했어요.'
+              : '이동시간·체류를 반영해 동선을 다시 계산했어요.'),
+        );
+        refreshTrigger();
+        setTimeout(() => setAutoReplaceNotice(null), 6000);
+      }
     } catch (e) {
-      setAutoReplaceNotice(`동선 재계산 실패: ${e.message}`);
+      if (recordHistory) {
+        rollbackResolve('ROUTE'); // 성공 상태 → 원래 상태로 되돌리는 트랜지션 + 실패 토스트
+      } else {
+        setAutoReplaceNotice(`동선 재계산 실패: ${e.message}`);
+        setTimeout(() => setAutoReplaceNotice(null), 6000);
+      }
     } finally {
       setOptimizeLoading(false);
-      setTimeout(() => setAutoReplaceNotice(null), 6000);
     }
   }
 
   /** 오늘 동선 「동선 재계산」 — GPS 시도 후 서버 TSP·시간표.
    *  startTime을 지정했으면 GPS 위치와 무관하게 그 시각을 첫 장소 도착 시각으로 고정한다. */
   function handleOptimizeFromGps(startTime) {
+    if (!itineraryId || optimizeLoading) return;
     setOptimizeLoading(true);
-    setAutoReplaceNotice('동선 재계산 중…');
+    beginOptimistic('ROUTE'); // 클릭 즉시 핀휠을 성공 스킨으로 (API 응답 대기 없이)
+    const done = (origin) => handleOptimizeRoute(origin, startTime, true);
     if (!navigator.geolocation) {
-      handleOptimizeRoute(null, startTime, true);
+      done(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        handleOptimizeRoute({
-          lon: pos.coords.longitude,
-          lat: pos.coords.latitude,
-        }, startTime, true);
-      },
-      () => {
-        // 위치 거부·실패여도 장소 간 매트릭스로 재계산
-        handleOptimizeRoute(null, startTime, true);
-      },
+      (pos) => done({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
+      () => done(null), // 위치 거부·실패여도 장소 간 매트릭스로 재계산
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   }
@@ -1660,6 +1715,8 @@ export default function App() {
                 <PinwheelHero
                   compactWhenIdle
                   trigger={trigger}
+                  optimistic={pinwheelOptimistic}
+                  rollbackAnimating={pinwheelRollback}
                   onRequestAlternatives={handleRequestAlternatives}
                   loading={altLoading}
                   onRerouteSchedule={handleRerouteSchedule}
@@ -1669,6 +1726,8 @@ export default function App() {
                 />
 
                 {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
+
+                <Toast toast={toast} onDismiss={dismissToast} />
 
                 {itinerary.changeHistory?.length > 0 && (
                   <div className="daytrip-chip-row">

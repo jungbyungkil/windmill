@@ -1227,6 +1227,117 @@
   fill: var(--sea-deep);
 }
 
+/* ---------- 상태 전환 색 트랜지션 (모든 전환 공통: 🟡→🟢 · 🟡→🔴 · 🔴→🟢 …) ---------- */
+.pinwheel-blade,
+.pinwheel-hub {
+  transition: fill 0.4s ease;
+}
+
+.pinwheel-svg {
+  transition: filter 0.4s ease;
+}
+
+.pinwheel-caption {
+  transition: color 0.4s ease;
+}
+
+.pinwheel-graphic {
+  transition: background-color 0.4s ease;
+}
+
+/* ---------- 낙관적 UI: 클릭 즉시 성공 스킨 (API 응답 대기 없이) ---------- */
+.pinwheel-hero.is-optimistic {
+  --level-color: var(--level-normal);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--level-normal) 18%, white) 0%, var(--sand) 100%);
+}
+
+.pinwheel-hero.is-optimistic .pinwheel-caption {
+  color: var(--level-normal);
+  text-shadow: none;
+}
+
+.pinwheel-hero.is-optimistic .pinwheel-blades {
+  animation-duration: 3s;
+}
+
+.pinwheel-check {
+  font-size: 0.95em;
+}
+
+/* ---------- 실패 롤백: 성공 스킨 → 원래 상태로 되돌아올 때 0.45초 ---------- */
+.pinwheel-hero.rolling-back {
+  animation: pinwheel-rollback 0.45s ease;
+}
+
+@keyframes pinwheel-rollback {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+
+/* ---------- 액션 즉시 피드백 토스트 (동선 최적화 / 혼잡도 대안 공통 스타일) ---------- */
+.wf-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(92vw, 420px);
+  padding: 11px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: #fff;
+  background: var(--sea-deep);
+  box-shadow: 0 12px 28px -10px rgba(6, 40, 52, 0.5);
+  text-shadow: 0 1px 2px rgba(6, 40, 52, 0.35);
+  word-break: keep-all;
+  cursor: pointer;
+  animation: wf-toast-in 0.22s ease both;
+}
+
+.wf-toast-success {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--level-normal) 90%, white) 0%, var(--level-normal) 100%);
+}
+
+.wf-toast-error {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--level-danger) 90%, white) 0%, var(--level-danger) 100%);
+}
+
+.wf-toast-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+@keyframes wf-toast-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pinwheel-blade,
+  .pinwheel-hub,
+  .pinwheel-svg,
+  .pinwheel-caption,
+  .pinwheel-graphic {
+    transition: none;
+  }
+
+  .pinwheel-hero.rolling-back {
+    animation: none;
+  }
+
+  .wf-toast {
+    animation: none;
+  }
+}
+
 @keyframes pinwheel-spin {
   to {
     transform: rotate(360deg);

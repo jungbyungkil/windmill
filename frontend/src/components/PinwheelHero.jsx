@@ -82,12 +82,17 @@ export default function PinwheelHero({
   rerouteLoading,
   onOptimizeRoute,
   optimizeLoading,
+  /** 액션 클릭 즉시 띄우는 낙관적 성공 스킨: { hint, message } | null */
+  optimistic = null,
+  /** 액션 실패로 원래 상태로 되돌리는 중 — 0.45초 롤백 애니메이션 */
+  rollbackAnimating = false,
   /** 일정 홈: 트리거 로딩 중이거나 순풍이면 한 줄로 접어 장소 목록을 위로 */
   compactWhenIdle = false,
 }) {
-  const level = trigger?.level || 'NORMAL';
+  const showOptimistic = Boolean(optimistic);
+  const level = showOptimistic ? 'NORMAL' : (trigger?.level || 'NORMAL');
   const meta = LEVEL_META[level];
-  const interactive = Boolean(trigger) && level !== 'NORMAL';
+  const interactive = !showOptimistic && Boolean(trigger) && level !== 'NORMAL';
   const causes = trigger
     ? Object.entries(CAUSE_META).filter(([key]) => trigger[key])
     : [];
@@ -97,7 +102,7 @@ export default function PinwheelHero({
   const tangleMode = Boolean(trigger?.routeTangleTrigger);
   const travelTimeMode = Boolean(trigger?.travelTimeTrigger);
   const weatherAlert = heatMode || rainMode;
-  const calm = (Boolean(trigger) && !interactive) || (compactWhenIdle && !interactive);
+  const calm = showOptimistic || (Boolean(trigger) && !interactive) || (compactWhenIdle && !interactive);
 
   const ctas = interactive ? resolveCtas(trigger) : [];
   const primaryCta = ctas[0] || null;
@@ -128,6 +133,7 @@ export default function PinwheelHero({
   }
 
   function caption() {
+    if (showOptimistic) return optimistic.message;
     if (travelTimeMode) return '이동시간 부족 · 다음 장소 마감이 임박했어요';
     if (heatMode) return '폭염 소식 · 실내로 바꾸세요';
     if (rainMode) return '비 소식 · 실내로 바꾸세요';
@@ -158,10 +164,12 @@ export default function PinwheelHero({
         `level-${level.toLowerCase()}`,
         calm ? 'is-calm' : '',
         interactive ? 'clickable' : '',
-        weatherAlert ? 'weather-alert' : '',
-        heatMode ? 'heat-alert' : '',
-        rainMode ? 'rain-alert' : '',
-        crowdMode ? 'crowd-alert' : '',
+        showOptimistic ? 'is-optimistic' : '',
+        rollbackAnimating ? 'rolling-back' : '',
+        !showOptimistic && weatherAlert ? 'weather-alert' : '',
+        !showOptimistic && heatMode ? 'heat-alert' : '',
+        !showOptimistic && rainMode ? 'rain-alert' : '',
+        !showOptimistic && crowdMode ? 'crowd-alert' : '',
       ].filter(Boolean).join(' ')}
     >
       <div className="pinwheel-card-top">
@@ -191,7 +199,10 @@ export default function PinwheelHero({
         {(trigger || compactWhenIdle) && (
           <div className="pinwheel-headline">
             {!calm && <div className="pinwheel-eyebrow">실시간 변수</div>}
-            <div className="pinwheel-caption">{caption()}</div>
+            <div className="pinwheel-caption">
+              {showOptimistic && <span className="pinwheel-check" aria-hidden="true">✅ </span>}
+              {caption()}
+            </div>
           </div>
         )}
       </div>
