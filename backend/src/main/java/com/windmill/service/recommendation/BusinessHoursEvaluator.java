@@ -563,7 +563,12 @@ public final class BusinessHoursEvaluator {
         }
         LocalTime latest = null;
         for (String field : USETIME_FIELDS) {
-            LocalTime close = extractCloseTimeFromText(introFields.get(field));
+            String v = introFields.get(field);
+            // 한 필드라도 자정 넘김 운영이면 "같은 날 마감"으로 볼 수 없다 - null(마감 제약 없음)로 둔다.
+            if (isOvernightUseTime(v)) {
+                return null;
+            }
+            LocalTime close = extractCloseTimeFromText(v);
             if (close != null && (latest == null || close.isAfter(latest))) {
                 latest = close;
             }
@@ -572,6 +577,13 @@ public final class BusinessHoursEvaluator {
     }
 
     public static LocalTime extractCloseTimeFromText(String useTimeText) {
+        // 자정을 넘겨 운영하는 곳(예: "19:00~01:00")은 "같은 날 마감 시각"으로 환원할 수 없다.
+        // ClosingTimeGate는 LocalTime만 비교하므로 01:00 같은 끝 시각을 그대로 주면 오전 방문이
+        // "이미 마감"으로 오판정된다(서울라이트 등 야간 경관 축제 09:00 슬롯에 "마감" 배지 버그).
+        // 실시간 영업중 판정은 statusAt()이 end<start 분기로 따로 올바르게 처리한다.
+        if (isOvernightUseTime(useTimeText)) {
+            return null;
+        }
         LocalTime latest = null;
         for (int[] range : parseAllTimeRanges(useTimeText)) {
             LocalTime end = LocalTime.of(range[2], range[3]);
@@ -583,6 +595,21 @@ public final class BusinessHoursEvaluator {
             return latest;
         }
         return parseUntilClock(useTimeText);
+    }
+
+    /**
+     * 운영시간 텍스트에 자정을 넘기는 구간(끝 시각 &lt; 시작 시각, 예: "19:00~01:00")이 하나라도
+     * 있으면 true. {@link #statusAt}의 {@code end.isBefore(start)} 판정과 같은 규칙을 재사용한다.
+     */
+    public static boolean isOvernightUseTime(String useTimeText) {
+        for (int[] range : parseAllTimeRanges(useTimeText)) {
+            LocalTime start = LocalTime.of(range[0], range[1]);
+            LocalTime end = LocalTime.of(range[2], range[3]);
+            if (end.isBefore(start)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** "21시까지", "20:00까지"처럼 구간 없이 끝 시각만 적힌 경우 */

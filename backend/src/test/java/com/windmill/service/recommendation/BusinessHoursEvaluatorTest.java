@@ -1,5 +1,6 @@
 package com.windmill.service.recommendation;
 
+import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.HoursPhase;
 import com.windmill.util.ClosingTimeGate;
 import org.junit.jupiter.api.BeforeEach;
@@ -229,6 +230,49 @@ class BusinessHoursEvaluatorTest {
     void missingCloseAllows() {
         assertNull(BusinessHoursEvaluator.extractCloseTimeFromText("상시개방"));
         assertFalse(ClosingTimeGate.check(null, LocalTime.of(17, 0)).blocked());
+    }
+
+    // ---- 자정 넘김(overnight) 운영시간 ----
+    // 배경: "서울라이트 DDP"(19:00~01:00) 09:00 슬롯에 "마감" 배지 오판정.
+    // extractCloseTimeFromText가 01:00을 그대로 close로 줘서 ClosingTimeGate가 오전 방문을 차단.
+
+    @Test
+    void isOvernightUseTimeDetectsCrossMidnight() {
+        assertTrue(BusinessHoursEvaluator.isOvernightUseTime("19:00~01:00"));
+        assertTrue(BusinessHoursEvaluator.isOvernightUseTime("오후 7시~오전 1시"));
+        assertTrue(BusinessHoursEvaluator.isOvernightUseTime("09:00~18:00 / 19:00~01:00"));
+        assertFalse(BusinessHoursEvaluator.isOvernightUseTime("09:00~18:00"));
+        assertFalse(BusinessHoursEvaluator.isOvernightUseTime("09:00~18:00 / 야간개장 19:00~21:00"));
+        assertFalse(BusinessHoursEvaluator.isOvernightUseTime(null));
+    }
+
+    @Test
+    void extractCloseTimeReturnsNullForOvernightHours() {
+        assertNull(BusinessHoursEvaluator.extractCloseTimeFromText("19:00~01:00"));
+        // 자정 넘김 구간이 하나라도 섞이면 전체가 null (같은 날 마감으로 환원 불가)
+        assertNull(BusinessHoursEvaluator.extractCloseTimeFromText("09:00~18:00 / 19:00~01:00"));
+        assertNull(BusinessHoursEvaluator.extractCloseTime(Map.of("usetimefestival", "19:00~01:00")));
+    }
+
+    @Test
+    void overnightFestivalDoesNotBlockDaytimeVisit() {
+        // 09:00 방문(마감~오픈 사이) → close null → 마감 게이트가 차단하지 않아야 정상
+        LocalTime close = BusinessHoursEvaluator.extractCloseTimeFromText("19:00~01:00");
+        assertFalse(ClosingTimeGate.check(close, LocalTime.of(9, 0), 60).blocked());
+    }
+
+    @Test
+    void statusAtHandlesOvernightFestival() {
+        Map<String, String> intro = Map.of("usetimefestival", "19:00~01:00");
+        // 운영 중(밤)
+        assertEquals(BusinessStatus.OPEN,
+                BusinessHoursEvaluator.statusAt(intro, LocalDateTime.of(2026, 9, 9, 23, 30)));
+        // 01:00 마감 지남
+        assertEquals(BusinessStatus.HOURS_ENDED,
+                BusinessHoursEvaluator.statusAt(intro, LocalDateTime.of(2026, 9, 10, 2, 0)));
+        // 낮 시간대 - 아직 안 열림(운영 중은 아님). 트리거는 visitWindowActive로 별도 게이팅.
+        assertEquals(BusinessStatus.HOURS_ENDED,
+                BusinessHoursEvaluator.statusAt(intro, LocalDateTime.of(2026, 9, 9, 9, 0)));
     }
 
     @Test
