@@ -965,14 +965,24 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 12%, transparent);
 }
 
+/* 반려동물/유모차/무장애 체크박스 한 줄 배치 - 이모티콘 빼고 라벨을 줄여 한 줄에 맞춘다
+   (2026-09-11 사용자 요청). */
+.trip-form-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+  margin-top: 4px;
+}
+
 .trip-form-checkbox {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 14px;
   font-weight: 700;
   color: var(--ink);
-  margin-top: 4px;
+  white-space: nowrap;
 }
 
 .trip-form-party-size {
