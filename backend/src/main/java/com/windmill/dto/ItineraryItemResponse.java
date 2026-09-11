@@ -1,6 +1,7 @@
 package com.windmill.dto;
 
 import com.windmill.domain.ItineraryItem;
+import com.windmill.util.ItineraryItemStatus;
 import com.windmill.util.PlaceTagSanitizer;
 import lombok.Builder;
 import lombok.Data;
@@ -46,6 +47,11 @@ public class ItineraryItemResponse {
     private com.windmill.domain.CongestionSensitivity congestionSensitivity;
     private com.windmill.domain.InferredSource inferredSource;
 
+    /** 지난 일정(완료) 여부 - 시각 경과 자동 판정 또는 사용자 수동 표시. 완료 항목은 pinwheel·폴링에서 제외됨. */
+    private boolean completed;
+    /** "DONE"|"ACTIVE"|null - null이면 자동 판정. 프론트가 "자동 완료"와 "직접 표시"를 구분하는 데 사용. */
+    private String completionOverride;
+
     public static ItineraryItemResponse from(ItineraryItem item) {
         // 이미 저장된 #맛집 오탐도 응답 시점에 바로잡음 (체험관·스테이션 등)
         List<String> tags = PlaceTagSanitizer.sanitizeStored(
@@ -81,6 +87,8 @@ public class ItineraryItemResponse {
                 .overview(item.getOverview())
                 .detailFacts(item.getDetailFacts())
                 .indoor(item.getIndoorYn())
+                .completed(ItineraryItemStatus.isCompletedNow(item, item.getVisitDate()))
+                .completionOverride(item.getCompletionOverride())
                 .build();
     }
 }

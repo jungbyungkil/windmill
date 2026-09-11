@@ -48,10 +48,12 @@ export default function ItineraryItemCard({
   alerted = false,
   /** 알림을 눌러 들어온 경우 잠깐 스크롤+펄스로 눈에 띄게 한다(App.jsx의 deep-link 처리 참고) */
   highlighted = false,
+  completed = false,
   onUpdateTime,
   onUpdateItem,
   onTogglePin,
   onDelete,
+  onToggleComplete,
   onOpenDocent,
   onOpenHistory,
 }) {
@@ -59,12 +61,14 @@ export default function ItineraryItemCard({
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(() => draftFromItem(item));
-  const isWeather = (weatherAlerted || alerted) && !isIndoorPlace(item);
-  const businessAlerted = closedDayAlerted || hoursEndedAlerted;
-  const status = itemStatusLevel(item, {
+  const isWeather = !completed && (weatherAlerted || alerted) && !isIndoorPlace(item);
+  const businessAlerted = !completed && (closedDayAlerted || hoursEndedAlerted);
+  const crowdAlert = !completed && crowdAlerted;
+  // 완료(지난 일정) 항목은 상태 컬러·경고를 걷어내고 회색조로 둔다.
+  const status = completed ? 'NORMAL' : itemStatusLevel(item, {
     weatherAlerted: isWeather,
     businessAlerted,
-    crowdAlerted,
+    crowdAlerted: crowdAlert,
   });
   const statusClass = `status-${status.toLowerCase()}`;
 
@@ -122,20 +126,33 @@ export default function ItineraryItemCard({
   }
 
   function summaryStatusLabel() {
-    if (closedDayAlerted) return '휴무';
-    if (hoursEndedAlerted) return '마감';
+    if (completed) return '다녀옴';
+    if (businessAlerted && closedDayAlerted) return '휴무';
+    if (businessAlerted && hoursEndedAlerted) return '마감';
     if (isWeather) return '야외';
-    if (crowdAlerted) return '혼잡';
+    if (crowdAlert) return '혼잡';
     return STATUS_LABEL[status];
   }
 
   return (
     <div
       id={`item-${item.itemId}`}
-      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''} ${showDetail ? 'is-expanded' : 'is-collapsed'} ${highlighted ? 'item-card-highlighted' : ''}`}
+      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${completed ? 'is-completed' : ''} ${editing ? 'editing' : ''} ${showDetail ? 'is-expanded' : 'is-collapsed'} ${highlighted ? 'item-card-highlighted' : ''}`}
       data-status={status}
     >
       <span className={`item-status-rail ${statusClass}`} title={STATUS_LABEL[status]} aria-hidden="true" />
+
+      {onToggleComplete && (
+        <button
+          type="button"
+          className={`item-complete-toggle ${completed ? 'is-done' : ''}`}
+          onClick={() => onToggleComplete(item.itemId, !completed)}
+          aria-label={completed ? '다시 진행 중으로 되돌리기' : '다녀온 곳으로 표시'}
+          title={completed ? '다시 진행 중으로' : '다녀온 곳으로 표시'}
+        >
+          {completed ? '✓' : ''}
+        </button>
+      )}
 
       {!editing ? (
         <VisitTimePicker
@@ -238,7 +255,7 @@ export default function ItineraryItemCard({
               <PlaceDetailFacts facts={item.detailFacts} />
             </div>
 
-            {item.crowdRate !== null && item.crowdRate !== undefined && (
+            {!completed && item.crowdRate !== null && item.crowdRate !== undefined && (
               <div className={`item-crowd ${statusClass}`}>혼잡도 {Math.round(item.crowdRate)}%</div>
             )}
 
@@ -247,6 +264,16 @@ export default function ItineraryItemCard({
             )}
 
             <div className="item-text-actions">
+              {onToggleComplete && (
+                <button
+                  type="button"
+                  className="item-text-btn"
+                  onClick={() => onToggleComplete(item.itemId, !completed)}
+                >
+                  <span className="item-text-btn-icon" aria-hidden="true">{completed ? '↩️' : '✓'}</span>
+                  {completed ? '되돌리기' : '다녀옴'}
+                </button>
+              )}
               <button
                 type="button"
                 className="item-text-btn"

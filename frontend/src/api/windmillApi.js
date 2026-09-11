@@ -98,6 +98,14 @@ export function deleteItem(itineraryId, itemId, { reflow = true, replaceBackup =
   return request(`/itineraries/${itineraryId}/items/${itemId}${qs({ reflow, replaceBackup })}`, { method: 'DELETE' });
 }
 
+/** 지난 일정(완료) 수동 처리 - completed=true 완료 표시(스킵·조기 완료), false 다시 진행 중으로 되돌림 */
+export function setItemCompletion(itineraryId, itemId, completed) {
+  return request(`/itineraries/${itineraryId}/items/${itemId}/completion`, {
+    method: 'PATCH',
+    body: { completed },
+  });
+}
+
 /** origin이 있으면 "다음 장소까지 이동시간" 트리거도 함께 판정됨 (위치 권한 없으면 생략) */
 export function getTriggerStatus(itineraryId, origin) {
   return request(`/itineraries/${itineraryId}/trigger-status${qs({

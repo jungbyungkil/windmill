@@ -171,6 +171,7 @@ export default function App() {
   const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const autoOptimizedRef = useRef(false);
+  const autoRecordPromptedRef = useRef(false);
   const [activeDate, setActiveDate] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tripSection, setTripSection] = useState('home');
@@ -328,6 +329,16 @@ export default function App() {
           return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
         })
     : [];
+  // 오늘 일정을 전부 다녀오면(완료) 한 번만 후기 플로우로 연결한다. 스킵(안 간 곳)도 completed로 잡히므로
+  // "모두 완료 = 하루가 끝났다"로 본다. 되돌리기로 다시 미완료가 되면 재프롬프트하지 않는다(ref 가드).
+  const allDayItemsDone = visibleItems.length > 0 && visibleItems.every((i) => i.completed);
+  useEffect(() => {
+    if (!itinerary || !isTripToday(tripDate)) return;
+    if (!allDayItemsDone || tripRecordOpen || autoRecordPromptedRef.current) return;
+    autoRecordPromptedRef.current = true;
+    setTripRecordOpen(true);
+  }, [allDayItemsDone, itinerary, tripDate, tripRecordOpen]);
+
   const searchOriginPlaces = visibleItems.filter((item) => item.contentId);
   const pinnedToday = searchOriginPlaces.filter((item) => item.pinned);
   const defaultSearchOrigin = pinnedToday.length > 0
@@ -366,7 +377,7 @@ export default function App() {
   // 동선 최적화 / 혼잡도(비·폭염) 대안이 같은 패턴을 공유한다.
   const {
     toast, optimistic: pinwheelOptimistic, rollback: pinwheelRollback,
-    beginOptimistic, commitResolve, rollbackResolve, cancelOptimistic, dismissToast,
+    beginOptimistic, commitResolve, rollbackResolve, cancelOptimistic, dismissToast, showToast,
   } = useResolveFeedback({ triggerRef, setTrigger, refreshTrigger });
 
   useEffect(() => {
@@ -655,6 +666,19 @@ export default function App() {
   async function handleTogglePin(itemId, isPinned) {
     const result = await api.updateItem(itineraryId, itemId, { isPinned });
     setItinerary(result);
+  }
+
+  /** 지난 일정(완료) 수동 토글 - 스킵/조기 완료, 또는 완료 항목을 다시 진행 중으로 되돌리기 */
+  async function handleToggleComplete(itemId, completed) {
+    if (!itineraryId) return;
+    try {
+      const result = await api.setItemCompletion(itineraryId, itemId, completed);
+      setItinerary(result);
+      refreshTrigger();
+      showToast('success', completed ? '다녀온 곳으로 표시했어요' : '다시 진행 중으로 되돌렸어요');
+    } catch (e) {
+      showToast('error', e?.message || '처리하지 못했어요, 다시 시도해주세요');
+    }
   }
 
   async function handleDeleteItem(itemId) {
@@ -1777,6 +1801,7 @@ export default function App() {
                   onUpdateItem={handleUpdateItem}
                   onTogglePin={handleTogglePin}
                   onDelete={handleDeleteItem}
+                  onToggleComplete={handleToggleComplete}
                   onOpenDocent={handleOpenDocent}
                   onOpenHistory={itinerary.changeHistory?.length > 0 ? () => setHistoryOpen(true) : undefined}
                   onSortByTime={handleSortByTime}
