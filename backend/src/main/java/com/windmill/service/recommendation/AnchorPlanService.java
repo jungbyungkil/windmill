@@ -80,6 +80,9 @@ public class AnchorPlanService {
                 // 표준 4단계 일정과 동일하게 "당일치기 시작하기" 첫 화면 스피드가 중요해 LLM(Stage4)
                 // 단계를 건너뛴다 - 순위 결정에는 관여하지 않아 뽑히는 장소는 동일함(SmartPlanService 참고)
                 .skipLlm(true)
+                // visitDate 없이 부르면 Stage2가 "미래 방문 계획"으로 보고 지금 영업종료라도 무조건
+                // OPEN으로 찍는다(2026-09-11 검색과 같은 원인으로 발견 - 앵커 일정도 빠져 있었음).
+                .visitDate(itinerary.getStartDate())
                 .build();
 
         // TarRlteTarService1(연관 관광지)는 seed(앵커 장소)에 baseYm 데이터가 아예 없을 수 있다 -

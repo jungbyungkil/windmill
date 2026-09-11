@@ -439,6 +439,9 @@ public class ItineraryController {
                 .excludePlaceNames(excludePlaceNames)
                 .originContentId(origin == null ? null : origin.getContentId())
                 .originContentTypeId(origin == null ? null : origin.getContentTypeId())
+                // visitDate 없이 부르면 Stage2가 "미래 방문 계획"으로 보고 지금 영업종료라도 무조건
+                // OPEN으로 찍는다(2026-09-11 검색과 같은 원인으로 발견 - AI 초안도 빠져 있었음).
+                .visitDate(itinerary.getStartDate())
                 .build();
     }
 
@@ -467,6 +470,9 @@ public class ItineraryController {
                 .skipLlm(true)
                 .originContentId(origin == null ? null : origin.getContentId())
                 .originContentTypeId(origin == null ? null : origin.getContentTypeId())
+                // visitDate 없이 부르면 Stage2가 "미래 방문 계획"으로 보고 지금 영업종료라도 무조건
+                // OPEN으로 찍는다(2026-09-11 검색과 같은 원인으로 발견 - 대안 카드도 빠져 있었음).
+                .visitDate(itinerary.getStartDate())
                 .build();
     }
 
