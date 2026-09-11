@@ -11,6 +11,7 @@ import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
 import PinwheelLoader from './components/PinwheelLoader';
 import Toast from './components/Toast';
+import VisitConfirmationNudge from './components/VisitConfirmationNudge';
 import WeatherBanner from './components/WeatherBanner';
 import MidWeatherBanner from './components/MidWeatherBanner';
 import FestivalBanner from './components/FestivalBanner';
@@ -104,6 +105,20 @@ function scheduleMinutes(scheduledTime) {
   return h * 60 + m;
 }
 
+/**
+ * 방문 예정 시각이 지났는데 아직 완료 처리 안 된 첫 항목 - "OO 다녀오셨나요?" nudge 대상(방문 완료
+ * UX 개선 스펙 2항). items는 이미 시각순으로 정렬된 visibleItems를 받는다는 전제.
+ */
+function overdueUnconfirmedItem(items, nowMin) {
+  if (!Array.isArray(items)) return null;
+  for (const item of items) {
+    if (item.completed) continue;
+    const t = scheduleMinutes(item.scheduledTime);
+    if (t != null && t <= nowMin) return item;
+  }
+  return null;
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -153,6 +168,11 @@ export default function App() {
   const [pendingFinishOpen, setPendingFinishOpen] = useState(false);
   /** 상태 악화 알림이 문제 장소를 지목했을 때("&item=") 그 카드로 스크롤+펄스하기 위한 딥링크 대상 */
   const [highlightItemId, setHighlightItemId] = useState(null);
+  /** "방문 예정 시각 지남 + 미완료" nudge - "아직이에요" 누른 시각(itemId별). 30분 지나면 재노출. */
+  const [visitNudgeSnoozedAt, setVisitNudgeSnoozedAt] = useState({});
+  /** 위 nudge를 시간 경과에 따라 다시 평가시키기 위한 1분 주기 tick - setter로 리렌더만 트리거,
+   *  값 자체는 안 읽으므로 lint 컨벤션대로 밑줄 접두사(_)를 붙인다. */
+  const [_visitNudgeTick, setVisitNudgeTick] = useState(0);
   const [tripSubmitting, setTripSubmitting] = useState(false);
   const [rerouteCount, setRerouteCount] = useState(0);
 
@@ -235,6 +255,13 @@ export default function App() {
     setTripRecordOpen(true);
     setPendingFinishOpen(false);
   }, [pendingFinishOpen, itinerary, navigate]);
+
+  // "방문 예정 시각 지남" nudge를 1분마다 다시 평가한다(스누즈 30분 경과 여부 포함) - 서버 폴링과
+  // 무관하게 순수 시간 경과만으로 판단하므로 별도의 가벼운 로컬 타이머로 충분하다.
+  useEffect(() => {
+    const timer = setInterval(() => setVisitNudgeTick((t) => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // 알림 권한이 이미 있으면 FCM 토큰을 서버에 등록(팝업 없음). 여행이 생기면 itineraryId도 보강.
   useEffect(() => {
@@ -338,6 +365,25 @@ export default function App() {
     autoRecordPromptedRef.current = true;
     setTripRecordOpen(true);
   }, [allDayItemsDone, itinerary, tripDate, tripRecordOpen]);
+
+  // "OO 다녀오셨나요?" nudge 대상 - 오늘 일정 중 방문 예정 시각이 지났는데 미완료인 첫 항목.
+  // 긴급(혼잡·날씨·폭염 등) 트리거가 떠 있으면 그게 우선이라 이 nudge는 숨긴다(방문 완료 UX
+  // 개선 스펙 오픈 이슈 확정: 혼잡도·열기·날씨보다 낮게, 기본 순풍보다는 위). "아직이에요"로
+  // 스누즈하면 30분 뒤 visitNudgeTick(1분 주기)이 자연히 다시 노출시킨다 - 별도 서버 저장 불필요.
+  const visitNudgeUrgentTrigger = trigger?.level === 'WARNING' || trigger?.level === 'DANGER';
+  const visitNudgeCandidate = isTripToday(tripDate)
+    ? overdueUnconfirmedItem(visibleItems, new Date().getHours() * 60 + new Date().getMinutes())
+    : null;
+  const visitNudgeSnoozedUntil = visitNudgeCandidate
+    ? visitNudgeSnoozedAt[visitNudgeCandidate.itemId]
+    : null;
+  const visitNudgeSnoozed = visitNudgeSnoozedUntil != null
+    && Date.now() - visitNudgeSnoozedUntil < 30 * 60 * 1000;
+  const visitNudgeItem = !visitNudgeUrgentTrigger && !visitNudgeSnoozed ? visitNudgeCandidate : null;
+
+  function handleDismissVisitNudge(itemId) {
+    setVisitNudgeSnoozedAt((prev) => ({ ...prev, [itemId]: Date.now() }));
+  }
 
   const searchOriginPlaces = visibleItems.filter((item) => item.contentId);
   const pinnedToday = searchOriginPlaces.filter((item) => item.pinned);
@@ -1767,6 +1813,12 @@ export default function App() {
                   rerouteLoading={rerouteLoading}
                   onOptimizeRoute={() => handleOptimizeFromGps()}
                   optimizeLoading={optimizeLoading}
+                />
+
+                <VisitConfirmationNudge
+                  item={visitNudgeItem}
+                  onConfirm={() => handleToggleComplete(visitNudgeItem.itemId, true)}
+                  onDismiss={() => handleDismissVisitNudge(visitNudgeItem.itemId)}
                 />
 
                 {autoReplaceNotice && <div className="auto-replace-notice">⚡ {autoReplaceNotice}</div>}
