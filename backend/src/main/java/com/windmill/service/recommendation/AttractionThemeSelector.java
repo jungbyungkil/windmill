@@ -14,11 +14,16 @@ import java.util.stream.Collectors;
  * 역사 테마를 좋아할 법한 대가족도 무조건 #역사가 배제돼 근대역사관류가 애초에 후보 풀에 못 들어온다
  * (2026-08-20 사용자 제보 - 목포 대가족 여행에 근대역사관 대신 남농기념관이 뽑힌 사례).
  *
- * 연령대(있으면)를 1순위 신호로, 동반 자녀 유무를 2순위 신호로 써서 실제 RecommendThemeTag 28종 중
- * 존재하는 태그로만 매핑한다 - AgeGroupRanking.ADULT_KEYWORDS/youngestChildKeywords와 같은 의도를
+ * 연령대(있으면)와 동반 자녀 나이(있으면)를 함께 반영해 실제 RecommendThemeTag 28종 중 존재하는
+ * 태그로만 매핑한다 - AgeGroupRanking.ADULT_KEYWORDS/youngestChildKeywords와 같은 의도를
  * "후보를 재정렬"이 아니라 "애초에 어떤 태그로 검색할지"에 반영해, categoryMcls/categoryScls가 비어
  * 있어 사실상 무동작인 테마 검색 경로의 다운스트림 랭킹(CompanionCategoryRanking/AgeGroupRanking)에
  * 기대지 않고도 확실히 개인화가 반영되게 한다.
+ *
+ * 부모+자녀 태그 혼합(2026-09-11 박진명 결정): 자녀 나이가 있어도 성인 연령대 태그를 버리지 않고
+ * 함께 담는다 - 이전엔 자녀 나이가 있으면 성인 연령대 신호가 완전히 무시됐다("30대 부모+9세 자녀"가
+ * #박물관만 뽑히고 #역사/#전시는 후보에도 못 들어감). 자녀 태그를 LinkedHashSet에 먼저 넣어 우선
+ * 순위를 유지하고, 자리가 남으면(MAX_THEMES 안에서) 성인 태그가 이어서 채워진다.
  */
 final class AttractionThemeSelector {
 
@@ -43,18 +48,24 @@ final class AttractionThemeSelector {
         }
 
         Integer youngestChildAge = youngestAge(childAges);
-        if (youngestChildAge != null) {
+        boolean hasChildSignal = youngestChildAge != null;
+        if (hasChildSignal) {
             tags.add("#아이동반");
             tags.add(childThemeTag(youngestChildAge));
-        } else if (adultAgeGroup != null) {
+        }
+        if (adultAgeGroup != null) {
+            // 자녀 신호가 있어도 더 이상 버리지 않는다 - 자녀 태그가 먼저 들어가 있어 우선순위는
+            // 유지되고, MAX_THEMES 안에서 자리가 남는 만큼만 성인 태그가 이어서 채워진다.
             tags.addAll(adultThemeTags(adultAgeGroup));
-        } else if (!familyPace) {
-            // 연령대·자녀 나이 둘 다 모르고 가족형도 아니면(신규 데이터 없는 옛 일정 등) 기존 동작으로 폴백
-            tags.add("#자연");
-            tags.add("#역사");
-        } else {
-            // 가족형인데 연령대·자녀 나이 데이터가 전혀 없으면 기존 동작(자연+아이동반)과 동일하게 유지
-            tags.add("#자연");
+        } else if (!hasChildSignal) {
+            if (!familyPace) {
+                // 연령대·자녀 나이 둘 다 모르고 가족형도 아니면(신규 데이터 없는 옛 일정 등) 기존 동작으로 폴백
+                tags.add("#자연");
+                tags.add("#역사");
+            } else {
+                // 가족형인데 연령대·자녀 나이 데이터가 전혀 없으면 기존 동작(자연+아이동반)과 동일하게 유지
+                tags.add("#자연");
+            }
         }
 
         return tags.stream().limit(MAX_THEMES).collect(Collectors.toList());

@@ -105,4 +105,24 @@ class AttractionThemeSelectorTest {
         assertTrue(tags.contains("#자연"));
         assertTrue(tags.contains("#사찰"));
     }
+
+    @Test
+    void childAgeAndAdultAgeGroupBothPresent_blendsBothTagSets() {
+        // 2026-09-11 박진명 결정: 자녀 나이가 있어도 성인 연령대 태그를 버리지 않고 섞는다.
+        // 30대 부모 + 9세 자녀 -> 자녀 태그(#박물관)와 성인 태그(#역사) 둘 다 후보에 들어가야 함
+        List<String> tags = AttractionThemeSelector.select(CompanionType.TRIO, AgeGroup.THIRTIES, List.of(9));
+
+        assertTrue(tags.contains("#아이동반"));
+        assertTrue(tags.contains("#박물관"));
+        assertTrue(tags.contains("#역사"), "성인 연령대 태그도 함께 남아야 함, got " + tags);
+    }
+
+    @Test
+    void childAgeSignalKeepsPriorityOverAdultWhenBudgetIsTight() {
+        // 자녀 태그가 먼저 채워지므로 MAX_THEMES(4) 예산이 빠듯해도 자녀 신호(#아이동반·나이대 태그)는
+        // 항상 살아남고, 성인 태그는 남는 자리만큼만(1개) 들어간다
+        List<String> tags = AttractionThemeSelector.select(CompanionType.EXTENDED_FAMILY, AgeGroup.SIXTIES, List.of(3));
+
+        assertEquals(List.of("#실내", "#아이동반", "#테마파크", "#사찰"), tags);
+    }
 }
