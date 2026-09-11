@@ -872,13 +872,25 @@
   text-shadow: var(--text-shadow-notice);
 }
 
-/* 날짜 입력 바로 옆에 "당일치기만 지원" 안내를 한 줄로 붙인다(2026-09-11 사용자 요청 - 예전엔
-   입력칸 아래 별도 줄이었음). 좁은 화면에서 줄바꿈되지 않게 nowrap 유지. */
+/* "여행 날짜" 라벨 + 입력칸 + "당일치기만 지원" 안내를 전부 한 줄로 붙인다(2026-09-11 사용자
+   요청 - 예전엔 라벨은 위 줄, 안내는 입력칸 아래 별도 줄이었음). 좁은 화면에서 줄바꿈되지
+   않게 nowrap 유지하고, 날짜 입력은 flex:1로 늘어나지 않게 고유 폭만 쓰게 해 라벨·안내
+   문구에 자리를 내준다. */
 .trip-form-date-row {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
+}
+
+.trip-form-date-row .trip-form-label {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.trip-form-date-row input[type='date'] {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .trip-form-date-help {

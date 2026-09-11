@@ -426,10 +426,10 @@ export default function CreateTripScreen({
         </div>
 
         <div className="trip-form-row">
-          <label className="trip-form-label" htmlFor="trip-date">
-            여행 날짜
-          </label>
           <div className="trip-form-date-row">
+            <label className="trip-form-label" htmlFor="trip-date">
+              여행 날짜
+            </label>
             <input
               id="trip-date"
               type="date"
