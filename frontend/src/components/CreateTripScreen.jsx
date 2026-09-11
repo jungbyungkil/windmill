@@ -429,19 +429,21 @@ export default function CreateTripScreen({
           <label className="trip-form-label" htmlFor="trip-date">
             여행 날짜
           </label>
-          <p className="trip-form-date-help">당일치기만 지원해요.</p>
-          <input
-            id="trip-date"
-            type="date"
-            className={`trip-form-date-single ${dateTouched && dateInvalid ? 'invalid' : ''}`}
-            value={tripDate}
-            min={today}
-            onChange={(e) => handleDateChange(e.target.value)}
-            onBlur={() => setDateTouched(true)}
-            required
-            aria-invalid={dateTouched && dateInvalid}
-            aria-describedby="trip-date-help"
-          />
+          <div className="trip-form-date-row">
+            <input
+              id="trip-date"
+              type="date"
+              className={`trip-form-date-single ${dateTouched && dateInvalid ? 'invalid' : ''}`}
+              value={tripDate}
+              min={today}
+              onChange={(e) => handleDateChange(e.target.value)}
+              onBlur={() => setDateTouched(true)}
+              required
+              aria-invalid={dateTouched && dateInvalid}
+              aria-describedby="trip-date-help"
+            />
+            <p className="trip-form-date-help">당일치기만 지원해요.</p>
+          </div>
           <span id="trip-date-help" className="sr-only">하루 날짜만 선택하세요</span>
           {dateTouched && !tripDate && (
             <div className="error-msg">❌ 여행 날짜를 선택해 주세요</div>

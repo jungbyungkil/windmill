@@ -872,6 +872,15 @@
   text-shadow: var(--text-shadow-notice);
 }
 
+/* 날짜 입력 바로 옆에 "당일치기만 지원" 안내를 한 줄로 붙인다(2026-09-11 사용자 요청 - 예전엔
+   입력칸 아래 별도 줄이었음). 좁은 화면에서 줄바꿈되지 않게 nowrap 유지. */
+.trip-form-date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
 .trip-form-date-help {
   margin: 0;
   font-size: 12px;
@@ -879,6 +888,7 @@
   color: var(--sea-deep);
   line-height: 1.4;
   text-shadow: var(--text-shadow-notice);
+  white-space: nowrap;
 }
 
 .trip-form-date-single.invalid,
