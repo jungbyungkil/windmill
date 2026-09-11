@@ -50,7 +50,12 @@ export default function RecommendationSearch({
     });
   }
 
-  const visibleResults = (!foodSearch && freeOnly) ? (results || []).filter((c) => c.isFree) : results;
+  // 가격 정보가 없는(isFree === null) 곳은 무료로 간주한다. 음식점은 이 체크박스 자체가
+  // foodSearch일 때 숨겨지므로(항상 유료 취급) 여기 남는 후보(산책로·공원·문화시설 등)는
+  // 정보 없음 = 유료로 단정할 근거가 없어 무료 쪽에 포함하는 게 사용자 기대와 맞다(2026-09-11 제보).
+  const visibleResults = (!foodSearch && freeOnly)
+    ? (results || []).filter((c) => c.isFree !== false)
+    : results;
 
   return (
     <div className="reco-search">
