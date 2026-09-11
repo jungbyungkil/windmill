@@ -51,7 +51,6 @@ export default function ItineraryItemCard({
   completed = false,
   onUpdateTime,
   onUpdateItem,
-  onTogglePin,
   onDelete,
   onToggleComplete,
   onOpenDocent,
@@ -261,10 +260,6 @@ export default function ItineraryItemCard({
               <div className={`item-crowd ${statusClass}`}>혼잡도 {Math.round(item.crowdRate)}%</div>
             )}
 
-            {item.pinned && (
-              <p className="item-pin-hint">검색할 때 근처 기준의 기본값이에요. 검색 화면에서 바꿀 수 있어요.</p>
-            )}
-
             <div className="item-text-actions">
               {onToggleComplete && (
                 <button
@@ -279,27 +274,10 @@ export default function ItineraryItemCard({
               <button
                 type="button"
                 className="item-text-btn"
-                onClick={handleOpenMap}
-                disabled={!mapAvailable}
-              >
-                <span className="item-text-btn-icon" aria-hidden="true">🗺️</span>
-                지도
-              </button>
-              <button
-                type="button"
-                className="item-text-btn"
                 onClick={() => setEditing(true)}
               >
                 <span className="item-text-btn-icon" aria-hidden="true">✏️</span>
                 수정
-              </button>
-              <button
-                type="button"
-                className="item-text-btn"
-                onClick={() => onTogglePin(item.itemId, !item.pinned)}
-              >
-                <span className="item-text-btn-icon" aria-hidden="true">📌</span>
-                {item.pinned ? '고정 해제' : '고정'}
               </button>
               <button
                 type="button"
@@ -318,9 +296,6 @@ export default function ItineraryItemCard({
                 삭제
               </button>
             </div>
-            {!item.pinned && (
-              <p className="item-pin-hint">고정하면 검색의 근처 기준이 이 장소로 바뀌어요. 검색에서 직접 골라도 돼요.</p>
-            )}
           </>
         ) : (
           <div className="item-edit-form">

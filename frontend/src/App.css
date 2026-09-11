@@ -2804,9 +2804,10 @@
   text-shadow: var(--text-shadow-notice);
 }
 
+/* 2026-09-11 사용자 요청 - 지도/고정 버튼 제거하고 다녀옴/수정/도슨트/삭제 4개만 한 줄로 */
 .item-text-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
