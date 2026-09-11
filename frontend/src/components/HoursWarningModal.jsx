@@ -26,6 +26,7 @@ export default function HoursWarningModal({
         aria-labelledby="hours-warning-title"
         onClick={(e) => e.stopPropagation()}
       >
+        <button type="button" className="modal-close-x" aria-label="닫기" onClick={onCancel}>✕</button>
         <p className="hours-warning-eyebrow">{eyebrow}</p>
         <h2 id="hours-warning-title" className="hours-warning-title">
           {placeName || '이 장소'}

@@ -10,6 +10,7 @@ export default function ExitConfirmModal({ open, onCancel, onConfirm }) {
         aria-labelledby="exit-confirm-title"
         onClick={(e) => e.stopPropagation()}
       >
+        <button type="button" className="modal-close-x" aria-label="닫기" onClick={onCancel}>✕</button>
         <h2 id="exit-confirm-title" className="exit-confirm-title">앱을 종료할까요?</h2>
         <p className="exit-confirm-message">지금까지 만든 일정은 그대로 남아있어요. 다음에 이어서 볼 수 있어요.</p>
         <div className="exit-confirm-actions">

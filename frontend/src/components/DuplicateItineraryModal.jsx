@@ -27,6 +27,7 @@ export default function DuplicateItineraryModal({
         aria-labelledby="duplicate-itinerary-title"
         onClick={(e) => e.stopPropagation()}
       >
+        <button type="button" className="modal-close-x" aria-label="닫기" onClick={onClose}>✕</button>
         <p className="duplicate-itinerary-eyebrow">일정 중복</p>
         <h2 id="duplicate-itinerary-title" className="duplicate-itinerary-title">
           이미 {dateLabel} 일정이 있어요

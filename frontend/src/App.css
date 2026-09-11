@@ -512,6 +512,32 @@
   border-color: color-mix(in srgb, var(--sea) 28%, var(--sand-border));
 }
 
+/* 팝업/모달 우측 상단 ✕ - 배경 클릭·뒤로가기와 동일하게 "닫기만, 상태 유지"로 동작한다(2026-09-11).
+   개별 카드형 모달(duplicate-itinerary/closing-gate/exit-confirm/hours-warning)에 쓴다 - 이미
+   .modal-header + .icon-btn 패턴을 쓰는 모달(TripRecordModal 등)은 그쪽을 그대로 쓰면 됨. */
+.modal-close-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.modal-close-x:hover {
+  background: color-mix(in srgb, var(--sea) 10%, white);
+  color: var(--ink);
+}
+
 .tag {
   background: var(--sand-card);
   border: 1px solid var(--sand-border);
@@ -6116,6 +6142,7 @@
 }
 
 .closing-gate-modal {
+  position: relative;
   width: min(100%, 360px);
   background: #fff;
   border-radius: 16px;
@@ -6133,6 +6160,7 @@
 
 .closing-gate-title {
   margin: 0 0 10px;
+  padding-right: 34px;
   font-size: 1.15rem;
   font-weight: 800;
   line-height: 1.35;
@@ -6404,6 +6432,7 @@
 }
 
 .duplicate-itinerary-modal {
+  position: relative;
   width: min(100%, 380px);
   background: #fff;
   border-radius: 16px;
@@ -6420,6 +6449,7 @@
 
 .duplicate-itinerary-title {
   margin: 0 0 10px;
+  padding-right: 34px;
   font-size: 1.15rem;
   line-height: 1.35;
 }
@@ -6822,6 +6852,7 @@
 }
 
 .exit-confirm-modal {
+  position: relative;
   width: min(100%, 340px);
   background: #fff;
   border-radius: 16px;
@@ -6883,6 +6914,7 @@
 }
 
 .hours-warning-modal {
+  position: relative;
   width: min(100%, 360px);
   background: #fff;
   border-radius: 16px;
@@ -6900,6 +6932,7 @@
 
 .hours-warning-title {
   margin: 0 0 10px;
+  padding-right: 34px;
   font-size: 1.15rem;
   font-weight: 800;
   line-height: 1.35;

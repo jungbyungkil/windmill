@@ -42,6 +42,7 @@ export default function ClosingGateModal({
         aria-labelledby="closing-gate-title"
         onClick={(e) => e.stopPropagation()}
       >
+        <button type="button" className="modal-close-x" aria-label="닫기" onClick={onClose}>✕</button>
         <p className="closing-gate-eyebrow">{copy.eyebrow}</p>
         <h2 id="closing-gate-title" className="closing-gate-title">
           {placeName || '이 장소'}
