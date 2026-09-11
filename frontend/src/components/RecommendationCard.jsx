@@ -1,5 +1,6 @@
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
+import { sanitizeApiText } from '../utils/sanitizeApiText';
 import { isFoodPlace } from '../constants';
 import PlaceOverview from './PlaceOverview';
 import PlaceDetailFacts from './PlaceDetailFacts';
@@ -71,12 +72,14 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         )}
         {candidate.strollerFriendly === true && <div className="reco-info-row">🍼 유모차 이용 가능</div>}
         {candidate.accessibleFriendly && <div className="reco-info-row">♿ 무장애 시설</div>}
-        {candidate.restDateText && <div className="reco-info-row reco-restdate">🚫 정기휴무: {candidate.restDateText}</div>}
+        {candidate.restDateText && (
+          <div className="reco-info-row reco-restdate">🚫 정기휴무: {sanitizeApiText(candidate.restDateText)}</div>
+        )}
         {candidate.closeTime && (
-          <div className="reco-info-row reco-close">🕐 마감 {candidate.closeTime}{candidate.useTimeText ? ` · ${candidate.useTimeText}` : ''}</div>
+          <div className="reco-info-row reco-close">🕐 마감 {candidate.closeTime}{candidate.useTimeText ? ` · ${sanitizeApiText(candidate.useTimeText)}` : ''}</div>
         )}
         {!candidate.closeTime && candidate.useTimeText && (
-          <div className="reco-info-row reco-close">🕐 {candidate.useTimeText}</div>
+          <div className="reco-info-row reco-close">🕐 {sanitizeApiText(candidate.useTimeText)}</div>
         )}
         {candidate.homepageUrl && (
           <button

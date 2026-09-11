@@ -1,3 +1,5 @@
+import { sanitizeApiText } from '../utils/sanitizeApiText';
+
 function visibleFacts(facts) {
   if (!Array.isArray(facts)) return [];
   return facts.filter((f) => {
@@ -16,7 +18,7 @@ export default function PlaceDetailFacts({ facts, className = '' }) {
       {rows.map((f) => (
         <div key={f.key || f.label} className="reco-info-row place-fact-row">
           <span className="place-fact-label">{f.label}</span>
-          <span className="place-fact-value">{f.value}</span>
+          <span className="place-fact-value">{sanitizeApiText(f.value)}</span>
         </div>
       ))}
     </div>

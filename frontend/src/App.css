@@ -4264,6 +4264,9 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0 0 6px;
+  /* sanitizeApiText가 원문 "<br>"를 실제 줄바꿈(\n)으로 바꿔서 넘긴다 - pre-line이 있어야
+     그 줄바꿈이 화면에 보인다(기본값 normal은 \n을 공백으로 뭉갬). */
+  white-space: pre-line;
 }
 
 .place-overview-compact {
@@ -4301,6 +4304,7 @@
   overflow: hidden;
   overflow-wrap: break-word;
   word-break: keep-all;
+  white-space: pre-line;
 }
 
 .situational-chips {
@@ -4348,6 +4352,7 @@
 
 .reco-restdate {
   color: var(--level-warning);
+  white-space: pre-line;
 }
 
 .reco-cost-hint {
@@ -4356,6 +4361,7 @@
 
 .reco-close {
   color: var(--ink, #1e293b);
+  white-space: pre-line;
 }
 
 .reco-distance {

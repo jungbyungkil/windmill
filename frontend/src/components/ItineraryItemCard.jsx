@@ -3,6 +3,7 @@ import { itemStatusLevel, STATUS_LABEL, isIndoorPlace } from '../utils/statusLev
 import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
+import { sanitizeApiText } from '../utils/sanitizeApiText';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 import PlaceThumb from './PlaceThumb';
 import TagGroupPicker from './TagGroupPicker';
@@ -254,7 +255,9 @@ export default function ItineraryItemCard({
               )}
               {item.strollerFriendly === true && <div className="reco-info-row">유모차 이용 가능</div>}
               {item.accessibleFriendly && <div className="reco-info-row">무장애 시설</div>}
-              {item.restDateText && <div className="reco-info-row reco-restdate">정기휴무: {item.restDateText}</div>}
+              {item.restDateText && (
+                <div className="reco-info-row reco-restdate">정기휴무: {sanitizeApiText(item.restDateText)}</div>
+              )}
               {item.homepageUrl && (
                 <button
                   type="button"
