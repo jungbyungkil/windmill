@@ -358,49 +358,51 @@ public class RecommendationPipeline {
     };
 
     /**
-     * 트리거 우선회피 정렬. 혼잡 회피는 혼잡 둔감·여유율 높은 순, 비/폭염은 실내·우천 둔감을 앞으로 당긴다.
-     * 동반 자녀가 있으면 그 안에서도 아이 동반에 어울리는 실내 장소(체험관·키즈카페·박물관 등)를
-     * 한 번 더 앞으로 당긴다 - 폭염철 아이 동반 여행은 실내 중에서도 "아이가 할 게 있는 곳"이 우선.
-     * 스마트 동선(힌트 없음)은 여기 타지 않고, 인기 명소를 오전에 두는 쪽은 SmartPlanService가 담당한다.
+     * 트리거 우선회피 정렬. 스마트 동선(힌트 없음)은 여기 타지 않고, 인기 명소를 오전에 두는 쪽은
+     * SmartPlanService가 담당한다.
+     *
+     * 인기순 최우선(2026-09-11 사용자 결정 - "혼잡 회피여도 인기순 우선이 맞다, 사용자가 판단하게
+     * 해달라"): 혼잡 둔감·우천 둔감·실내 여부 같은 건 "그래도 갈 수는 있는" 소프트 선호라 인기순보다
+     * 뒤로 민다 - 실제로 가장 좋은 곳이 뭔지 사용자가 직접 보고 판단하게 한다. 다만 방문일 정기휴무
+     * (isVisitableOnDay)는 예외 - "휴무라서 대안을 찾는" 요청에 휴무인 곳을 1순위로 보여주면 아예
+     * 갈 수 없는 곳이라 선호 문제가 아니라 무효한 답이라, 이것만 인기순보다 먼저 걸러둔다.
      */
-    private List<RecommendationCandidate> applyAvoidanceOrdering(List<RecommendationCandidate> candidates,
+    static List<RecommendationCandidate> applyAvoidanceOrdering(List<RecommendationCandidate> candidates,
                                                                    RecommendationRequest.AvoidanceHint hint,
                                                                    List<Integer> childAges) {
         if (hint == RecommendationRequest.AvoidanceHint.CROWD) {
-            // 혼잡 회피 우선순위(제일 좋은 것부터): ①혼잡 둔감 ②실시간 집중률 낮은 순 ③지역 인기(조회)순
-            // ④썸네일 있는 카드. ②·③이 상충할 때 "지금 덜 붐비는 곳"을 인기보다 앞세운다.
+            // ①지역 인기(조회)순 ②혼잡 둔감 ③실시간 집중률 낮은 순 ④썸네일 있는 카드.
             return candidates.stream()
                     .sorted(Comparator
-                            .comparing((RecommendationCandidate c) ->
+                            .comparingInt((RecommendationCandidate c) -> PopularityRanking.rankKey(c.getRank()))
+                            .thenComparing((RecommendationCandidate c) ->
                                     c.getCongestionSensitivity() == CongestionSensitivity.INSENSITIVE ? 0 : 1)
                             .thenComparing(RecommendationCandidate::getCrowdRate,
                                     Comparator.nullsLast(Comparator.naturalOrder()))
-                            .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank()))
                             .thenComparing(c -> hasThumbnail(c) ? 0 : 1))
                     .collect(Collectors.toList());
         }
         if (hint == RecommendationRequest.AvoidanceHint.ROUTE
                 || hint == RecommendationRequest.AvoidanceHint.BUSINESS) {
-            // 휴무/마감/이동시간 대응 우선순위: ①방문일에 문 여는 곳(정기휴무 아님) ②가까운 곳
-            // ③지역 인기순. 휴무 때문에 대안을 찾는 건데 대안도 휴무면 뒤로 보낸다.
+            // ①방문일에 문 여는 곳(정기휴무 아님, 무효한 답 배제) ②지역 인기순 ③가까운 곳.
             return candidates.stream()
                     .sorted(Comparator
                             .comparingInt((RecommendationCandidate c) -> isVisitableOnDay(c) ? 0 : 1)
+                            .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank()))
                             .thenComparing(RecommendationCandidate::getDistanceKm,
-                                    Comparator.nullsLast(Comparator.naturalOrder()))
-                            .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank())))
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
         }
         if (hint == RecommendationRequest.AvoidanceHint.WEATHER
                 || hint == RecommendationRequest.AvoidanceHint.HEAT) {
-            // 비/폭염 우선순위: ①실내 ②우천 둔감 ③(자녀 동반 시)아이가 즐길 실내 ④지역 인기순 ⑤썸네일.
+            // ①지역 인기순 ②실내 ③우천 둔감 ④(자녀 동반 시)아이가 즐길 실내 ⑤썸네일.
             boolean hasChildren = childAges != null && !childAges.isEmpty();
             return candidates.stream()
                     .sorted(Comparator
-                            .comparing((RecommendationCandidate c) -> indoorPreferred(c) ? 0 : 1)
+                            .comparingInt((RecommendationCandidate c) -> PopularityRanking.rankKey(c.getRank()))
+                            .thenComparing((RecommendationCandidate c) -> indoorPreferred(c) ? 0 : 1)
                             .thenComparing(c -> c.getRainSensitivity() == RainSensitivity.INSENSITIVE ? 0 : 1)
                             .thenComparing(c -> hasChildren && matchesKidsIndoorKeyword(c) ? 0 : 1)
-                            .thenComparingInt(c -> PopularityRanking.rankKey(c.getRank()))
                             .thenComparing(c -> hasThumbnail(c) ? 0 : 1))
                     .collect(Collectors.toList());
         }
@@ -424,7 +426,7 @@ public class RecommendationPipeline {
         return c.getMatchedTags() != null && c.getMatchedTags().contains("#실내");
     }
 
-    private boolean matchesKidsIndoorKeyword(RecommendationCandidate c) {
+    private static boolean matchesKidsIndoorKeyword(RecommendationCandidate c) {
         String text = (c.getCategory() == null ? "" : c.getCategory())
                 + " " + (c.getPlaceName() == null ? "" : c.getPlaceName());
         for (String keyword : KIDS_INDOOR_KEYWORDS) {
