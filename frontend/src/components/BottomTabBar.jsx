@@ -17,6 +17,15 @@ function TabIcon({ name }) {
       </svg>
     );
   }
+  if (name === 'itinerary') {
+    return (
+      <svg {...ICON}>
+        <rect x="5" y="4" width="14" height="17" rx="2" />
+        <path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1z" />
+        <path d="M8.5 11h7M8.5 14.5h7M8.5 18h4.5" />
+      </svg>
+    );
+  }
   if (name === 'map') {
     return (
       <svg {...ICON}>
@@ -50,7 +59,12 @@ function TabIcon({ name }) {
 }
 
 const TABS = [
-  { key: 'home', label: '홈' },
+  // "홈" = 메인(지역/날짜/동반유형 입력 화면)으로 이동 - 2026-09-11 핸드오프 브리프: 기존엔 상단
+  // "← 메인" 텍스트 버튼 하나뿐이던 진입점을 하단 탭으로 승격. 다른 5개와 달리 이 탭은 /trip 안의
+  // 섹션이 아니라 라우트 자체를 벗어나는 액션이라, active로 선택되는 일은 없다(onSelect 쪽에서
+  // 'main'을 특별 처리 - App.jsx의 selectTripSection 참고).
+  { key: 'main', label: '홈', icon: 'home' },
+  { key: 'home', label: '일정', icon: 'itinerary' },
   { key: 'map', label: '지도' },
   { key: 'search', label: '검색' },
   { key: 'alerts', label: '알림' },
@@ -58,11 +72,11 @@ const TABS = [
 ];
 
 /**
- * 일정 화면 하단 탭 — 홈/지도/검색/알림/프로필 중 한 화면만 연다.
+ * 일정 화면 하단 탭 — 홈(메인 이동)/일정/지도/검색/알림/프로필 6개.
  */
 export default function BottomTabBar({ active, onSelect }) {
   return (
-    <nav className="bottom-tab-bar" aria-label="일정 화면 구간">
+    <nav className="bottom-tab-bar" aria-label="하단 내비게이션">
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
@@ -73,7 +87,7 @@ export default function BottomTabBar({ active, onSelect }) {
             onClick={() => onSelect?.(tab.key)}
             aria-current={isActive ? 'page' : undefined}
           >
-            <TabIcon name={tab.key} />
+            <TabIcon name={tab.icon || tab.key} />
             <span className="bottom-tab-label">{tab.label}</span>
           </button>
         );

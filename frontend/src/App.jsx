@@ -319,6 +319,12 @@ export default function App() {
   const defaultSearchOriginId = defaultSearchOrigin ? String(defaultSearchOrigin.itemId) : '';
 
   function selectTripSection(key) {
+    // "홈" 탭은 /trip 내부 섹션이 아니라 메인(CreateTripScreen)으로 나가는 액션 - 기존 상단
+    // "← 메인" 버튼(handleGoHome)과 동일하게 처리한다(2026-09-11 핸드오프 브리프).
+    if (key === 'main') {
+      handleGoHome();
+      return;
+    }
     if (!TRIP_SECTIONS.includes(key)) return;
     setTripSection(key);
     const next = tripSectionPath(key);
@@ -1684,15 +1690,8 @@ export default function App() {
               )}
               <header className="app-header">
                 <div className="header-inner">
-                  <button
-                    type="button"
-                    className="header-home-btn"
-                    onClick={handleGoHome}
-                    aria-label="메인으로"
-                  >
-                    <span aria-hidden="true">←</span>
-                    메인
-                  </button>
+                  {/* 상단 "← 메인" 버튼은 제거됨(2026-09-11) - 하단 탭바의 신규 "홈" 탭이 같은
+                      역할(handleGoHome)을 대체한다. */}
                   <div className="header-trip-meta">
                     <span className="header-trip-region">{itinerary.regionDisplayName || '바람따라'}</span>
                     {tripDate && <span className="header-trip-date">{formatTripDate(tripDate)}</span>}
