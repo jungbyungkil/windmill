@@ -754,6 +754,10 @@ export default function App() {
         excludeContentIds,
         originContentId,
         originContentTypeId,
+        // 지금 시각 기준 영업 상태(영업중/휴무/영업종료) 배지가 정확히 뜨려면 방문일이 필요하다
+        // (2026-09-11 사용자 제보 - 21시 넘어도 "영업중"으로 뜨던 문제. 없으면 백엔드가 "미래
+        // 방문 계획"으로 보고 무조건 OPEN으로 찍음).
+        visitDate: activeDate || itinerary.startDate,
       });
       setRecoResults(results);
     } catch {

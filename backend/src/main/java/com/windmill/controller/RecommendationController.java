@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -82,7 +83,8 @@ public class RecommendationController {
             @RequestParam(required = false) List<String> excludeContentIds,
             @RequestParam(required = false) String originContentId,
             @RequestParam(required = false) Integer originContentTypeId,
-            @RequestParam(required = false) Integer maxBudgetPerPerson) {
+            @RequestParam(required = false) Integer maxBudgetPerPerson,
+            @RequestParam(required = false) LocalDate visitDate) {
 
         Mono<List<String>> badPlaceNamesMono = sessionId == null || sessionId.isBlank()
                 ? Mono.just(List.of())
@@ -107,6 +109,12 @@ public class RecommendationController {
                     .originContentId(originContentId)
                     .originContentTypeId(originContentTypeId)
                     .maxBudgetPerPerson(maxBudgetPerPerson)
+                    // visitDate 없이 호출하면 Stage2가 "미래 방문 계획"으로 보고 지금 영업종료라도
+                    // 무조건 OPEN으로 찍었다(TripDayPolicy.liveConditionsApply(null)==false 폴백 -
+                    // 2026-09-11 사용자 제보: 국립극장 공연예술박물관이 21시 넘어서도 "영업중"으로
+                    // 뜸). "새로운 장소 추천받기"는 지금 담을 곳을 찾는 즉시성 검색이라 프론트가 넘겨준
+                    // 여행일(=오늘인 당일치기)을 그대로 실어 지금 시각 기준 영업 상태가 반영되게 한다.
+                    .visitDate(visitDate)
                     // 태그가 세분화되면서(한식/중식/카페/박물관 등) "새로운 장소 추천받기" 검색도
                     // 자주 반복해서 누르는 액션이 됨 - LLM(Stage4) 단계가 전체 시간의 상당 부분을
                     // 차지해(2026-08-16 실측) 표준 일정과 동일하게 건너뛴다. 순위에는 영향 없음.

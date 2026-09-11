@@ -140,8 +140,8 @@ export function getSmartPlan(itineraryId, { placeCount, date, standard } = {}) {
   return request(`/itineraries/${itineraryId}/smart-plan${qs({ placeCount, date, standard })}`);
 }
 
-export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId, maxBudgetPerPerson } = {}) {
-  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId, maxBudgetPerPerson })}`);
+export function getRecommendations({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId, maxBudgetPerPerson, visitDate } = {}) {
+  return request(`/recommendations${qs({ regionCode, withPet, strollerFriendly, accessibleFriendly, companionType, adultAgeGroup, childAges, seedPlaceName, tags, query, excludeContentIds, originContentId, originContentTypeId, maxBudgetPerPerson, visitDate })}`);
 }
 
 /** 가고 싶은 곳이 정해진 사용자용 - 장소명으로 직접 검색(카카오맵 검색과 동일한 결과). 앵커 등록에도 재사용.
