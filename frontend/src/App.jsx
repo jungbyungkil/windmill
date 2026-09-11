@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import useSession from './hooks/useSession';
-import useExitConfirm from './hooks/useExitConfirm';
 import * as api from './api/windmillApi';
 import CreateTripScreen from './components/CreateTripScreen';
 import SmartPlanScreen from './components/SmartPlanScreen';
@@ -34,7 +33,6 @@ import MyTripsScreen from './components/MyTripsScreen';
 import TripRecordDetailScreen from './components/TripRecordDetailScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
-import ExitConfirmModal from './components/ExitConfirmModal';
 import { recordView } from './utils/viewHistory';
 import { placeSnapshotFields } from './utils/placeSnapshot';
 import { syncPushSubscription } from './utils/webPush';
@@ -288,10 +286,6 @@ export default function App() {
   // itineraryId는 설정됐지만(초안 재개 등) 아직 itinerary를 못 불러온 사이 - 이 동안엔 라우트 가드가
   // "/"로 튕겼다가 로드 완료 후 다시 "/trip"으로 튕기는 깜빡임을 피하기 위한 로딩 상태
   const restoring = itineraryId != null && !itinerary;
-
-  // 뒤로가기 종료 확인 - 최상위(홈, CreateTripScreen이 실제로 보이는 시점)에서만 적용
-  const isTopLevel = location.pathname === '/' && !itinerary;
-  const exitConfirm = useExitConfirm(isTopLevel && !shareToken && !restoring);
 
   function handleGoHome() {
     setMenuOpen(false);
@@ -1667,11 +1661,6 @@ export default function App() {
         onClose={() => setMenuOpen(false)}
         onNavigateMyTrips={handleOpenMyTrips}
         onNavigateGuide={handleOpenGuide}
-      />
-      <ExitConfirmModal
-        open={exitConfirm.confirmOpen}
-        onCancel={exitConfirm.cancel}
-        onConfirm={exitConfirm.confirmExit}
       />
       <Routes>
       <Route

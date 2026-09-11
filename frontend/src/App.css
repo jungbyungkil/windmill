@@ -554,8 +554,9 @@
 }
 
 /* 팝업/모달 우측 상단 ✕ - 배경 클릭·뒤로가기와 동일하게 "닫기만, 상태 유지"로 동작한다(2026-09-11).
-   개별 카드형 모달(duplicate-itinerary/closing-gate/exit-confirm/hours-warning)에 쓴다 - 이미
-   .modal-header + .icon-btn 패턴을 쓰는 모달(TripRecordModal 등)은 그쪽을 그대로 쓰면 됨. */
+   개별 카드형 모달(duplicate-itinerary/closing-gate/hours-warning)에 쓴다 - 이미
+   .modal-header + .icon-btn 패턴을 쓰는 모달(TripRecordModal 등)은 그쪽을 그대로 쓰면 됨.
+   (exit-confirm 모달은 2026-09-11 사용자 요청으로 기능 자체를 제거함) */
 .modal-close-x {
   position: absolute;
   top: 14px;
@@ -7085,68 +7086,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-/* ---------- 종료 확인 모달 ---------- */
-
-.exit-confirm-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 95;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.exit-confirm-modal {
-  position: relative;
-  width: min(100%, 340px);
-  background: #fff;
-  border-radius: 16px;
-  padding: 22px 20px 18px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
-  text-align: center;
-}
-
-.exit-confirm-title {
-  margin: 0 0 10px;
-  font-size: 1.1rem;
-}
-
-.exit-confirm-message {
-  margin: 0 0 18px;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--muted);
-}
-
-.exit-confirm-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.exit-confirm-cancel,
-.exit-confirm-exit {
-  flex: 1;
-  min-height: 44px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.exit-confirm-cancel {
-  border: 1px solid var(--sand-border);
-  background: #fff;
-  color: var(--ink);
-}
-
-.exit-confirm-exit {
-  border: none;
-  background: var(--level-danger);
-  color: #fff;
 }
 
 /* ---------- 휴무·마감 경고 (막지 않고 확인만) ---------- */
