@@ -259,7 +259,13 @@ public class RouteRecalculationService {
             ItineraryItem moving = result.get(violationIdx);
             LocalTime close = closeTimeOf(moving);
 
+            // 여러 자리가 마감시간을 만족하면 그중 총 거리(좌표 기준)가 가장 짧은 자리를 고른다.
+            // 예전엔 violationIdx 바로 앞부터 스캔하며 처음 맞는 자리를 무조건 채택했는데, 그 자리가
+            // 직선거리상 멀리 떨어져 있으면 방금 감지기가 풀어 준 동선 꼬임을 마감시간 보정이 다시
+            // 만들어 버렸다(2026-09-11 사용자 제보 - "동선 최적화"를 눌러도 계속 "동선이 꼬였어요"가
+            // 반복됨). 좌표가 없으면 모든 후보 거리가 0으로 동일해 기존처럼 첫 유효 자리를 그대로 쓴다.
             int bestPos = -1;
+            double bestDistanceKm = Double.POSITIVE_INFINITY;
             for (int p = violationIdx - 1; p >= 0; p--) {
                 List<ItineraryItem> candidate = new ArrayList<>(result);
                 candidate.remove(violationIdx);
@@ -267,8 +273,12 @@ public class RouteRecalculationService {
                 LocalTime[] candArrivals = simulateArrivals(candidate, minutes, idToIdx, overrideStartTime);
                 if (ClosingTimeGate.check(close, candArrivals[p]).allowed()
                         && closingViolations(candidate, candArrivals).size() < violations.size()) {
-                    bestPos = p;
-                    break;
+                    double distanceKm = VisitOrderOptimizer.pathDistanceKm(
+                            candidate, null, null, ItineraryItem::getMapX, ItineraryItem::getMapY);
+                    if (distanceKm < bestDistanceKm) {
+                        bestDistanceKm = distanceKm;
+                        bestPos = p;
+                    }
                 }
             }
             if (bestPos < 0) {

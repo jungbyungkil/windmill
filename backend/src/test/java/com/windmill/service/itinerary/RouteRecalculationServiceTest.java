@@ -257,6 +257,38 @@ class RouteRecalculationServiceTest {
     }
 
     @Test
+    void repairClosingTimeConflicts_prefersShortestValidSlot_notJustFirstFound() {
+        // 2026-09-11 사용자 제보 - "바람이가 동선 최적화"를 눌러도 계속 "동선이 꼬였어요"가 반복됨.
+        // 재현: 일직선 4곳(A-B-C-D)은 이미 최단순서(꼬이지 않음)인데, D의 마감시간 때문에
+        // repairClosingTimeConflicts가 D를 앞으로 옮겨야 한다. 옛 로직은 violationIdx 바로 앞부터
+        // 스캔하며 "마감시간을 만족하는 첫 자리"를 무조건 채택해(A,D,B,C, 10.7km) 방금 감지기가
+        // 풀어 준 꼬임을 다시 만들었다. 이제는 마감시간을 만족하는 자리 중 총 거리가 가장 짧은 자리를
+        // 고른다(D,A,B,C, 8.9km) - 완전히 안 꼬이게는 못 해도(D가 기하학적으로 가장 먼 지점이라
+        // 마감 때문에 일찍 가야 하는 이 시나리오 자체가 거리·시간이 근본적으로 상충함), 항상 더 나은
+        // 선택지를 고른다.
+        ItineraryItem a = coord(1, "A", "127.00", "37.00", false);
+        ItineraryItem b = coord(2, "B", "127.02", "37.00", false);
+        ItineraryItem c = coord(3, "C", "127.04", "37.00", false);
+        ItineraryItem d = coord(4, "D", "127.06", "37.00", false);
+        d.setCloseTime("11:00");
+
+        List<ItineraryItem> chosen = RouteRecalculationService.chooseShortestVisitOrder(
+                List.of(a, d, b, c), null, null);
+        for (int i = 0; i < chosen.size(); i++) {
+            chosen.get(i).setDisplayOrder(i);
+        }
+        assertEquals(List.of(a, b, c, d), chosen);
+        assertEquals(false, RouteTangleDetector.detect(chosen).isTangled());
+
+        List<ItineraryItem> repaired = service.repairClosingTimeConflicts(chosen, null, null);
+
+        assertEquals(List.of(d, a, b, c), repaired, "마감시간을 만족하는 자리 중 가장 짧은 자리를 골라야 함");
+        double repairedKm = com.windmill.util.VisitOrderOptimizer.pathDistanceKm(
+                repaired, null, null, ItineraryItem::getMapX, ItineraryItem::getMapY);
+        assertTrue(repairedKm < 9.0, "옛 로직(A,D,B,C)의 10.7km보다는 짧아야 함, got " + repairedKm);
+    }
+
+    @Test
     void repairClosingTimeConflicts_noFeasibleSlotAnywhere_givesUpWithoutReordering() {
         // 하루 시작(09:00)+이동 20분=09:20 도착조차 마감(09:00-60=08:00... 음수 방지로 08:00보다도
         // 이른)을 넘기는 극단적으로 이른 마감 - 어디로 옮겨도 못 맞추므로 순서를 그대로 둔다.
