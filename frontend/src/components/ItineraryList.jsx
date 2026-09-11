@@ -33,6 +33,9 @@ export default function ItineraryList({
   hoursEndedAffectedItemIds,
   crowdAffectedItemIds,
   weatherAlert = false,
+  /** 야외 알림이 비/폭염 중 어느 쪽인지 - 배지 다중 라벨(우천/폭염)을 나누기 위함(둘 다 켜져 있으면 둘 다 표시) */
+  rainAlert = false,
+  heatAlert = false,
   dayLabel,
   highlightedItemId,
   onUpdateTime,
@@ -74,6 +77,8 @@ export default function ItineraryList({
         closedDayAlerted={!item.completed && closedDayIds.has(id)}
         hoursEndedAlerted={!item.completed && hoursEndedIds.has(id)}
         crowdAlerted={!item.completed && crowdIds.has(id)}
+        rainTrigger={rainAlert}
+        heatTrigger={heatAlert}
         highlighted={highlightedItemId != null && id === Number(highlightedItemId)}
         onUpdateTime={onUpdateTime}
         onUpdateItem={onUpdateItem}

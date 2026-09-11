@@ -2480,8 +2480,13 @@
   cursor: pointer;
 }
 
+/* 다중 트리거 라벨("혼잡 · 폭염" 등, 2026-09-10 브리프)이 너무 길어지면 줄바꿈 대신 말줄임 */
 .item-status-chip {
   flex-shrink: 0;
+  display: inline-block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 800;
   border-radius: 999px;

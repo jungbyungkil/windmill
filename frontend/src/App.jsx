@@ -1850,6 +1850,8 @@ export default function App() {
                   hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
                   crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
                   weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
+                  rainAlert={Boolean(trigger?.weatherTrigger)}
+                  heatAlert={Boolean(trigger?.heatTrigger)}
                   trigger={trigger}
                   dayLabel={isTripToday(tripDate) ? '오늘' : (tripDate ? formatTripDate(tripDate) : null)}
                   highlightedItemId={highlightItemId}

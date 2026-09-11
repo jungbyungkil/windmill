@@ -44,6 +44,9 @@ export default function ItineraryItemCard({
   closedDayAlerted = false,
   hoursEndedAlerted = false,
   crowdAlerted = false,
+  /** weatherAlerted가 비/폭염 중 어느 쪽인지 - 배지 라벨을 "우천"/"폭염"으로 나누기 위함 */
+  rainTrigger = false,
+  heatTrigger = false,
   /** @deprecated */
   alerted = false,
   /** 알림을 눌러 들어온 경우 잠깐 스크롤+펄스로 눈에 띄게 한다(App.jsx의 deep-link 처리 참고) */
@@ -124,12 +127,23 @@ export default function ItineraryItemCard({
     openInKakaoMap(item);
   }
 
+  /**
+   * 배지 라벨 - 실제 발생한 트리거를 우선순위 없이 전부 병기한다("혼잡 · 폭염" 형태,
+   * 2026-09-10 핸드오프 브리프: 고정 "주의" 텍스트만으로는 원인을 알 수 없던 문제).
+   * 최대 3개까지만(그 이상은 CSS 말줄임), "·"로 구분. 트리거가 하나도 없으면(예: 서버
+   * crowdAlerted는 false인데 itemStatusLevel 자체 휴리스틱으로만 WARNING이 된 경우) 기존처럼
+   * 상태값 라벨(정상/주의/긴급)로 폴백한다.
+   */
+  const MAX_BADGE_LABELS = 3;
   function summaryStatusLabel() {
     if (completed) return '다녀옴';
-    if (businessAlerted && closedDayAlerted) return '휴무';
-    if (businessAlerted && hoursEndedAlerted) return '마감';
-    if (isWeather) return '야외';
-    if (crowdAlert) return '혼잡';
+    const labels = [];
+    if (businessAlerted && closedDayAlerted) labels.push('휴무');
+    if (businessAlerted && hoursEndedAlerted) labels.push('마감');
+    if (crowdAlert) labels.push('혼잡');
+    if (isWeather && rainTrigger) labels.push('우천');
+    if (isWeather && heatTrigger) labels.push('폭염');
+    if (labels.length > 0) return labels.slice(0, MAX_BADGE_LABELS).join(' · ');
     return STATUS_LABEL[status];
   }
 
