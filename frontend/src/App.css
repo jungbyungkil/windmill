@@ -6086,14 +6086,8 @@
   color: var(--sea-deep);
 }
 
-.day-route-map-info-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
 .day-route-map-open {
+  margin-top: 8px;
   width: 100%;
   border: 1px solid color-mix(in srgb, var(--sea) 28%, var(--sand-border));
   background: color-mix(in srgb, var(--sea) 8%, white);
@@ -6107,29 +6101,6 @@
 
 .day-route-map-open:hover {
   background: color-mix(in srgb, var(--sea) 14%, white);
-}
-
-/* 지도에서 이미 일정에 들어간(초록 번호) 마커 눌렀을 때 바로 빼기 - 2026-09-11 사용자 요청,
-   검색 마커(MapPlaceCard)엔 이미 있던 제거 버튼을 동선 마커 쪽에도 추가 */
-.day-route-map-remove {
-  width: 100%;
-  border: 1px solid color-mix(in srgb, var(--level-danger) 30%, var(--sand-border));
-  background: color-mix(in srgb, var(--level-danger) 8%, white);
-  color: var(--level-danger);
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.day-route-map-remove:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--level-danger) 14%, white);
-}
-
-.day-route-map-remove:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 @media (min-width: 640px) {
