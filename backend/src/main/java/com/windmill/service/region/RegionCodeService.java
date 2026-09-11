@@ -45,19 +45,23 @@ public class RegionCodeService {
             Map<String, List<RegionCode>> bySido = all.stream()
                     .collect(Collectors.groupingBy(RegionCode::getSidoCode, LinkedHashMap::new, Collectors.toList()));
 
+            // 시/도·시/군/구 둘 다 가나다순(이름 기준) - 예전엔 행정구역 코드순이라 "종로구"가
+            // 코드값(11110)이 낮다는 이유만으로 서울 목록 맨 위에 오는 등 사전순과 안 맞았다
+            // (2026-09-11 사용자 제보). 한글 완성형 음절은 유니코드 코드포인트 순서가 가나다순과
+            // 그대로 일치해 Comparator.naturalOrder()만으로 충분하다(별도 Collator 불필요).
             tree = bySido.values().stream()
                     .map(group -> RegionSidoGroup.builder()
                             .sidoCode(group.get(0).getSidoCode())
                             .sidoName(group.get(0).getSidoName())
                             .signgus(group.stream()
-                                    .sorted(Comparator.comparing(RegionCode::getSignguFullCode))
+                                    .sorted(Comparator.comparing(RegionCode::getSignguName))
                                     .map(r -> RegionSignguOption.builder()
                                             .signguFullCode(r.getSignguFullCode())
                                             .signguName(r.getSignguName())
                                             .build())
                                     .collect(Collectors.toList()))
                             .build())
-                    .sorted(Comparator.comparing(RegionSidoGroup::getSidoCode))
+                    .sorted(Comparator.comparing(RegionSidoGroup::getSidoName))
                     .collect(Collectors.toList());
 
             log.info("[RegionCodeService] 지역코드 {}개 시군구 로드 완료", bySignguFullCode.size());
