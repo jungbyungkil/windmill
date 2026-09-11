@@ -1665,7 +1665,6 @@ export default function App() {
       <GlobalMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        onNavigateHome={handleGoHome}
         onNavigateMyTrips={handleOpenMyTrips}
         onNavigateGuide={handleOpenGuide}
       />
