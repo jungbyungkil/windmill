@@ -91,6 +91,38 @@ class GreedyRouteSuggestServiceTest {
     }
 
     @Test
+    void currentStopsAlsoCarryHardTodayStatus() {
+        // "이 순서 어때요?" 비교 카드 - 제안(suggestedStops)만 지금 상태를 반영하고
+        // 기존 순서(currentStops)는 항상 비어 있던 문제 재현 (2026-09-11 사용자 제보).
+        ItineraryItem open = place(1, "열린카페", "127.001", "37.500", 1);
+        ItineraryItem closed = place(2, "이미닫힌전시", "127.002", "37.500", 2);
+        ItineraryItem rest = place(3, "월요일휴무", "127.003", "37.500", 3);
+        closed.setUseTimeText("09:00~12:00");
+        closed.setCloseTime("12:00");
+        rest.setUseTimeText("09:00~18:00");
+        rest.setRestDateText("매주 월요일");
+        open.setUseTimeText("09:00~21:00");
+        open.setCloseTime("21:00");
+
+        SuggestedRouteResponse result = service.suggest(
+                List.of(open, closed, rest), 127.0, 37.5,
+                LocalDateTime.of(DAY, LocalTime.of(14, 0)));
+
+        SuggestedRouteStop currentOpen = result.getCurrentStops().stream()
+                .filter(s -> s.getItemId() == 1L).findFirst().orElseThrow();
+        SuggestedRouteStop currentClosed = result.getCurrentStops().stream()
+                .filter(s -> s.getItemId() == 2L).findFirst().orElseThrow();
+        SuggestedRouteStop currentRest = result.getCurrentStops().stream()
+                .filter(s -> s.getItemId() == 3L).findFirst().orElseThrow();
+
+        assertFalse(currentOpen.isVisitHardToday());
+        assertTrue(currentClosed.isVisitHardToday());
+        assertEquals("HOURS_ENDED", currentClosed.getHardTodayReason());
+        assertTrue(currentRest.isVisitHardToday());
+        assertEquals("REST_DAY", currentRest.getHardTodayReason());
+    }
+
+    @Test
     void mealInLunchWindowBeatsSlightlyCloserAttraction() {
         ItineraryItem attraction = place(1, "농업박물관", "127.001", "37.500", 1);
         ItineraryItem meal = place(2, "한식당", "127.003", "37.500", 2);

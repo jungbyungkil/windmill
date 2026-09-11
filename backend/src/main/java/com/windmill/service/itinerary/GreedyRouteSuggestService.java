@@ -2,6 +2,7 @@ package com.windmill.service.itinerary;
 
 import com.windmill.client.KakaoDirectionsClient;
 import com.windmill.domain.ItineraryItem;
+import com.windmill.dto.BusinessStatus;
 import com.windmill.dto.HoursPhase;
 import com.windmill.dto.MapRouteRequest;
 import com.windmill.dto.SuggestedRouteResponse;
@@ -49,8 +50,9 @@ public class GreedyRouteSuggestService {
 
     SuggestedRouteResponse suggest(List<ItineraryItem> items, Double originLon, Double originLat,
                                    LocalDateTime at) {
+        LocalDateTime when = at == null ? KoreaClock.now() : at;
         List<ItineraryItem> current = sortCurrent(items);
-        List<SuggestedRouteStop> currentStops = current.stream().map(this::snapshotCurrent).toList();
+        List<SuggestedRouteStop> currentStops = current.stream().map(item -> snapshotCurrent(item, when)).toList();
         if (current.isEmpty()) {
             return SuggestedRouteResponse.builder()
                     .message("담은 장소가 없어요.")
@@ -66,7 +68,6 @@ public class GreedyRouteSuggestService {
                     .build();
         }
 
-        LocalDateTime when = at == null ? KoreaClock.now() : at;
         LocalDate visitDate = resolveVisitDate(current, when.toLocalDate());
         LocalTime cursor = resolveStartTime(visitDate, when);
         boolean useOrigin = originLon != null && originLat != null;
@@ -403,13 +404,31 @@ public class GreedyRouteSuggestService {
         return VisitTiming.DAY_START;
     }
 
-    private SuggestedRouteStop snapshotCurrent(ItineraryItem item) {
+    /**
+     * "기존 순서" 칸 - 제안(suggestedStops)엔 이미 지금 시각 기준 휴무·영업종료 경고가 붙는데,
+     * 현재 순서 칸은 항상 비어 있어 "이 순서 어때요?" 비교에서 지금 상태를 알 수 없었다
+     * (2026-09-11 사용자 제보 - 검색과 동일하게 여기도 지금 이 순간 영업 상태를 알려달라).
+     * 도착 시각을 재시뮬레이션하지 않고, 검색 카드와 같은 방식(BusinessHoursEvaluator.statusAt,
+     * suggest()가 받은 기준 시각 at 그대로)으로 정기휴무·영업종료만 표시한다 - "이동해서 늦게
+     * 도착하면 마감"까지는 순서를 그대로 시뮬레이션해야 해서 별도 스코프(제안 칸이 이미 그 역할을 함).
+     */
+    private SuggestedRouteStop snapshotCurrent(ItineraryItem item, LocalDateTime at) {
+        BusinessStatus status = BusinessHoursEvaluator.statusAt(hoursFields(item), at);
+        boolean hard = status != BusinessStatus.OPEN;
+        String reason = switch (status) {
+            case CLOSED_DAY -> "REST_DAY";
+            case HOURS_ENDED -> "HOURS_ENDED";
+            default -> null;
+        };
         return SuggestedRouteStop.builder()
                 .itemId(item.getId())
                 .placeName(item.getPlaceName())
                 .scheduledTime(item.getScheduledTime())
                 .stayMinutes(VisitTiming.stayMinutes(item))
                 .contentTypeId(item.getContentTypeId())
+                .visitHardToday(hard)
+                .hardTodayReason(reason)
+                .hardTodayLabel(hard ? hardLabel(reason) : null)
                 .build();
     }
 
@@ -447,6 +466,7 @@ public class GreedyRouteSuggestService {
         return switch (reason) {
             case "REST_DAY" -> "오늘은 정기휴무예요";
             case "CLOSING" -> "영업시간 안에 도착하기 어려워요";
+            case "HOURS_ENDED" -> "지금은 영업이 끝났어요";
             case "TOO_LATE" -> "오늘 일정 끝 시각을 넘어요";
             case "TIME_OVERLAP" -> "다른 일정과 시간이 겹쳐요";
             case "NO_COORDS" -> "위치가 없어 순서만 뒤에 두었어요";
