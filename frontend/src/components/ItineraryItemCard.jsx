@@ -147,10 +147,12 @@ export default function ItineraryItemCard({
           type="button"
           className={`item-complete-toggle ${completed ? 'is-done' : ''}`}
           onClick={() => onToggleComplete(item.itemId, !completed)}
-          aria-label={completed ? '다시 진행 중으로 되돌리기' : '다녀온 곳으로 표시'}
+          aria-label={completed ? '완료됨' : '다녀왔어요 표시하기'}
           title={completed ? '다시 진행 중으로' : '다녀온 곳으로 표시'}
         >
-          {completed ? '✓' : ''}
+          {/* 미완료일 땐 hover/press로만 살짝 보이는 "고스트 체크" - 탭하면 완료 처리된다는 걸
+              암시한다(2026-09-11 스펙: 아이콘이 인터랙션 가능해 보이지 않던 문제 개선). */}
+          <span className="item-complete-check" aria-hidden="true">✓</span>
         </button>
       )}
 

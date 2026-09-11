@@ -1993,17 +1993,15 @@
   background: var(--muted);
 }
 
+/* 방문 완료 토글 - 2026-09-11 스펙: 상태 컬러(3-state 영업시간 모델)와는 별개 축이라 브랜드 teal
+   (--sea)을 전용으로 쓴다. 미완료=투명 배경+teal 테두리, 완료=teal 채움+흰 체크. */
 .item-complete-toggle {
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--sea) 32%, var(--sand-border));
-  background: var(--sand-card);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1;
+  border: 2px solid var(--sea);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2012,14 +2010,38 @@
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.item-complete-toggle:hover {
-  border-color: var(--sea);
-  background: color-mix(in srgb, var(--sea) 12%, white);
+.item-complete-check {
+  color: var(--sea);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* 미완료 상태에서만 hover/press로 체크를 살짝 보여준다("탭하면 완료 처리됨" 암시).
+   터치 기기는 hover가 불안정해 :active(누르는 중)로도 동일 효과가 뜨게 따로 정의. */
+.item-complete-toggle:not(.is-done):hover .item-complete-check {
+  opacity: 0.2;
+}
+
+.item-complete-toggle:not(.is-done):active .item-complete-check {
+  opacity: 0.4;
 }
 
 .item-complete-toggle.is-done {
-  background: var(--status-normal, #1a7f5a);
-  border-color: var(--status-normal, #1a7f5a);
+  background: var(--sea);
+  border-color: var(--sea);
+}
+
+.item-complete-toggle.is-done .item-complete-check {
+  opacity: 1;
+  color: #fff;
+}
+
+.item-complete-toggle.is-done:hover {
+  background: var(--sea-deep);
+  border-color: var(--sea-deep);
 }
 
 .itinerary-past-section {
