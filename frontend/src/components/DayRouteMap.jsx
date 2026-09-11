@@ -493,22 +493,37 @@ function DayRouteMapCanvas({
                 <p>{statusText(selectedStop.item, selectedStop.weather, selectedStop.closedDay, selectedStop.hoursEnded, selectedStop.crowd)}</p>
                 {selectedStop.fromAddress && <em>주소 기준 위치</em>}
                 {selectedStop.item.category && !selectedStop.fromAddress && <em>{selectedStop.item.category}</em>}
-                {canOpenInKakaoMap(selectedStop.item) && (
+                <div className="day-route-map-info-actions">
+                  {canOpenInKakaoMap(selectedStop.item) && (
+                    <button
+                      type="button"
+                      className="day-route-map-open"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openInKakaoMap({
+                          ...selectedStop.item,
+                          mapX: String(selectedStop.lng),
+                          mapY: String(selectedStop.lat),
+                        });
+                      }}
+                    >
+                      카카오맵에서 보기
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="day-route-map-open"
-                    onClick={(e) => {
+                    className="day-route-map-remove"
+                    disabled={busyContentId != null && readContentId(busyContentId) === readContentId(selectedStop.item)}
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      openInKakaoMap({
-                        ...selectedStop.item,
-                        mapX: String(selectedStop.lng),
-                        mapY: String(selectedStop.lat),
-                      });
+                      await handleRemove(selectedStop.item);
+                      setSelectedStopId(null);
                     }}
                   >
-                    카카오맵에서 보기
+                    {busyContentId != null && readContentId(busyContentId) === readContentId(selectedStop.item)
+                      ? '빼는 중…' : '일정에서 삭제'}
                   </button>
-                )}
+                </div>
               </div>
             </CustomOverlayMap>
           )}
