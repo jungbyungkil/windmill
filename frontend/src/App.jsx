@@ -916,7 +916,10 @@ export default function App() {
   async function handleAddRecommendation(candidate) {
     setAddingContentId(candidate.contentId);
     try {
-      await addCandidateToItinerary(candidate, activeDate, false, { logHistory: true });
+      const result = await addCandidateToItinerary(candidate, activeDate, false, { logHistory: true });
+      // 검색 탭에서 담으면 방금 담은 걸 바로 확인할 수 있게 "일정" 탭으로 이동한다(2026-09-11
+      // 사용자 요청). 마감 경고를 취소해 실제로 안 담겼으면(result=null) 이동하지 않는다.
+      if (result) selectTripSection('home');
     } catch {
       /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
     } finally {
@@ -943,6 +946,8 @@ export default function App() {
       if (!result) {
         throw new Error('not-added');
       }
+      // 지도 탭에서 담으면 방금 담은 걸 바로 확인할 수 있게 "일정" 탭으로 이동한다(2026-09-11 사용자 요청).
+      selectTripSection('home');
       return result;
     } finally {
       setAddingContentId(null);
