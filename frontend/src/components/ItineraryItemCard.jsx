@@ -46,6 +46,8 @@ export default function ItineraryItemCard({
   crowdAlerted = false,
   /** @deprecated */
   alerted = false,
+  /** 알림을 눌러 들어온 경우 잠깐 스크롤+펄스로 눈에 띄게 한다(App.jsx의 deep-link 처리 참고) */
+  highlighted = false,
   onUpdateTime,
   onUpdateItem,
   onTogglePin,
@@ -129,7 +131,8 @@ export default function ItineraryItemCard({
 
   return (
     <div
-      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''} ${showDetail ? 'is-expanded' : 'is-collapsed'}`}
+      id={`item-${item.itemId}`}
+      className={`item-card ${statusClass} ${item.pinned ? 'pinned' : ''} ${isWeather ? 'weather-affected' : ''} ${businessAlerted ? 'business-affected' : ''} ${editing ? 'editing' : ''} ${showDetail ? 'is-expanded' : 'is-collapsed'} ${highlighted ? 'item-card-highlighted' : ''}`}
       data-status={status}
     >
       <span className={`item-status-rail ${statusClass}`} title={STATUS_LABEL[status]} aria-hidden="true" />

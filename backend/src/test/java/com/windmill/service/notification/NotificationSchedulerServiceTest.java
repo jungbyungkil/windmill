@@ -125,6 +125,28 @@ class NotificationSchedulerServiceTest {
     }
 
     @Test
+    void urgentStatus_includesPrimaryAffectedItemIdInUrl() {
+        // 2026-09-11 사용자 제보 - 알림을 눌러도 문제 장소 카드로 안 감. crowdAffectedItemIds가
+        // 있으면 그중 첫 항목을 "item=" 쿼리로 실어 프론트가 그 카드로 스크롤+하이라이트할 수 있게 한다.
+        Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.WARNING)
+                .crowdTrigger(true)
+                .crowdAffectedItemIds(List.of(42L, 99L))
+                .triggerDetails(List.of("혼잡해요"))
+                .build());
+
+        scheduler.runTick(MID_TRIP);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> data = ArgumentCaptor.forClass(Map.class);
+        verify(pushSenderService, times(1)).send(eq("token-1"), anyString(), anyString(), data.capture());
+        assertTrue(data.getValue().get("url").contains("&item=42"));
+    }
+
+    @Test
     void firstObservationWarning_usesWeatherFlagInSignature() {
         Itinerary itinerary = itineraryWithItems(placeAt("10:00"));
         stubActive(itinerary, MID_TRIP);

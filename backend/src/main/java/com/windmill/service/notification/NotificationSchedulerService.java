@@ -161,7 +161,31 @@ public class NotificationSchedulerService {
         String title = composer.statusTitle(newLevel);
         String body = composer.statusBody(result);
         recordAlertEvent(itinerary, "STATUS", result, title, body, now);
-        dispatch(itinerary, subs, title, body, nudgeId, now, false);
+        dispatch(itinerary, subs, title, body, nudgeId, now, false, primaryAffectedItemId(result));
+    }
+
+    /**
+     * 알림을 눌렀을 때 바로 그 카드로 스크롤+하이라이트하기 위한 "문제 발생한 장소" 1곳 - 가장 급한
+     * 원인 순으로 훑어 처음 걸리는 항목을 쓴다(2026-09-11 사용자 요청: 상태 악화 알림은 해당 장소
+     * 카드로 직행). 여러 곳이 동시에 걸려도 알림 문구(composer.statusBody)가 대표하는 곳과 정확히
+     * 일치한다는 보장은 없지만, 없는 것보다 "가장 급한 곳 하나"가 훨씬 유용하다.
+     */
+    private static Long primaryAffectedItemId(TriggerResult result) {
+        for (List<Long> ids : List.of(
+                nullToEmpty(result.getCrowdAffectedItemIds()),
+                nullToEmpty(result.getWeatherAffectedItemIds()),
+                nullToEmpty(result.getClosedDayAffectedItemIds()),
+                nullToEmpty(result.getHoursEndedAffectedItemIds()),
+                nullToEmpty(result.getAffectedItemIds()))) {
+            if (!ids.isEmpty()) {
+                return ids.get(0);
+            }
+        }
+        return null;
+    }
+
+    private static List<Long> nullToEmpty(List<Long> list) {
+        return list == null ? List.of() : list;
     }
 
     private void handleDayBookends(Itinerary itinerary, List<PushSubscription> subs,
@@ -182,7 +206,7 @@ public class NotificationSchedulerService {
                 String title = composer.dayStartTitle();
                 String body = composer.dayStartBody();
                 recordBookend(itinerary, "DAY_START", title, body, now);
-                dispatch(itinerary, subs, title, body, "DAY_START@" + minuteKey(now), now, false);
+                dispatch(itinerary, subs, title, body, "DAY_START@" + minuteKey(now), now, false, null);
                 itinerary.setDayStartNotified(true);
             } else if (!nowTime.isBefore(bounds.firstStart())) {
                 itinerary.setDayStartNotified(true); // 창을 놓침 - 발송 없이 마킹
@@ -197,7 +221,7 @@ public class NotificationSchedulerService {
                 String title = composer.dayEndTitle();
                 String body = composer.dayEndBody();
                 recordBookend(itinerary, "DAY_END", title, body, now);
-                dispatch(itinerary, subs, title, body, "DAY_END@" + minuteKey(now), now, true);
+                dispatch(itinerary, subs, title, body, "DAY_END@" + minuteKey(now), now, true, null);
                 itinerary.setDayEndNotified(true);
             }
         }
@@ -290,9 +314,11 @@ public class NotificationSchedulerService {
     }
 
     private void dispatch(Itinerary itinerary, List<PushSubscription> subs, String title, String body,
-                          String nudgeId, LocalDateTime now, boolean finish) {
+                          String nudgeId, LocalDateTime now, boolean finish, Long highlightItemId) {
         String todayKey = now.toLocalDate() + ":" + nudgeId;
-        String url = "/?open=" + itinerary.getId() + (finish ? "&finish=1" : "");
+        String url = "/?open=" + itinerary.getId()
+                + (highlightItemId != null ? "&item=" + highlightItemId : "")
+                + (finish ? "&finish=1" : "");
         Map<String, String> data = Map.of(
                 "itineraryId", String.valueOf(itinerary.getId()),
                 "url", url);

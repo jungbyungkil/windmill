@@ -151,6 +151,8 @@ export default function App() {
 
   const [tripRecordOpen, setTripRecordOpen] = useState(false);
   const [pendingFinishOpen, setPendingFinishOpen] = useState(false);
+  /** 상태 악화 알림이 문제 장소를 지목했을 때("&item=") 그 카드로 스크롤+펄스하기 위한 딥링크 대상 */
+  const [highlightItemId, setHighlightItemId] = useState(null);
   const [tripSubmitting, setTripSubmitting] = useState(false);
   const [rerouteCount, setRerouteCount] = useState(0);
 
@@ -182,13 +184,16 @@ export default function App() {
   }, []);
 
   // 알림 탭으로 새 탭이 열린 경우 - sw.js가 붙여준 "?open={itineraryId}"를 읽어 그 일정으로 바로 진입.
-  // 마무리 알림은 "&finish=1"이 붙어 있어, 일정이 로드된 뒤 여행 마무리 모달을 연다.
+  // 마무리 알림은 "&finish=1", 상태 악화 알림은 문제 장소를 "&item={itemId}"로 실어 보낸다
+  // (NotificationSchedulerService.dispatch 참고) - 있으면 그 카드로 스크롤+하이라이트한다.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const openId = params.get('open');
     if (!openId) return;
     resumeDraftItinerary(openId);
     if (params.get('finish') === '1') setPendingFinishOpen(true);
+    const itemId = params.get('item');
+    if (itemId) setHighlightItemId(itemId);
     navigate('/trip');
     // 새로고침/재진입 시 같은 파라미터로 반복 리다이렉트되지 않도록 정리
     window.history.replaceState({}, '', window.location.pathname);
@@ -205,11 +210,23 @@ export default function App() {
       if (!openId) return;
       resumeDraftItinerary(openId);
       if (url.searchParams.get('finish') === '1') setPendingFinishOpen(true);
+      const itemId = url.searchParams.get('item');
+      if (itemId) setHighlightItemId(itemId);
       navigate('/trip');
     }
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, [resumeDraftItinerary, navigate]);
+
+  // 하이라이트 대상 카드가 실제로 DOM에 나타나면(일정 로드 완료) 스크롤 후, 펄스 애니메이션이
+  // 끝날 시간(펄스 2회×1.6s) 뒤에 상태를 지워 다음에 같은 카드를 다시 여는 것도 감지되게 한다.
+  useEffect(() => {
+    if (!highlightItemId || !itinerary || tripSection !== 'home') return;
+    const el = document.getElementById(`item-${highlightItemId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = setTimeout(() => setHighlightItemId(null), 3400);
+    return () => clearTimeout(timer);
+  }, [highlightItemId, itinerary, tripSection]);
 
   useEffect(() => {
     if (!pendingFinishOpen || !itinerary) return;
@@ -1755,6 +1772,7 @@ export default function App() {
                   weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
                   trigger={trigger}
                   dayLabel={isTripToday(tripDate) ? '오늘' : (tripDate ? formatTripDate(tripDate) : null)}
+                  highlightedItemId={highlightItemId}
                   onUpdateTime={handleUpdateTime}
                   onUpdateItem={handleUpdateItem}
                   onTogglePin={handleTogglePin}

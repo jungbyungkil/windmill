@@ -1958,6 +1958,24 @@
   background: color-mix(in srgb, var(--sea) 4%, white);
 }
 
+/* 알림을 눌러 이 카드로 딥링크해 들어왔을 때 - 몇 초간 펄스로 눈에 띄게 한 뒤 자동으로 사라진다
+   (App.jsx가 타이머로 highlighted 상태를 지움, 클래스는 계속 붙어 있어도 애니메이션은 1회만 재생). */
+.item-card.item-card-highlighted {
+  animation: item-card-pulse 1.6s ease-out 2;
+}
+
+@keyframes item-card-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--sea) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--sea) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--sea) 0%, transparent);
+  }
+}
+
 .item-time {
   border: 1px solid #d3ede8;
   border-radius: 10px;

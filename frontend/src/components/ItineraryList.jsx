@@ -33,6 +33,7 @@ export default function ItineraryList({
   crowdAffectedItemIds,
   weatherAlert = false,
   dayLabel,
+  highlightedItemId,
   onUpdateTime,
   onUpdateItem,
   onTogglePin,
@@ -93,6 +94,7 @@ export default function ItineraryList({
                 closedDayAlerted={closedDayIds.has(id)}
                 hoursEndedAlerted={hoursEndedIds.has(id)}
                 crowdAlerted={crowdIds.has(id)}
+                highlighted={highlightedItemId != null && id === Number(highlightedItemId)}
                 onUpdateTime={onUpdateTime}
                 onUpdateItem={onUpdateItem}
                 onTogglePin={onTogglePin}
