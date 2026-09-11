@@ -13,8 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 추천 카드별 실시간 상태 배지(날씨/혼잡/영업) 조립.
+ * 추천 카드별 실시간 상태 배지(날씨/혼잡/영업/예약필수) 조립.
  * 폭염은 TMX(없으면 TMP) 33/35℃ B안. 혼잡은 카테고리 → 평시대비% → 피크상대 폴백.
+ * 예약필수는 정기휴무 원문 텍스트의 키워드 매칭(ReservationRequiredRanking 재사용) - 실시간이
+ * 아니라 정적 판단이라 liveWeatherCrowd 여부와 무관하게 항상 붙인다.
  */
 @Component
 public class BadgeAssembler {
@@ -80,6 +82,14 @@ public class BadgeAssembler {
                         .severity(Badge.Severity.WARNING)
                         .build());
             }
+        }
+
+        if (ReservationRequiredRanking.matchesReservationKeyword(c.getRestDateText())) {
+            badges.add(Badge.builder()
+                    .type(Badge.BadgeType.RESERVATION)
+                    .label("예약 필수")
+                    .severity(Badge.Severity.INFO)
+                    .build());
         }
 
         if (c.getBusinessStatus() == com.windmill.dto.BusinessStatus.OPEN) {

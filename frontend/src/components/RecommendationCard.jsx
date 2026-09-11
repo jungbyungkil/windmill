@@ -5,7 +5,7 @@ import PlaceOverview from './PlaceOverview';
 import PlaceDetailFacts from './PlaceDetailFacts';
 import SituationalChips from './SituationalChips';
 
-const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐' };
+const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐', RESERVATION: '📅' };
 
 export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [], addLabel = '+ 일정에 추가', addingLabel = '담는 중...' }) {
   const food = isFoodPlace(candidate);

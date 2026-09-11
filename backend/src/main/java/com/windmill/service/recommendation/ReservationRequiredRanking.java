@@ -9,6 +9,10 @@ import java.util.stream.Collectors;
 /**
  * 정기휴무 원문에 "예약 시에만 영업" 류 안내가 있는 곳은 뒤로 미룬다(제거는 아님).
  * PopularityRanking보다 먼저 적용되므로, 조회순이 같은 후보끼리만 예약 필수가 뒤로 밀린다.
+ *
+ * matchesReservationKeyword는 BadgeAssembler도 재사용한다 - 인기 명소일수록 예약이 필요한 경우가
+ * 많아(2026-09-11 사용자 제보) 카드에 "예약 필수" 배지로 노출한다. 키워드 목록을 한 곳에서만
+ * 관리해 정렬과 배지 표시가 서로 다른 기준으로 어긋나지 않게 한다.
  */
 final class ReservationRequiredRanking {
 
@@ -31,12 +35,15 @@ final class ReservationRequiredRanking {
     }
 
     private static boolean requiresReservation(RelatedCandidate c) {
-        String text = c.getRestDateText();
-        if (text == null || text.isBlank()) {
+        return matchesReservationKeyword(c.getRestDateText());
+    }
+
+    static boolean matchesReservationKeyword(String restDateText) {
+        if (restDateText == null || restDateText.isBlank()) {
             return false;
         }
         for (String keyword : KEYWORDS) {
-            if (text.contains(keyword)) {
+            if (restDateText.contains(keyword)) {
                 return true;
             }
         }

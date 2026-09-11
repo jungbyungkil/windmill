@@ -122,6 +122,43 @@ class BadgeAssemblerTest {
     }
 
     @Test
+    void reservationRequiredKeywordAddsBadge() {
+        RegionCondition condition = RegionCondition.builder().crowdRateByPlaceName(Map.of()).build();
+        RecommendationCandidate candidate = RecommendationCandidate.builder()
+                .placeName("A")
+                .restDateText("연중무휴, 단 사전예약 필수")
+                .build();
+        assembler.attach(List.of(candidate), condition);
+        assertTrue(candidate.getBadges().stream()
+                .anyMatch(b -> b.getType() == Badge.BadgeType.RESERVATION
+                        && b.getSeverity() == Badge.Severity.INFO
+                        && "예약 필수".equals(b.getLabel())));
+    }
+
+    @Test
+    void noReservationKeywordSkipsBadge() {
+        RegionCondition condition = RegionCondition.builder().crowdRateByPlaceName(Map.of()).build();
+        RecommendationCandidate candidate = RecommendationCandidate.builder()
+                .placeName("A")
+                .restDateText("매주 월요일 휴무")
+                .build();
+        assembler.attach(List.of(candidate), condition);
+        assertTrue(candidate.getBadges().stream().noneMatch(b -> b.getType() == Badge.BadgeType.RESERVATION));
+    }
+
+    @Test
+    void reservationBadgeSurvivesFutureVisitDate() {
+        // 예약필수는 정적 판단이라 미래 방문일(실시간 날씨/혼잡 배지가 스킵되는 상황)에도 살아남아야 함
+        RegionCondition condition = RegionCondition.builder().crowdRateByPlaceName(Map.of()).build();
+        RecommendationCandidate candidate = RecommendationCandidate.builder()
+                .placeName("A")
+                .restDateText("예약제로만 운영")
+                .build();
+        assembler.attach(List.of(candidate), condition, KoreaClock.today().plusDays(4));
+        assertTrue(candidate.getBadges().stream().anyMatch(b -> b.getType() == Badge.BadgeType.RESERVATION));
+    }
+
+    @Test
     void futureVisitDateSkipsTodaysRainAndCrowdBadges() {
         RegionCondition raining = RegionCondition.builder()
                 .crowdRateByPlaceName(Map.of("설악산", 95.0))

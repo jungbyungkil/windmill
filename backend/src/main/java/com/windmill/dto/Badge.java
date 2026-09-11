@@ -3,7 +3,7 @@ package com.windmill.dto;
 import lombok.Builder;
 import lombok.Data;
 
-/** 추천 카드 실시간 상태 배지 - 날씨/혼잡/영업 3종 */
+/** 추천 카드 실시간 상태 배지 - 날씨/혼잡/영업/예약필수 4종 */
 @Data
 @Builder
 public class Badge {
@@ -11,7 +11,7 @@ public class Badge {
     private String label;
     private Severity severity;
 
-    public enum BadgeType { WEATHER, CONGESTION, HOURS }
+    public enum BadgeType { WEATHER, CONGESTION, HOURS, RESERVATION }
 
     public enum Severity { INFO, WARNING, SUCCESS, DANGER }
 }
