@@ -33,6 +33,7 @@ import MyTripsScreen from './components/MyTripsScreen';
 import TripRecordDetailScreen from './components/TripRecordDetailScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GuideScreen from './components/GuideScreen';
+import TravelerProfileScreen from './components/TravelerProfileScreen';
 import { recordView } from './utils/viewHistory';
 import { placeSnapshotFields } from './utils/placeSnapshot';
 import { syncPushSubscription } from './utils/webPush';
@@ -2085,6 +2086,15 @@ export default function App() {
           <>
             <BackHeader title="이용 가이드" onMenuClick={() => setMenuOpen(true)} />
             <GuideScreen />
+          </>
+        }
+      />
+      <Route
+        path="/traveler-profile"
+        element={
+          <>
+            <BackHeader title="내 여행 정보" onMenuClick={() => setMenuOpen(true)} />
+            <TravelerProfileScreen />
           </>
         }
       />

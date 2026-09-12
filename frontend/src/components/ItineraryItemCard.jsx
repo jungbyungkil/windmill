@@ -207,7 +207,7 @@ export default function ItineraryItemCard({
       >
         <span className="item-name-wrap">
           <span className="item-name">{item.placeName}</span>
-          {intro && <span className="item-intro">· {intro}</span>}
+          {intro && <span className="item-intro">{intro}</span>}
         </span>
         <span className={`item-status-chip ${statusClass}`}>{summaryStatusLabel()}</span>
         {!editing && (

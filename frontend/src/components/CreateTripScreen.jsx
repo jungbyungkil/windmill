@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import BrandMark from './BrandMark';
 import PinwheelLoader from './PinwheelLoader';
 import VisitTimePicker from './VisitTimePicker';
@@ -14,6 +14,9 @@ import {
   EXTENDED_FAMILY_MIN_SIZE,
   EXTENDED_FAMILY_MAX_SIZE,
 } from '../constants';
+import { readTravelerProfile, writeTravelerProfile, isChildAgeStale } from '../utils/travelerProfile';
+
+const MAX_SUMMARY_ACCESSIBILITY_LABELS = 2;
 
 const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
@@ -53,20 +56,26 @@ export default function CreateTripScreen({
   draftItineraryId,
   onResumeDraft,
 }) {
+  // 동반·접근성 저장 프로필(2026-09-12 브리프) - 한 번 입력하면 다음부터 자동으로 채워 넣고
+  // 접힌 상태로 시작한다. 마운트 시 1회만 읽고, 이후 갱신은 각 필드 변경 시점에 persistProfile로.
+  const [savedProfile] = useState(readTravelerProfile);
+  const isFirstVisit = !savedProfile;
+  const lastRegionAppliedRef = useRef(false);
+
   const [regions, setRegions] = useState([]);
   const [regionsError, setRegionsError] = useState(null);
   const [sidoCode, setSidoCode] = useState('');
   const [signguFullCode, setSignguFullCode] = useState('');
   const [tripDate, setTripDate] = useState(todayIso());
   const [dateTouched, setDateTouched] = useState(false);
-  const [companionType, setCompanionType] = useState('SOLO');
-  const [partySize, setPartySize] = useState(1);
+  const [companionType, setCompanionType] = useState(savedProfile?.companionType || 'SOLO');
+  const [partySize, setPartySize] = useState(savedProfile?.totalCount || 1);
   const [partySizeTouched, setPartySizeTouched] = useState(false);
-  const [adultAgeGroup, setAdultAgeGroup] = useState('THIRTIES');
-  const [childAges, setChildAges] = useState([]);
-  const [withPet, setWithPet] = useState(false);
-  const [strollerFriendly, setStrollerFriendly] = useState(false);
-  const [accessibleFriendly, setAccessibleFriendly] = useState(false);
+  const [adultAgeGroup, setAdultAgeGroup] = useState(savedProfile?.adultAgeGroup || 'THIRTIES');
+  const [childAges, setChildAges] = useState(() => [...(savedProfile?.childrenAges || [])]);
+  const [withPet, setWithPet] = useState(Boolean(savedProfile?.accessibility?.pet));
+  const [strollerFriendly, setStrollerFriendly] = useState(Boolean(savedProfile?.accessibility?.stroller));
+  const [accessibleFriendly, setAccessibleFriendly] = useState(Boolean(savedProfile?.accessibility?.barrierFree));
   const [ongoingTrips, setOngoingTrips] = useState([]);
   const [ongoingLoading, setOngoingLoading] = useState(Boolean(sessionId));
   const [deletingDraftId, setDeletingDraftId] = useState(null);
@@ -79,16 +88,23 @@ export default function CreateTripScreen({
   const [anchorResolvingKey, setAnchorResolvingKey] = useState(null);
   const [anchorResolveError, setAnchorResolveError] = useState(null);
   const [storyFeedAvailable, setStoryFeedAvailable] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(true);
+  // 저장값이 없으면(첫 방문) 펼친 채로 시작. 저장값이 있어도 동반 자녀 나이가 180일 넘게
+  // 지났으면 틀린 값일 수 있어 재확인을 유도하려고 펼친 채로 시작한다(브리프 4절).
+  const [detailsOpen, setDetailsOpen] = useState(() => isFirstVisit || isChildAgeStale(savedProfile));
   const [otherWaysOpen, setOtherWaysOpen] = useState(false);
 
   useEffect(() => {
     api.getRegions()
       .then((list) => {
         setRegions(list);
-        if (list.length > 0) setSidoCode(list[0].sidoCode);
+        if (list.length > 0) {
+          const savedSidoName = savedProfile?.lastRegion?.sido;
+          const match = savedSidoName ? list.find((r) => r.sidoName === savedSidoName) : null;
+          setSidoCode((match || list[0]).sidoCode);
+        }
       })
       .catch((e) => setRegionsError(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 미완료 당일치기 목록 (날짜별 줄 + 이어하기)
@@ -117,9 +133,17 @@ export default function CreateTripScreen({
   const signguOptions = selectedSido?.signgus || [];
 
   useEffect(() => {
-    if (signguOptions.length > 0 && !signguOptions.some((s) => s.signguFullCode === signguFullCode)) {
-      setSignguFullCode(signguOptions[0].signguFullCode);
+    if (signguOptions.length === 0 || signguOptions.some((s) => s.signguFullCode === signguFullCode)) return;
+    let next = signguOptions[0];
+    // 저장된 마지막 지역 기본값 주입은 최초 1회만 - 이후 사용자가 시/도를 직접 바꾸면
+    // 그 시/도의 첫 시군구로만 자동 채운다(다른 지역의 저장값을 계속 끌어오지 않도록).
+    if (!lastRegionAppliedRef.current) {
+      const savedSigunguName = savedProfile?.lastRegion?.sigungu;
+      const match = savedSigunguName ? signguOptions.find((s) => s.signguName === savedSigunguName) : null;
+      if (match) next = match;
     }
+    lastRegionAppliedRef.current = true;
+    setSignguFullCode(next.signguFullCode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidoCode, regions]);
 
@@ -151,27 +175,69 @@ export default function CreateTripScreen({
 
   const canSubmit = Boolean(signguFullCode && tripDate && !dateBeforeToday && !partySizeError);
 
+  // 접힌 헤더 요약 칩: 동반유형 · 연령대 (+ 체크된 접근성 옵션 최대 2개). 값이 자주 바뀌지
+  // 않는 고정 속성만 담고, 매번 확인하는 자녀 나이는 요약에서 뺀다(브리프 5-1절).
   const detailsSummary = useMemo(() => {
     const companion = COMPANION_LABEL[companionType] || '';
     const age = AGE_GROUP_OPTIONS.find((o) => o.value === adultAgeGroup)?.label || '';
-    const extras = [
+    const accessibilityLabels = [
       withPet ? '반려동물' : null,
       strollerFriendly ? '유모차' : null,
       accessibleFriendly ? '무장애' : null,
-      childAges.length > 0 ? `자녀 ${childAges.length}명` : null,
-    ].filter(Boolean);
-    return [companion, age, ...extras].filter(Boolean).join(' · ');
-  }, [companionType, adultAgeGroup, withPet, strollerFriendly, accessibleFriendly, childAges.length]);
+    ].filter(Boolean).slice(0, MAX_SUMMARY_ACCESSIBILITY_LABELS);
+    return [companion, age, ...accessibilityLabels].filter(Boolean).join(' · ');
+  }, [companionType, adultAgeGroup, withPet, strollerFriendly, accessibleFriendly]);
+
+  /**
+   * 동반·접근성 입력을 로컬에 저장한다(2026-09-12 브리프) - 각 필드 변경 핸들러에서 그
+   * 시점의 최신 값 + 방금 바뀐 값(overrides)을 넘겨 호출한다. 마운트 시 자동 저장은 하지
+   * 않는다 - 매번 열 때마다 저장값을 그대로 다시 쓰면 savedAt이 계속 갱신되어 자녀 나이
+   * 180일 경과 판정(4절)이 무력화되기 때문에, 반드시 사용자가 실제로 값을 바꿀 때만 호출한다.
+   */
+  function persistProfile(overrides = {}) {
+    writeTravelerProfile({
+      companionType,
+      totalCount: partySize,
+      accessibility: { pet: withPet, stroller: strollerFriendly, barrierFree: accessibleFriendly },
+      adultAgeGroup,
+      childrenAges: childAges,
+      lastRegion: selectedSido && signguFullCode
+        ? { sido: selectedSido.sidoName, sigungu: signguOptions.find((s) => s.signguFullCode === signguFullCode)?.signguName }
+        : undefined,
+      ...overrides,
+    });
+  }
 
   function handleCompanionTypeChange(value) {
     setCompanionType(value);
     const fixedSize = FIXED_PARTY_SIZE_BY_COMPANION_TYPE[value];
+    let nextPartySize = partySize;
     if (fixedSize != null) {
       setPartySize(fixedSize);
+      nextPartySize = fixedSize;
     } else if (partySize < EXTENDED_FAMILY_MIN_SIZE || partySize > EXTENDED_FAMILY_MAX_SIZE) {
       setPartySize(EXTENDED_FAMILY_MIN_SIZE);
+      nextPartySize = EXTENDED_FAMILY_MIN_SIZE;
     }
     setPartySizeTouched(false);
+    persistProfile({ companionType: value, totalCount: nextPartySize });
+  }
+
+  function handleSidoChange(nextSidoCode) {
+    setSidoCode(nextSidoCode);
+    const sido = regions.find((r) => r.sidoCode === nextSidoCode);
+    const firstSigungu = sido?.signgus?.[0];
+    persistProfile({
+      lastRegion: sido && firstSigungu ? { sido: sido.sidoName, sigungu: firstSigungu.signguName } : undefined,
+    });
+  }
+
+  function handleSignguChange(nextSignguFullCode) {
+    setSignguFullCode(nextSignguFullCode);
+    const sigungu = signguOptions.find((s) => s.signguFullCode === nextSignguFullCode);
+    if (selectedSido && sigungu) {
+      persistProfile({ lastRegion: { sido: selectedSido.sidoName, sigungu: sigungu.signguName } });
+    }
   }
 
   function handleDateChange(value) {
@@ -268,15 +334,28 @@ export default function CreateTripScreen({
   }
 
   function handleAddChild() {
-    setChildAges((prev) => (prev.length >= maxChildren ? prev : [...prev, 10]));
+    setChildAges((prev) => {
+      if (prev.length >= maxChildren) return prev;
+      const next = [...prev, 10];
+      persistProfile({ childrenAges: next });
+      return next;
+    });
   }
 
   function handleChangeChildAge(index, age) {
-    setChildAges((prev) => prev.map((a, i) => (i === index ? age : a)));
+    setChildAges((prev) => {
+      const next = prev.map((a, i) => (i === index ? age : a));
+      persistProfile({ childrenAges: next });
+      return next;
+    });
   }
 
   function handleRemoveChild(index) {
-    setChildAges((prev) => prev.filter((_, i) => i !== index));
+    setChildAges((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      persistProfile({ childrenAges: next });
+      return next;
+    });
   }
 
   async function handleDeleteDraft(trip) {
@@ -390,12 +469,12 @@ export default function CreateTripScreen({
           <label className="trip-form-label">여행 지역</label>
           {regionsError && <div className="error-msg">❌ 지역 목록을 불러오지 못했어요: {regionsError}</div>}
           <div className="trip-form-region-selects">
-            <select value={sidoCode} onChange={(e) => setSidoCode(e.target.value)} disabled={regions.length === 0}>
+            <select value={sidoCode} onChange={(e) => handleSidoChange(e.target.value)} disabled={regions.length === 0}>
               {regions.map((r) => (
                 <option key={r.sidoCode} value={r.sidoCode}>{r.sidoName}</option>
               ))}
             </select>
-            <select value={signguFullCode} onChange={(e) => setSignguFullCode(e.target.value)} disabled={signguOptions.length === 0}>
+            <select value={signguFullCode} onChange={(e) => handleSignguChange(e.target.value)} disabled={signguOptions.length === 0}>
               {signguOptions.map((s) => (
                 <option key={s.signguFullCode} value={s.signguFullCode}>{s.signguName}</option>
               ))}
@@ -440,7 +519,11 @@ export default function CreateTripScreen({
           >
             <span className="trip-form-disclose-title">동반 · 접근성</span>
             <span className="trip-form-disclose-meta">{detailsSummary}</span>
-            <span className="trip-form-disclose-chevron" aria-hidden="true">{detailsOpen ? '▾' : '▸'}</span>
+            {detailsOpen ? (
+              <span className="trip-form-disclose-chevron" aria-hidden="true">▾</span>
+            ) : (
+              <span className="trip-form-disclose-edit">변경</span>
+            )}
           </button>
           {detailsOpen && (
             <div className="trip-form-disclose-body">
@@ -471,7 +554,9 @@ export default function CreateTripScreen({
               onChange={(e) => {
                 if (!isExtendedFamily) return;
                 const n = parseInt(e.target.value, 10);
-                setPartySize(Number.isNaN(n) ? '' : n);
+                const next = Number.isNaN(n) ? '' : n;
+                setPartySize(next);
+                if (next !== '') persistProfile({ totalCount: next });
               }}
               onBlur={() => setPartySizeTouched(true)}
             />
@@ -484,14 +569,24 @@ export default function CreateTripScreen({
           )}
           <div className="trip-form-checkbox-row">
             <label className="trip-form-checkbox">
-              <input type="checkbox" checked={withPet} onChange={(e) => setWithPet(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={withPet}
+                onChange={(e) => {
+                  setWithPet(e.target.checked);
+                  persistProfile({ accessibility: { pet: e.target.checked, stroller: strollerFriendly, barrierFree: accessibleFriendly } });
+                }}
+              />
               반려동물
             </label>
             <label className="trip-form-checkbox" title="유모차 이용 가능한 곳을 우선 추천해요">
               <input
                 type="checkbox"
                 checked={strollerFriendly}
-                onChange={(e) => setStrollerFriendly(e.target.checked)}
+                onChange={(e) => {
+                  setStrollerFriendly(e.target.checked);
+                  persistProfile({ accessibility: { pet: withPet, stroller: e.target.checked, barrierFree: accessibleFriendly } });
+                }}
               />
               유모차
             </label>
@@ -499,7 +594,10 @@ export default function CreateTripScreen({
               <input
                 type="checkbox"
                 checked={accessibleFriendly}
-                onChange={(e) => setAccessibleFriendly(e.target.checked)}
+                onChange={(e) => {
+                  setAccessibleFriendly(e.target.checked);
+                  persistProfile({ accessibility: { pet: withPet, stroller: strollerFriendly, barrierFree: e.target.checked } });
+                }}
               />
               무장애
             </label>
@@ -514,7 +612,10 @@ export default function CreateTripScreen({
                 key={opt.value}
                 type="button"
                 className={`tag ${adultAgeGroup === opt.value ? 'selected' : ''}`}
-                onClick={() => setAdultAgeGroup(opt.value)}
+                onClick={() => {
+                  setAdultAgeGroup(opt.value);
+                  persistProfile({ adultAgeGroup: opt.value });
+                }}
               >
                 {opt.label}
               </button>
@@ -557,6 +658,9 @@ export default function CreateTripScreen({
             ))}
           </div>
         </div>
+        {isFirstVisit && (
+          <p className="trip-form-disclose-hint">한 번 선택하면 다음부터 자동으로 채워져요.</p>
+        )}
             </div>
           )}
         </div>

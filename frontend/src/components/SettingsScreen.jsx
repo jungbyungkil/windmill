@@ -170,6 +170,10 @@ export default function SettingsScreen({ sessionId, itineraryId, onFinishTrip })
       )}
 
       <nav className="settings-menu-list" aria-label="바로가기">
+        <button type="button" className="settings-menu-item" onClick={() => navigate('/traveler-profile')}>
+          <TripsIcon size={18} /> 내 여행 정보
+          <span className="settings-menu-item-chevron">›</span>
+        </button>
         <button type="button" className="settings-menu-item" onClick={() => navigate('/my-trips')}>
           <TripsIcon size={18} /> 내 여행 관리
           <span className="settings-menu-item-chevron">›</span>

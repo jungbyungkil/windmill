@@ -777,11 +777,25 @@
   font-size: 12px;
 }
 
+/* 저장된 값이 있어 접힌 상태일 때 헤더 우측에 노출하는 변경 버튼(2026-09-12 브리프) */
+.trip-form-disclose-edit {
+  flex-shrink: 0;
+  color: var(--sea-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .trip-form-disclose-body {
   padding: 0 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.trip-form-disclose-hint {
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
 .trip-form-disclose-body .plan-mode-section {
@@ -2566,12 +2580,13 @@
   text-shadow: var(--text-shadow-notice);
 }
 
-/* 이름 + 한 줄 소개(overview 첫 문장, 2026-09-12) - 이름은 그대로 두고 소개만 남는 공간에서
-   말줄임한다. 이름 자체의 접힘/펼침 줄바꿈 규칙은 기존 .item-name 셀렉터가 그대로 담당. */
+/* 이름 + 짧은 소개(overview 첫 문장, 최대 10자, 2026-09-12) - 이름과 한 줄에서 나눠 쓰면
+   자리가 부족해 글자가 잘려 보이던 문제로, 소개를 이름 아래 줄로 내렸다. */
 .item-name-wrap {
   display: flex;
-  align-items: baseline;
-  gap: 5px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -2582,10 +2597,11 @@
 .item-card-summary .item-name-wrap .item-name {
   flex: 0 1 auto;
   min-width: 0;
+  width: 100%;
 }
 
 .item-intro {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
