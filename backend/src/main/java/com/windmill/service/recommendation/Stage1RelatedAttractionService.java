@@ -439,7 +439,7 @@ public class Stage1RelatedAttractionService {
         int rank = 1;
         for (JsonNode item : items) {
             String name = item.path("title").asText(null);
-            if (name == null || name.isBlank()) {
+            if (name == null || name.isBlank() || isUnsuitableForCasualTrip(name)) {
                 continue;
             }
             String mapX = blankToNull(item.path("mapx").asText(null));
@@ -457,6 +457,18 @@ public class Stage1RelatedAttractionService {
         }
         log.info("[Stage1] {} 후보 {}건 확보", categoryLcls, result.size());
         return result;
+    }
+
+    /**
+     * 회원제·예약제라 당일치기 추천에 부적합한 시설을 이름으로 걸러낸다(2026-09-13 사용자 제보 -
+     * 4인 가족 표준 일정에 골프장 "설악프라자컨트리클럽"이 추천됨). TourAPI 카테고리 분류가
+     * 부정확한 경우(골프장이 문화시설/레포츠 등으로 잘못 등록)에도 걸러지도록 contentTypeId·cat3가
+     * 아니라 이름 키워드로 판단한다 - 이 메서드는 모든 KorService2 목록 조회가 공유하는 유일한
+     * 매핑 지점이라 여기 한 곳만 고치면 스마트 동선·검색·대안 추천 전부에 적용된다.
+     */
+    private static boolean isUnsuitableForCasualTrip(String placeName) {
+        String name = placeName.toLowerCase(Locale.ROOT);
+        return name.contains("골프장") || name.contains("골프클럽") || name.contains("컨트리클럽");
     }
 
     private Integer parseContentTypeId(JsonNode item) {
