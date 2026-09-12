@@ -4,7 +4,6 @@ import PinwheelLoader from './PinwheelLoader';
 import VisitTimePicker from './VisitTimePicker';
 import TripStoryFeed from './TripStoryFeed';
 import RecommendationCard from './RecommendationCard';
-import NudgeCard, { loadSituationByGeolocation, maybeNotifySituation } from './NudgeCard';
 import * as api from '../api/windmillApi';
 import {
   COMPANION_TYPE_OPTIONS,
@@ -67,9 +66,6 @@ export default function CreateTripScreen({
   const [withPet, setWithPet] = useState(false);
   const [strollerFriendly, setStrollerFriendly] = useState(false);
   const [accessibleFriendly, setAccessibleFriendly] = useState(false);
-  const [situation, setSituation] = useState(null);
-  const [situationLoading, setSituationLoading] = useState(true);
-  const [situationDismissed, setSituationDismissed] = useState(false);
   const [ongoingTrips, setOngoingTrips] = useState([]);
   const [ongoingLoading, setOngoingLoading] = useState(Boolean(sessionId));
   const [deletingDraftId, setDeletingDraftId] = useState(null);
@@ -115,25 +111,6 @@ export default function CreateTripScreen({
       });
     return () => { cancelled = true; };
   }, [sessionId, draftItineraryId]);
-
-  // 앱 실행 시 현재 위치 기반 상황 요약 + (주의 시) Notification
-  useEffect(() => {
-    let cancelled = false;
-    setSituationLoading(true);
-    loadSituationByGeolocation((lat, lon) => api.getSituationByLocation(lat, lon))
-      .then((res) => {
-        if (cancelled) return;
-        setSituation(res);
-        if (res) maybeNotifySituation(res);
-      })
-      .catch(() => {
-        if (!cancelled) setSituation(null);
-      })
-      .finally(() => {
-        if (!cancelled) setSituationLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   const selectedSido = regions.find((r) => r.sidoCode === sidoCode);
   const signguOptions = selectedSido?.signgus || [];
@@ -708,17 +685,6 @@ export default function CreateTripScreen({
       </form>
 
       {resumeBlock}
-
-      {!situationDismissed && (
-        <NudgeCard
-          situation={situation}
-          loading={situationLoading}
-          onDismiss={() => setSituationDismissed(true)}
-          onAction={() => {
-            document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
-      )}
     </div>
   );
 }
