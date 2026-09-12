@@ -32,6 +32,7 @@ import com.windmill.service.recommendation.AnchorPlanService;
 import com.windmill.service.recommendation.InitialPlanService;
 import com.windmill.service.recommendation.RecommendationPipeline;
 import com.windmill.service.recommendation.SmartPlanService;
+import com.windmill.service.recommendation.SiblingTripExclusionResolver;
 import com.windmill.service.trigger.TriggerDetectionService;
 import com.windmill.service.trip.TripRecordService;
 import jakarta.validation.Valid;
@@ -42,6 +43,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -61,6 +63,7 @@ public class ItineraryController {
     private final AnchorPlanService anchorPlanService;
     private final TripRecordService tripRecordService;
     private final AlertFeedService alertFeedService;
+    private final SiblingTripExclusionResolver siblingTripExclusionResolver;
 
     @PostMapping
     public Mono<ResponseEntity<ItineraryResponse>> create(
@@ -420,9 +423,12 @@ public class ItineraryController {
     }
 
     private RecommendationRequest buildAutoPlanRequest(Itinerary itinerary, List<String> tags, String query) {
-        List<String> excludeContentIds = itinerary.getItems().stream()
+        List<String> excludeContentIds = new ArrayList<>(itinerary.getItems().stream()
                 .map(item -> item.getContentId())
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+        // 2박3일 등을 당일치기 여러 건으로 나눠 쓰는 경우, 같은 세션·같은 지역의 다른 날 일정에
+        // 이미 담긴 장소도 제외한다(2026-09-12 사용자 요청 - AI 초안이 날짜별로 똑같이 나옴).
+        excludeContentIds.addAll(siblingTripExclusionResolver.resolve(itinerary));
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
         ItineraryItem origin = originItem(itinerary);
         return RecommendationRequest.builder()
@@ -448,9 +454,12 @@ public class ItineraryController {
     private RecommendationRequest buildAlternativeRequest(Itinerary itinerary,
                                                             RecommendationRequest.AvoidanceHint avoid,
                                                             String seedPlaceName) {
-        List<String> excludeContentIds = itinerary.getItems().stream()
+        List<String> excludeContentIds = new ArrayList<>(itinerary.getItems().stream()
                 .map(item -> item.getContentId())
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+        // 2박3일 등을 당일치기 여러 건으로 나눠 쓰는 경우, 같은 세션·같은 지역의 다른 날 일정에
+        // 이미 담긴 장소도 제외한다(2026-09-12 사용자 요청 - 대안 카드가 다른 날짜와 겹침).
+        excludeContentIds.addAll(siblingTripExclusionResolver.resolve(itinerary));
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
         ItineraryItem origin = originItem(itinerary);
         return RecommendationRequest.builder()

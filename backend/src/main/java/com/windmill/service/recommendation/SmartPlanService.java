@@ -69,6 +69,7 @@ public class SmartPlanService {
     private final TripRecordService tripRecordService;
     private final FestivalTriggerService festivalTriggerService;
     private final Stage1RelatedAttractionService relatedAttractionService;
+    private final SiblingTripExclusionResolver siblingTripExclusionResolver;
 
     public Mono<SmartPlanResponse> build(Itinerary itinerary, int placeCount) {
         return build(itinerary, placeCount, null);
@@ -456,10 +457,13 @@ public class SmartPlanService {
                                                  RecommendationRequest.AvoidanceHint avoid,
                                                  List<String> tags,
                                                  boolean skipLlm) {
-        List<String> excludeContentIds = itinerary.getItems().stream()
+        List<String> excludeContentIds = new ArrayList<>(itinerary.getItems().stream()
                 .map(ItineraryItem::getContentId)
                 .filter(id -> id != null && !id.isBlank())
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+        // 2박3일 등을 당일치기 여러 건으로 나눠 쓰는 경우, 같은 세션·같은 지역의 다른 날 일정에
+        // 이미 담긴 장소도 제외한다(2026-09-12 사용자 요청 - 날짜별로 동일한 추천이 반복됨).
+        excludeContentIds.addAll(siblingTripExclusionResolver.resolve(itinerary));
         List<String> excludePlaceNames = List.copyOf(tripRecordService.getBadPlaceNames(itinerary.getSessionUuid()));
         ItineraryItem origin = originItem(itinerary);
 

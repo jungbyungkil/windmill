@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SmartPlanTimingTest {
 
-    private final SmartPlanService service = new SmartPlanService(null, null, null, null, null, null);
+    private final SmartPlanService service = new SmartPlanService(null, null, null, null, null, null, null);
 
     @Test
     void futureDayStartsAtNine() {

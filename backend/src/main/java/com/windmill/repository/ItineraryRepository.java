@@ -62,4 +62,15 @@ public interface ItineraryRepository extends JpaRepository<Itinerary, Long> {
               )
             """)
     List<Itinerary> findActiveTodayForNotification(@Param("today") LocalDate today);
+
+    /**
+     * 같은 세션·같은 지역의 다른 당일치기 일정들(자기 자신 제외) - 2박3일처럼 여러 날을 당일치기
+     * 여러 건으로 나눠 쓰는 경우, 다른 날 일정에 이미 담긴 장소를 추천에서 제외하기 위한 조회
+     * (2026-09-12 사용자 요청: "당일치기 1"·"당일치기 2"가 같은 속초시인데 서로 동일한 추천을 줌).
+     * 완료 여부(TripRecord)는 가리지 않는다 - 전날 일정이 이미 "다녀왔음" 처리됐어도 그 장소는
+     * 다음날 추천에서 여전히 빠져야 하기 때문. 날짜가 몇 달씩 떨어진 재방문까지 섞이지 않도록 하는
+     * 근접일 필터는 호출부(SiblingTripExclusionResolver)에서 Java 레벨로 건다.
+     */
+    List<Itinerary> findBySessionUuidAndSignguFullCodeAndIdNot(
+            String sessionUuid, String signguFullCode, Long id);
 }

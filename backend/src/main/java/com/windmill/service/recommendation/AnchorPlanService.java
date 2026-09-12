@@ -48,6 +48,7 @@ public class AnchorPlanService {
 
     private final RecommendationPipeline recommendationPipeline;
     private final CategoryRecommendationService categoryRecommendationService;
+    private final SiblingTripExclusionResolver siblingTripExclusionResolver;
 
     public Mono<List<RecommendationCandidate>> buildPlan(Itinerary itinerary, AnchorPlanRequest request) {
         RecommendationCandidate anchor = request.getAnchor();
@@ -64,6 +65,8 @@ public class AnchorPlanService {
 
         Set<String> used = new HashSet<>(existingContentIds(itinerary));
         used.add(anchor.getContentId());
+        // 같은 세션·같은 지역의 다른 당일치기(2박3일을 나눠 쓰는 경우)에 이미 담긴 장소도 제외
+        used.addAll(siblingTripExclusionResolver.resolve(itinerary));
 
         RecommendationRequest relatedReq = RecommendationRequest.builder()
                 .regionCode(itinerary.getSignguFullCode())
