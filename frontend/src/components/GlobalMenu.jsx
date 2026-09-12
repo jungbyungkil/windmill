@@ -1,4 +1,5 @@
 import useModalHistory from '../hooks/useModalHistory';
+import { PinwheelIcon, TripsIcon, GuideIcon } from './Icons';
 
 /**
  * 전체 메뉴(GNB) - 좌측 슬라이드 패널. 뒤로가기(popstate)로도 닫힘(useModalHistory).
@@ -24,18 +25,18 @@ export default function GlobalMenu({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="global-menu-head">
-          <span className="global-menu-title">🌬️ 바람따라</span>
+          <span className="global-menu-title"><PinwheelIcon size={18} /> 바람따라</span>
           <button type="button" className="icon-btn" aria-label="메뉴 닫기" onClick={onClose}>✕</button>
         </div>
         <ul className="global-menu-list">
           <li>
             <button type="button" className="global-menu-item" onClick={onNavigateMyTrips}>
-              🗂️ 내 여행 관리
+              <TripsIcon size={18} /> 내 여행 관리
             </button>
           </li>
           <li>
             <button type="button" className="global-menu-item" onClick={onNavigateGuide}>
-              ❓ 이용 가이드
+              <GuideIcon size={18} /> 이용 가이드
             </button>
           </li>
         </ul>

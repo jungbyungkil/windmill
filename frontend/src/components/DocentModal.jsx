@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import useModalHistory from '../hooks/useModalHistory';
+import { DocentIcon } from './Icons';
 
 const LANGS = [
   { value: 'ko', label: '한국어', speech: 'ko-KR' },
@@ -112,7 +113,7 @@ export default function DocentModal({
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-panel docent-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>🎧 바람이 Docent</h3>
+          <h3><DocentIcon size={20} /> 바람이 Docent</h3>
           <button className="icon-btn" type="button" onClick={handleClose}>✕</button>
         </div>
 

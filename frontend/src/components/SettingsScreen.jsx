@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useTextScale from '../hooks/useTextScale';
+import { TripsIcon, GuideIcon } from './Icons';
 import {
   isIOS,
   isStandalone,
@@ -170,11 +171,11 @@ export default function SettingsScreen({ sessionId, itineraryId, onFinishTrip })
 
       <nav className="settings-menu-list" aria-label="바로가기">
         <button type="button" className="settings-menu-item" onClick={() => navigate('/my-trips')}>
-          🗂️ 내 여행 관리
+          <TripsIcon size={18} /> 내 여행 관리
           <span className="settings-menu-item-chevron">›</span>
         </button>
         <button type="button" className="settings-menu-item" onClick={() => navigate('/guide')}>
-          ❓ 이용 가이드
+          <GuideIcon size={18} /> 이용 가이드
           <span className="settings-menu-item-chevron">›</span>
         </button>
       </nav>

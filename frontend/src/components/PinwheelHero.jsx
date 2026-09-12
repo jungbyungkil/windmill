@@ -1,5 +1,6 @@
 import BaramiBubble from './BaramiBubble';
 import { baramiCommentFromTrigger } from '../utils/statusLevel';
+import { HeatIcon, RainIcon, CrowdIcon } from './Icons';
 
 // 바람따라 넛지 상태 3단계: 🟢 순풍(변수 없음) · 🟡 주의(대응 가능) · 🔴 변경 필요(계획 유지 불가) -
 // TriggerLevel(NORMAL/WARNING/DANGER)에 그대로 1:1로 라벨만 입힌다(우선순위·판정 로직은 안 바꿈).
@@ -10,11 +11,11 @@ const LEVEL_META = {
 };
 
 const CAUSE_META = {
-  heatTrigger: { label: '폭염', avoid: 'HEAT' },
-  weatherTrigger: { label: '비 소식', avoid: 'WEATHER' },
+  heatTrigger: { label: '폭염', avoid: 'HEAT', Icon: HeatIcon },
+  weatherTrigger: { label: '비 소식', avoid: 'WEATHER', Icon: RainIcon },
   closedDayTrigger: { label: '휴무', avoid: 'BUSINESS' },
   hoursEndedTrigger: { label: '마감', avoid: 'BUSINESS' },
-  crowdTrigger: { label: '혼잡', avoid: 'CROWD' },
+  crowdTrigger: { label: '혼잡', avoid: 'CROWD', Icon: CrowdIcon },
   routeTangleTrigger: { label: '동선 꼬임', avoid: null },
   travelTimeTrigger: { label: '이동시간 부족', avoid: 'BUSINESS' },
 };
@@ -214,7 +215,9 @@ export default function PinwheelHero({
           {causes.length > 0 && (
             <div className="pinwheel-cause-labels">
               {causes.map(([key, c]) => (
-                <span key={key} className="cause-label">{c.label}</span>
+                <span key={key} className="cause-label">
+                  {c.Icon && <c.Icon size={14} />} {c.label}
+                </span>
               ))}
             </div>
           )}

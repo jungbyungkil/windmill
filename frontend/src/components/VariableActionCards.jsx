@@ -1,10 +1,13 @@
+import { HeatIcon, RainIcon, CrowdIcon } from './Icons';
+
 /**
  * 여행 중 3대 변수(비·폭염 / 혼잡 / 동선)를 항상 보여 주고, 감지되면 반짝이며 바로 대응하게 한다.
+ * weather 카드는 비/폭염 중 실제로 감지된 쪽에 맞춰 아이콘을 바꾼다(render의 heat 참고).
+ * route(동선)는 이 아이콘 세트에 전용 아이콘이 없어 기존 이모지를 그대로 둔다.
  */
 const CARDS = [
   {
     key: 'weather',
-    icon: '🌧️',
     title: '비 · 폭염',
     idle: '야외 일정은 실내로 바꿀 수 있어요',
     activeRain: '비가 와요. 실내 일정으로 바꿔 보세요',
@@ -12,7 +15,7 @@ const CARDS = [
   },
   {
     key: 'crowd',
-    icon: '👥',
+    Icon: CrowdIcon,
     title: '혼잡',
     idle: '붐비는 곳은 한산한 곳으로 바꿀 수 있어요',
     active: '혼잡이 감지됐어요. 한산한 곳으로 바꿔 보세요',
@@ -73,6 +76,7 @@ export default function VariableActionCards({
       <div className="variable-cards-grid">
         {CARDS.map((card) => {
           const state = states[card.key];
+          const CardIcon = card.key === 'weather' ? (heat ? HeatIcon : RainIcon) : card.Icon;
           return (
             <button
               key={card.key}
@@ -81,7 +85,9 @@ export default function VariableActionCards({
               onClick={state.onClick}
               disabled={state.loading}
             >
-              <span className="variable-card-icon" aria-hidden="true">{card.icon}</span>
+              <span className="variable-card-icon" aria-hidden="true">
+                {CardIcon ? <CardIcon size={20} /> : card.icon}
+              </span>
               <span className="variable-card-title">{card.title}</span>
               <span className="variable-card-body">{state.body}</span>
               <span className="variable-card-cta">

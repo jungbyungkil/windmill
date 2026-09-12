@@ -1,20 +1,21 @@
 import RecommendationCard from './RecommendationCard';
 import BaramiBubble from './BaramiBubble';
 import useModalHistory from '../hooks/useModalHistory';
+import { RainIcon, HeatIcon, CrowdIcon } from './Icons';
 
 const REASON_COPY = {
   RAIN_ALTERNATIVE: {
-    title: '🌧️ 비 소식 · 실내 대안',
+    title: <><RainIcon size={18} /> 비 소식 · 실내 대안</>,
     desc: '야외 대신 실내 장소예요. 담으면 일정에 바로 반영되고, 다른 여행자 참고 기록으로도 남아요.',
     barami: '비가 와도 즐겁게! 실내로 갈 만한 곳들을 모아왔어요.',
   },
   HEAT_ALTERNATIVE: {
-    title: '🌡️ 폭염 · 실내 대안',
+    title: <><HeatIcon size={18} /> 폭염 · 실내 대안</>,
     desc: '더위를 피하는 실내 코스예요. 담으면 일정에 바로 반영돼요.',
     barami: '너무 덥죠? 시원한 실내 위주로 골라왔어요.',
   },
   CROWD_ALTERNATIVE: {
-    title: '👥 혼잡 · 한산한 대안',
+    title: <><CrowdIcon size={18} /> 혼잡 · 한산한 대안</>,
     desc: '붐비는 곳 대신 여유 있는 장소예요. 고르면 일정에 바로 반영돼요.',
     barami: '사람 많은 곳 말고, 지금 한산한 데를 찾아왔어요.',
   },

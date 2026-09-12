@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../api/windmillApi';
 import { COMPANION_TYPE_OPTIONS } from '../constants';
+import { TrashIcon } from './Icons';
 
 const COMPANION_LABEL = Object.fromEntries(COMPANION_TYPE_OPTIONS.map((o) => [o.value, o.label]));
 
@@ -135,7 +136,7 @@ export default function MyTripsScreen({ sessionId, onResume }) {
                   onClick={() => handleDelete(trip)}
                   disabled={deletingId === trip.itineraryId}
                 >
-                  {deletingId === trip.itineraryId ? '…' : '🗑️'}
+                  {deletingId === trip.itineraryId ? '…' : <TrashIcon size={16} />}
                 </button>
               </li>
             ) : (
@@ -169,7 +170,7 @@ export default function MyTripsScreen({ sessionId, onResume }) {
                     onClick={() => handleDelete(trip)}
                     disabled={deletingId === trip.itineraryId}
                   >
-                    {deletingId === trip.itineraryId ? '…' : '🗑️'}
+                    {deletingId === trip.itineraryId ? '…' : <TrashIcon size={16} />}
                   </button>
                 </div>
               </li>

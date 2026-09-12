@@ -4,6 +4,7 @@ import PinwheelLoader from './PinwheelLoader';
 import VisitTimePicker from './VisitTimePicker';
 import TripStoryFeed from './TripStoryFeed';
 import RecommendationCard from './RecommendationCard';
+import { RecommendIcon, PickIcon, TrashIcon } from './Icons';
 import * as api from '../api/windmillApi';
 import {
   COMPANION_TYPE_OPTIONS,
@@ -550,7 +551,7 @@ export default function CreateTripScreen({
                   aria-label="자녀 삭제"
                   onClick={() => handleRemoveChild(index)}
                 >
-                  🗑️
+                  <TrashIcon size={16} />
                 </button>
               </div>
             ))}
@@ -573,9 +574,9 @@ export default function CreateTripScreen({
             onClick={() => setOtherWaysOpen((open) => !open)}
           >
             <span className="trip-alt-start-choices">
-              <span className="trip-alt-start-choice">📖 추천 코스</span>
+              <span className="trip-alt-start-choice"><RecommendIcon size={16} /> 추천 코스</span>
               <span className="trip-alt-start-or">또는</span>
-              <span className="trip-alt-start-choice">📌 직접 선택</span>
+              <span className="trip-alt-start-choice"><PickIcon size={16} /> 직접 선택</span>
             </span>
             <span className="trip-alt-start-chevron" aria-hidden="true">{otherWaysOpen ? '▾' : '▸'}</span>
           </button>
@@ -583,7 +584,7 @@ export default function CreateTripScreen({
             <div className="trip-form-disclose-body">
         <div className="plan-mode-section">
           <article className="plan-mode-card" hidden={!storyFeedAvailable}>
-            <h3 className="plan-mode-title">📖 추천 코스</h3>
+            <h3 className="plan-mode-title"><RecommendIcon size={18} /> 추천 코스</h3>
             <p className="plan-mode-desc">
               다녀온 사람이 남긴 당일치기를 그대로 복제해 시작할 수 있어요.
             </p>
@@ -599,13 +600,13 @@ export default function CreateTripScreen({
           </article>
 
           <article className="plan-mode-card">
-            <h3 className="plan-mode-title">📌 직접 선택</h3>
+            <h3 className="plan-mode-title"><PickIcon size={18} /> 직접 선택</h3>
             <p className="plan-mode-desc">
               공연·예약처럼 시각이 정해진 장소를 등록하면, 앞뒤 빈 시간을 자동으로 채워 드려요.
             </p>
             {anchorCandidate ? (
               <div className="anchor-selected-summary">
-                <span className="anchor-selected-name">📌 {anchorCandidate.placeName}</span>
+                <span className="anchor-selected-name"><PickIcon size={16} /> {anchorCandidate.placeName}</span>
                 <VisitTimePicker
                   className="anchor-selected-time"
                   value={anchorTime}
@@ -618,7 +619,7 @@ export default function CreateTripScreen({
                   aria-label="앵커 선택 해제"
                   onClick={handleClearAnchor}
                 >
-                  🗑️
+                  <TrashIcon size={16} />
                 </button>
               </div>
             ) : (
@@ -660,7 +661,7 @@ export default function CreateTripScreen({
                             candidate={c}
                             onAdd={handleSelectAnchor}
                             adding={anchorResolvingKey === key}
-                            addLabel="📌 이 장소를 중심으로"
+                            addLabel={<><PickIcon size={14} /> 이 장소를 중심으로</>}
                             addingLabel="확인하는 중..."
                           />
                         );
@@ -672,7 +673,7 @@ export default function CreateTripScreen({
             )}
             {anchorCandidate && (
               <button className="btn-primary btn-start" type="button" onClick={handleAnchorStart} disabled={loading || !canSubmit}>
-                {loading ? '일정 준비 중...' : `📌 ${anchorCandidate.placeName} 기준으로 시작`}
+                {loading ? '일정 준비 중...' : <><PickIcon size={16} /> {anchorCandidate.placeName} 기준으로 시작</>}
               </button>
             )}
           </article>

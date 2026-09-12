@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import * as api from '../api/windmillApi';
+import { PencilIcon } from './Icons';
 
 const RATINGS = [
   { value: 'GOOD', icon: '👍', label: '좋았음' },
@@ -150,7 +151,7 @@ export default function TripRecordDetailScreen({ sessionId, onViewItinerary }) {
         </p>
         {!editing && (
           <button type="button" className="btn-edit-diary" onClick={handleStartEdit}>
-            ✏️ 수정하기
+            <PencilIcon size={16} /> 수정하기
           </button>
         )}
       </div>

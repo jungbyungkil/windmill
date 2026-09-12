@@ -1451,6 +1451,25 @@
   50% { transform: translateX(3px); }
 }
 
+/* Icons.jsx 공통 아이콘 클래스 - 텍스트 라벨 옆(버튼·배지·타이틀)에 인라인으로 놓일 때
+   베이스라인이 뜨는 문제를 보정한다. 아이콘만 있는 정사각 버튼(icon-btn 등)에서는 살짝
+   아래로 처지므로 그런 컨테이너는 flex 정렬로 상쇄된다(대부분 이미 display:flex). */
+.bt-icon {
+  vertical-align: -3px;
+  flex-shrink: 0;
+}
+
+/* Icons.jsx PinwheelIcon(spinning) - 작은 인라인 아이콘용 회전, 기존 pinwheel-spin 재사용 */
+.bt-icon-spin {
+  animation: pinwheel-spin 3.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt-icon-spin {
+    animation: none;
+  }
+}
+
 .pinwheel-loading-overlay {
   position: fixed;
   inset: 0;

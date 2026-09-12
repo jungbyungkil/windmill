@@ -11,6 +11,7 @@ import TagGroupPicker from './TagGroupPicker';
 import PlaceOverview from './PlaceOverview';
 import PlaceDetailFacts from './PlaceDetailFacts';
 import SituationalChips from './SituationalChips';
+import { VisitedIcon, UndoIcon, PencilIcon, DocentIcon, TrashIcon } from './Icons';
 
 function draftFromItem(src) {
   return {
@@ -291,7 +292,9 @@ export default function ItineraryItemCard({
                   className="item-text-btn"
                   onClick={() => onToggleComplete(item.itemId, !completed)}
                 >
-                  <span className="item-text-btn-icon" aria-hidden="true">{completed ? '↩️' : '✓'}</span>
+                  <span className="item-text-btn-icon" aria-hidden="true">
+                    {completed ? <UndoIcon size={16} /> : <VisitedIcon size={16} />}
+                  </span>
                   {completed ? '되돌리기' : '다녀옴'}
                 </button>
               )}
@@ -300,7 +303,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn"
                 onClick={() => setEditing(true)}
               >
-                <span className="item-text-btn-icon" aria-hidden="true">✏️</span>
+                <span className="item-text-btn-icon" aria-hidden="true"><PencilIcon size={16} /></span>
                 수정
               </button>
               <button
@@ -308,7 +311,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn"
                 onClick={() => onOpenDocent(item)}
               >
-                <span className="item-text-btn-icon" aria-hidden="true">🎧</span>
+                <span className="item-text-btn-icon" aria-hidden="true"><DocentIcon size={16} /></span>
                 도슨트
               </button>
               <button
@@ -316,7 +319,7 @@ export default function ItineraryItemCard({
                 className="item-text-btn danger"
                 onClick={() => onDelete(item.itemId)}
               >
-                <span className="item-text-btn-icon" aria-hidden="true">🗑️</span>
+                <span className="item-text-btn-icon" aria-hidden="true"><TrashIcon size={16} /></span>
                 삭제
               </button>
             </div>

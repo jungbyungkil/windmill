@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RainIcon, HeatIcon } from './Icons';
 
 /**
  * 바람따라 핵심 화면: TourAPI + 인기 명소 오전 배치 + 날씨 + 동선 최적화 스마트 일정.
@@ -154,8 +155,8 @@ export default function SmartPlanScreen({
             <div className="smart-plan-flags">
               <span className="smart-flag">📅 당일치기</span>
               {plan.crowdFiltered && <span className="smart-flag">🌅 인기 명소는 오전</span>}
-              {plan.weatherAdjusted && <span className="smart-flag">🌧️ 실내 전환</span>}
-              {plan.heatAdjusted && <span className="smart-flag">🌡️ 폭염 실내</span>}
+              {plan.weatherAdjusted && <span className="smart-flag"><RainIcon size={14} /> 실내 전환</span>}
+              {plan.heatAdjusted && <span className="smart-flag"><HeatIcon size={14} /> 폭염 실내</span>}
               {plan.estimatedTotalDistanceKm > 0 && (
                 <span className="smart-flag">👣 약 {plan.estimatedTotalDistanceKm}km</span>
               )}

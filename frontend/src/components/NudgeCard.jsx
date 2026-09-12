@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { isPushOptedOut } from '../utils/webPush';
+import { RainIcon, CrowdIcon, HeatIcon, PinwheelIcon } from './Icons';
 
 const DISMISS_KEY = 'windtrail:dismissedNudgeIds';
 
 const NUDGE_STYLE = {
-  WEATHER_RAIN: { label: '비', tone: 'urgent' },
-  CROWD: { label: '혼잡', tone: 'crowd' },
-  WEATHER_HEAT: { label: '폭염', tone: 'heat' },
-  CRUISE: { label: '순풍', tone: 'ok' },
+  WEATHER_RAIN: { label: '비', tone: 'urgent', Icon: RainIcon },
+  CROWD: { label: '혼잡', tone: 'crowd', Icon: CrowdIcon },
+  WEATHER_HEAT: { label: '폭염', tone: 'heat', Icon: HeatIcon },
+  CRUISE: { label: '순풍', tone: 'ok', Icon: PinwheelIcon },
 };
 
 function readDismissedIds() {
@@ -65,7 +66,7 @@ export default function NudgeCard({ situation, loading, onDismiss, onAction }) {
         onClick={onAction ? () => onAction(situation) : undefined}
       >
         <div className="nudge-card-head">
-          <span className="nudge-card-tag">{style.label}</span>
+          <span className="nudge-card-tag"><style.Icon size={14} /> {style.label}</span>
           <strong className="nudge-card-headline">{situation.headline}</strong>
         </div>
         <span className="nudge-card-detail">{situation.detail}</span>

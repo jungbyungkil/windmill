@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as api from '../api/windmillApi';
+import { PinwheelIcon } from './Icons';
 
 export default function SharedItineraryScreen({ token, onBack }) {
   const [data, setData] = useState(null);
@@ -50,7 +51,7 @@ export default function SharedItineraryScreen({ token, onBack }) {
   return (
     <div className="share-screen">
       <header className="share-header">
-        <span className="logo">🌬️ 바람따라</span>
+        <span className="logo"><PinwheelIcon size={18} /> 바람따라</span>
         <span className="share-badge">공유된 일정</span>
       </header>
       <h1 className="share-title">{data.regionDisplayName}</h1>

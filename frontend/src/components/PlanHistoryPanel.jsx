@@ -2,15 +2,23 @@ import { useState } from 'react';
 import useModalHistory from '../hooks/useModalHistory';
 import { formatRelativeTime } from './AlertFeedScreen';
 import BaramiBubble from './BaramiBubble';
+import { RainIcon, HeatIcon, CrowdIcon, UndoIcon, PencilIcon } from './Icons';
 
+// ROUTE(동선)는 이 세트에 전용 아이콘이 없어 기존 이모지를 그대로 둔다.
 const TRIGGER_ICON = {
-  WEATHER: '🌧️',
-  HEAT: '🌡️',
-  CROWD: '🌊',
-  ROUTE: '🧭',
-  REVERT: '↩️',
-  MANUAL: '✏️',
+  WEATHER: RainIcon,
+  HEAT: HeatIcon,
+  CROWD: CrowdIcon,
+  REVERT: UndoIcon,
+  MANUAL: PencilIcon,
 };
+
+function TriggerBadgeIcon({ type }) {
+  const IconComp = TRIGGER_ICON[type];
+  if (IconComp) return <IconComp size={14} />;
+  if (type === 'ROUTE') return <span aria-hidden="true">🧭</span>;
+  return <PencilIcon size={14} />;
+}
 
 function stopsSummary(snapshot) {
   const stops = snapshot?.stops || [];
@@ -118,7 +126,7 @@ export default function PlanHistoryPanel({
               >
                 <div className="plan-history-item-head">
                   <span className="plan-history-badge">
-                    {TRIGGER_ICON[entry.triggerType] || '✏️'} 변경 이력 #{entry.sequence}
+                    <TriggerBadgeIcon type={entry.triggerType} /> 변경 이력 #{entry.sequence}
                   </span>
                   <span className="plan-history-time">{formatRelativeTime(entry.changedAt)}</span>
                   {isCurrent && <span className="plan-history-current-tag">현재 적용 중</span>}
