@@ -4,6 +4,7 @@ import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
 import { sanitizeApiText } from '../utils/sanitizeApiText';
+import { introLine } from '../utils/introLine';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 import PlaceThumb from './PlaceThumb';
 import TagGroupPicker from './TagGroupPicker';
@@ -123,6 +124,9 @@ export default function ItineraryItemCard({
 
   const mapAvailable = canOpenInKakaoMap(item);
   const showDetail = expanded || editing;
+  // 카드 이름 옆에 붙일 한 줄 소개 - 상세에서 따로 보여주는 item.overview 전문과 별개로,
+  // 접었을 때도 바로 보이도록 첫 문장만 짧게 뽑는다(2026-09-12 사용자 요청).
+  const intro = !editing ? introLine(item.overview) : '';
 
   function handleOpenMap() {
     openInKakaoMap(item);
@@ -200,7 +204,10 @@ export default function ItineraryItemCard({
         disabled={editing}
         aria-expanded={showDetail}
       >
-        <span className="item-name">{item.placeName}</span>
+        <span className="item-name-wrap">
+          <span className="item-name">{item.placeName}</span>
+          {intro && <span className="item-intro">· {intro}</span>}
+        </span>
         <span className={`item-status-chip ${statusClass}`}>{summaryStatusLabel()}</span>
         {!editing && (
           <span className="item-card-chevron" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
