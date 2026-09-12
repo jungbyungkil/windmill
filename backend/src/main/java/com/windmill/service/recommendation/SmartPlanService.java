@@ -62,6 +62,8 @@ public class SmartPlanService {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     /** 주변 관광지 1곳 추가 판단용 근접 기준 - ProximityRanking.NEAR_KM/AnchorPlanService와 동일값 */
     private static final double SLOT_EXPANSION_NEAR_KM = 1.5;
+    /** 표준 일정 식당 후보 중 상세정보(음식 종류·대표메뉴 등) 보강 대상 상한 - 인기순 상위만 API 호출 */
+    private static final int FOOD_DETAIL_ENRICH_LIMIT = 8;
 
     private final RecommendationPipeline recommendationPipeline;
     private final TriggerScheduler triggerScheduler;
@@ -70,6 +72,7 @@ public class SmartPlanService {
     private final FestivalTriggerService festivalTriggerService;
     private final Stage1RelatedAttractionService relatedAttractionService;
     private final SiblingTripExclusionResolver siblingTripExclusionResolver;
+    private final Stage2BusinessHoursFilter stage2BusinessHoursFilter;
 
     public Mono<SmartPlanResponse> build(Itinerary itinerary, int placeCount) {
         return build(itinerary, placeCount, null);
@@ -112,12 +115,19 @@ public class SmartPlanService {
                     // 여기서도 제외해야 날짜별 점심·저녁이 겹치지 않는다(2026-09-13 사용자 제보).
                     Set<String> excludeForFood = Set.copyOf(attractionReq.getExcludeContentIds() == null
                             ? List.of() : attractionReq.getExcludeContentIds());
+                    // 음식 종류(cat3)·대표메뉴는 목록 API엔 없고 상세조회(getDetail)로만 나온다 - 인기순
+                    // 상위 몇 곳만 상세보강(Stage2)해 호출 비용을 인기 관광지 후보와 비슷한 수준으로 묶는다
+                    // (2026-09-13 사용자 제보: 식당 카드에 종류/메뉴가 안 뜸 - toFoodCandidates가 이 값들을
+                    // 안 담고 있었음).
                     Mono<List<RecommendationCandidate>> foodsMono = relatedAttractionService == null
                             ? Mono.just(List.of())
                             : relatedAttractionService.fetchFood(region, null)
                                     .map(raw -> raw.stream()
                                             .filter(c -> c.getContentId() == null || !excludeForFood.contains(c.getContentId()))
+                                            .sorted(Comparator.comparingInt(RelatedCandidate::getRank))
+                                            .limit(FOOD_DETAIL_ENRICH_LIMIT)
                                             .toList())
+                                    .flatMap(list -> stage2BusinessHoursFilter.filter(list, date))
                                     .map(SmartPlanService::toFoodCandidates)
                                     .onErrorReturn(List.of());
 
@@ -1042,6 +1052,9 @@ public class SmartPlanService {
                     .distanceKm(c.getDistanceKm())
                     .mapX(c.getMapX())
                     .mapY(c.getMapY())
+                    .overview(c.getOverview())
+                    .detailFacts(c.getDetailFacts())
+                    .cat3(c.getCat3())
                     .rank(c.getRank())
                     .oneLiner("점심·저녁에 들르기 좋은 인기 맛집")
                     .build());
