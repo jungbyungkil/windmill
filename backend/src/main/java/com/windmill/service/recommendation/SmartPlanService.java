@@ -107,9 +107,17 @@ public class SmartPlanService {
                             ? Mono.just(List.of())
                             : festivalTriggerService.findDuringTrip(region, date, date).onErrorReturn(List.of());
 
+                    // 맛집 순위는 인기순 고정이라 제외 목록 없이는 지역이 같으면 매번 1위 식당이 뽑힌다
+                    // - 이 일정(이미 담긴 곳) + 같은 세션·지역의 형제 당일치기(다른 날짜)에 담긴 곳을
+                    // 여기서도 제외해야 날짜별 점심·저녁이 겹치지 않는다(2026-09-13 사용자 제보).
+                    Set<String> excludeForFood = Set.copyOf(attractionReq.getExcludeContentIds() == null
+                            ? List.of() : attractionReq.getExcludeContentIds());
                     Mono<List<RecommendationCandidate>> foodsMono = relatedAttractionService == null
                             ? Mono.just(List.of())
                             : relatedAttractionService.fetchFood(region, null)
+                                    .map(raw -> raw.stream()
+                                            .filter(c -> c.getContentId() == null || !excludeForFood.contains(c.getContentId()))
+                                            .toList())
                                     .map(SmartPlanService::toFoodCandidates)
                                     .onErrorReturn(List.of());
 

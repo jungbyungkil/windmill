@@ -4,7 +4,7 @@ import { canOpenInKakaoMap, openInKakaoMap } from '../utils/kakaoMap';
 import { openExternalLink } from '../utils/externalLink';
 import { recordView } from '../utils/viewHistory';
 import { sanitizeApiText } from '../utils/sanitizeApiText';
-import { introLine } from '../utils/introLine';
+import { foodSummaryLine } from '../utils/foodInfo';
 import VisitTimePicker, { normalizeTime } from './VisitTimePicker';
 import PlaceThumb from './PlaceThumb';
 import TagGroupPicker from './TagGroupPicker';
@@ -125,9 +125,9 @@ export default function ItineraryItemCard({
 
   const mapAvailable = canOpenInKakaoMap(item);
   const showDetail = expanded || editing;
-  // 카드 이름 옆에 붙일 한 줄 소개 - 상세에서 따로 보여주는 item.overview 전문과 별개로,
-  // 접었을 때도 바로 보이도록 첫 문장만 짧게 뽑는다(2026-09-12 사용자 요청).
-  const intro = !editing ? introLine(item.overview) : '';
+  // 개요(overview) 요약은 펼치면 어차피 보이므로 접힌 카드엔 넣지 않는다. 대신 이름만으론
+  // 구분이 안 되는 식당은 음식 종류(cat3)·대표메뉴를 짧게 보여준다(2026-09-12 사용자 요청).
+  const foodInfo = !editing ? foodSummaryLine(item) : '';
 
   function handleOpenMap() {
     openInKakaoMap(item);
@@ -136,17 +136,21 @@ export default function ItineraryItemCard({
   /**
    * 배지 라벨 - 실제 발생한 트리거를 우선순위 없이 전부 병기한다("혼잡 · 폭염" 형태,
    * 2026-09-10 핸드오프 브리프: 고정 "주의" 텍스트만으로는 원인을 알 수 없던 문제).
-   * 최대 3개까지만(그 이상은 CSS 말줄임), "·"로 구분. 트리거가 하나도 없으면(예: 서버
-   * crowdAlerted는 false인데 itemStatusLevel 자체 휴리스틱으로만 WARNING이 된 경우) 기존처럼
-   * 상태값 라벨(정상/주의/긴급)로 폴백한다.
+   * 최대 3개까지만(그 이상은 CSS 말줄임), "·"로 구분. 서버 crowdAlerted가 false여도
+   * itemStatusLevel과 같은 기준(혼잡도 70%↑)이면 혼잡으로 표시한다 - 그 기준 하나로 이미
+   * WARNING이 된 카드에 원인 없는 "주의"만 뜨던 문제(2026-09-13 사용자 제보) 수정.
+   * 그래도 원인이 하나도 안 잡히면(알 수 없는 케이스) 상태값 라벨(정상/주의/긴급)로 폴백한다.
    */
   const MAX_BADGE_LABELS = 3;
+  const CROWD_WARNING_THRESHOLD = 70;
   function summaryStatusLabel() {
     if (completed) return '다녀옴';
     const labels = [];
     if (businessAlerted && closedDayAlerted) labels.push('휴무');
     if (businessAlerted && hoursEndedAlerted) labels.push('마감');
-    if (crowdAlert) labels.push('혼잡');
+    if (crowdAlert || (item?.crowdRate != null && item.crowdRate >= CROWD_WARNING_THRESHOLD)) {
+      labels.push('혼잡');
+    }
     if (isWeather && rainTrigger) labels.push('우천');
     if (isWeather && heatTrigger) labels.push('폭염');
     if (labels.length > 0) return labels.slice(0, MAX_BADGE_LABELS).join(' · ');
@@ -207,7 +211,7 @@ export default function ItineraryItemCard({
       >
         <span className="item-name-wrap">
           <span className="item-name">{item.placeName}</span>
-          {intro && <span className="item-intro">{intro}</span>}
+          {foodInfo && <span className="item-food-info">{foodInfo}</span>}
         </span>
         <span className={`item-status-chip ${statusClass}`}>{summaryStatusLabel()}</span>
         {!editing && (

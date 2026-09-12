@@ -2580,8 +2580,8 @@
   text-shadow: var(--text-shadow-notice);
 }
 
-/* 이름 + 짧은 소개(overview 첫 문장, 최대 10자, 2026-09-12) - 이름과 한 줄에서 나눠 쓰면
-   자리가 부족해 글자가 잘려 보이던 문제로, 소개를 이름 아래 줄로 내렸다. */
+/* 이름 + 식당 정보(음식 종류·대표메뉴, 2026-09-12) - 이름과 한 줄에서 나눠 쓰면 자리가
+   부족해 글자가 잘려 보이던 문제로 이름 아래 줄에 놓는다. overview 요약은 펼치면 보이므로 뺐다. */
 .item-name-wrap {
   display: flex;
   flex-direction: column;
@@ -2600,7 +2600,7 @@
   width: 100%;
 }
 
-.item-intro {
+.item-food-info {
   width: 100%;
   min-width: 0;
   overflow: hidden;

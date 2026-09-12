@@ -15,6 +15,7 @@ public class ItineraryItemResponse {
     private Long itemId;
     private String contentId;
     private Integer contentTypeId;
+    private String cat3;
     private String placeName;
     private String thumbnailUrl;
     private String scheduledTime;
@@ -60,6 +61,7 @@ public class ItineraryItemResponse {
                 .itemId(item.getId())
                 .contentId(item.getContentId())
                 .contentTypeId(item.getContentTypeId())
+                .cat3(item.getCat3())
                 .placeName(item.getPlaceName())
                 .thumbnailUrl(item.getThumbnailUrl())
                 .scheduledTime(item.getScheduledTime())

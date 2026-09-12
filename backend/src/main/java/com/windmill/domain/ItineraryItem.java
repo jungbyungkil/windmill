@@ -32,6 +32,9 @@ public class ItineraryItem {
     /** detailIntro2 등 타입별 응답 조회에 필요 (12: 관광지, 14: 문화시설, 15: 축제/행사 등) */
     private Integer contentTypeId;
 
+    /** TourAPI 표준분류 소분류 코드(음식점 "A05020100"=한식 등) - 카드에서 음식 종류 표시용 스냅샷 */
+    private String cat3;
+
     @Column(nullable = false)
     private String placeName;
 
