@@ -281,9 +281,31 @@ export default function App() {
       setActiveDate(null);
       return;
     }
-    api.getItinerary(itineraryId)
-      .then(setItinerary)
-      .catch(() => setItineraryId(null));
+    let cancelled = false;
+    // 알림 탭으로 콜드스타트할 때는 모바일 네트워크 스택이 막 깨어나는 시점이라 첫 조회가 실패하는
+    // 경우가 흔하다 - 재시도 없이 바로 itineraryId를 null로 되돌리면(구 로직) "여행 마무리" 딥링크
+    // (pendingFinishOpen)가 다시는 실행되지 못해 조용히 홈 화면으로 떨어진다(2026-09-13 사용자
+    // 제보). 확정 실패(404 - 삭제됐거나 없는 일정)만 즉시 정리하고, 그 외는 지수 백오프로 재시도.
+    function load(attempt) {
+      api.getItinerary(itineraryId)
+        .then((data) => {
+          if (!cancelled) setItinerary(data);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (err?.status === 404) {
+            setItineraryId(null);
+            return;
+          }
+          if (attempt < 3) {
+            setTimeout(() => load(attempt + 1), 1500 * (attempt + 1));
+          } else {
+            setItineraryId(null);
+          }
+        });
+    }
+    load(0);
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itineraryId]);
 

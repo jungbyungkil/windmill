@@ -3,6 +3,7 @@ package com.windmill.exception;
 import com.windmill.dto.ClosingTimeInfeasibleResponse;
 import com.windmill.dto.DuplicateItineraryResponse;
 import com.windmill.dto.TimeSlotConflictResponse;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -41,6 +42,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ClosingTimeInfeasibleResponse> handleClosingTimeInfeasible(
             ClosingTimeInfeasibleException e) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(ClosingTimeInfeasibleResponse.from(e));
+    }
+
+    /**
+     * 삭제됐거나 없는 일정/항목 조회 - 예전엔 전역 처리기가 안 잡아 안전망(500, "일시적인 오류가
+     * 발생했어요")으로 새어나가, 프론트가 "진짜 없음(재시도 무의미)"과 "네트워크 순단(재시도해야
+     * 함)"을 구분할 수 없었다(2026-09-13 사용자 제보 - 알림 클릭 시 여행 마무리 대신 홈으로 감,
+     * 원인 중 하나가 이 구분 불가). 404로 내려 프론트가 즉시 포기하도록 한다.
+     */
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleEntityNotFound(EntityNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
     }
 
     /**
