@@ -211,12 +211,13 @@ public class RouteRecalculationService {
         for (int i = 0; i < orderedWithCoords.size(); i++) {
             coordIdx.put(orderedWithCoords.get(i).getId(), i);
         }
-        KakaoDirectionsClient.TravelTimeMatrix matrix = orderedWithCoords.size() >= 2
+        KakaoDirectionsClient.TravelTimeMatrix matrix = (kakaoDirectionsClient != null && orderedWithCoords.size() >= 2)
                 ? kakaoDirectionsClient.buildTravelTimeMatrix(orderedWithCoords.stream().map(this::toPoint).toList())
                 : null;
 
         List<Long> flaggedItemIds = new ArrayList<>();
         int totalTravel = 0;
+        int segmentsEvaluated = 0;
         ItineraryItem prevItem = null;
         LocalTime prevTime = null;
         for (int i = 0; i < ordered.size(); i++) {
@@ -227,6 +228,7 @@ public class RouteRecalculationService {
                 if (a != null && b != null) {
                     int travel = matrix.minutes()[a][b];
                     totalTravel += travel;
+                    segmentsEvaluated++;
                     int gap = VisitTiming.minutesOf(slotTimes.get(i)) - VisitTiming.minutesOf(prevTime);
                     if (travel > gap) {
                         flaggedItemIds.add(item.getId());
@@ -237,7 +239,10 @@ public class RouteRecalculationService {
             prevTime = slotTimes.get(i);
         }
 
-        if (flaggedItemIds.size() * 2 > ordered.size()) {
+        // 과반 판정은 평가된 구간(segmentsEvaluated, 최대 ordered.size()-1) 기준이어야 한다 - 항목 수
+        // (ordered.size())를 분모로 쓰면 기준이 실제보다 엄격해져(예: 4항목/3구간 중 2구간이 빠듯해도
+        // 2*2=4>4가 거짓) "과반이면 적용하지 않는다"는 설계 의도보다 늦게 반응한다.
+        if (segmentsEvaluated > 0 && flaggedItemIds.size() * 2 > segmentsEvaluated) {
             return new SlotResult(targets, "이동시간이 빠듯한 구간이 많아 이번엔 순서를 그대로 두었어요.",
                     null, matrix != null && matrix.roadBased(), flaggedItemIds, false, false);
         }

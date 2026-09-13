@@ -944,7 +944,9 @@ public class ItineraryService {
         LocalDate today = KoreaClock.today();
         LocalTime nowKst = KoreaClock.nowTime();
         List<ItineraryItem> completed = dayItems.stream()
-                .filter(i -> ItineraryItemStatus.isCompleted(i, i.getVisitDate(), today, nowKst))
+                .filter(i -> ItineraryItemStatus.isCompleted(i,
+                        i.getVisitDate() != null ? i.getVisitDate() : itinerary.getStartDate(),
+                        today, nowKst))
                 .collect(Collectors.toList());
         List<ItineraryItem> remaining = dayItems.stream()
                 .filter(i -> !completed.contains(i))

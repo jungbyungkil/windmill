@@ -5,6 +5,7 @@ import com.windmill.dto.MapRouteRequest;
 import com.windmill.dto.MapRouteResponse;
 import com.windmill.dto.TransportMode;
 import com.windmill.util.GeoUtils;
+import com.windmill.util.LocationCacheKeys;
 import com.windmill.util.SimpleTtlCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +46,13 @@ public class KakaoDirectionsClient {
     private static final int MAX_DESTINATIONS_PER_REQUEST = 30;
     /** radius는 필수 파라미터, 문서상 최대 10,000m */
     private static final int DESTINATIONS_RADIUS_METERS = 10_000;
+    /**
+     * 배치 실패분 1:1 재시도 전체에 대한 벽시계 상한 - 예전엔 Flux.flatMap(concurrency=4).blockLast
+     * (45초/30초)가 이 상한 역할을 했는데, 배치 API 도입으로 순차 재시도로 바뀌면서 그 상한이
+     * 사라졌었다(반경 10km 밖 목적지가 많으면 지점 수만큼 순차 10초 블로킹이 누적돼 사실상 무한정
+     * 늘어남). 이 상한을 넘기면 남은 목적지는 즉시 Haversine 추정치로 채운다.
+     */
+    private static final Duration SINGLE_RETRY_BUDGET = Duration.ofSeconds(20);
 
     private final WebClient webClient;
     private final String restApiKey;
@@ -98,8 +106,14 @@ public class KakaoDirectionsClient {
                 etaCache.put(pairKey(origin, points.get(e.getKey())), e.getValue());
             }
         }
+        long retryDeadlineNanos = System.nanoTime() + SINGLE_RETRY_BUDGET.toNanos();
         for (int i = 0; i < n; i++) {
             if (out[i] != null) {
+                continue;
+            }
+            if (System.nanoTime() >= retryDeadlineNanos) {
+                // 벽시계 상한 초과 - 남은 목적지는 더 이상 1:1 재시도하지 않고 바로 추정치로 채운다.
+                out[i] = haversineEta(origin, points.get(i));
                 continue;
             }
             DestinationEta single = singleEta(origin, points.get(i));
@@ -227,12 +241,11 @@ public class KakaoDirectionsClient {
         return new DestinationEta(false, meters, minutes * 60);
     }
 
+    /** 좌표쌍 캐시 키 - 소수 4자리(~11m)로 반올림해 LocationCacheKeys의 Locale.US 포맷을 그대로 쓴다
+     * (로케일별 소수 구분자 차이로 캐시 키가 흔들리지 않게). */
     private static String pairKey(MapRouteRequest.MapPoint a, MapRouteRequest.MapPoint b) {
-        return round4(a.getLon()) + "," + round4(a.getLat()) + "|" + round4(b.getLon()) + "," + round4(b.getLat());
-    }
-
-    private static double round4(double v) {
-        return Math.round(v * 10_000.0) / 10_000.0;
+        return LocationCacheKeys.formatCoord(a.getLon(), 4) + "," + LocationCacheKeys.formatCoord(a.getLat(), 4)
+                + "|" + LocationCacheKeys.formatCoord(b.getLon(), 4) + "," + LocationCacheKeys.formatCoord(b.getLat(), 4);
     }
 
     /**

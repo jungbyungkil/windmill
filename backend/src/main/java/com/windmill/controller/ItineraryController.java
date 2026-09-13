@@ -361,7 +361,9 @@ public class ItineraryController {
                     LocalDate today = KoreaClock.today();
                     java.time.LocalTime nowKst = KoreaClock.nowTime();
                     List<ItineraryItem> completed = dayItems.stream()
-                            .filter(i -> ItineraryItemStatus.isCompleted(i, i.getVisitDate(), today, nowKst))
+                            .filter(i -> ItineraryItemStatus.isCompleted(i,
+                                    i.getVisitDate() != null ? i.getVisitDate() : itinerary.getStartDate(),
+                                    today, nowKst))
                             .collect(Collectors.toList());
                     List<ItineraryItem> targets = dayItems.stream()
                             .filter(i -> !completed.contains(i))
@@ -373,7 +375,18 @@ public class ItineraryController {
                             RouteAnchorResolver.resolve(completed, targets, originLon, originLat);
                     Double anchorLon = anchor == null ? null : anchor.lon();
                     Double anchorLat = anchor == null ? null : anchor.lat();
-                    return greedyRouteSuggestService.suggest(targets, anchorLon, anchorLat);
+                    SuggestedRouteResponse response = greedyRouteSuggestService.suggest(targets, anchorLon, anchorLat);
+                    // 앵커가 GPS가 아니라 완료 항목 좌표·남은 첫 슬롯 좌표일 때도 GreedyRouteSuggestService는
+                    // origin이 채워졌다는 이유만으로 "현재 위치" 라벨을 붙인다 - 실제 GPS로 온 경우(완료 항목이
+                    // 없고 GPS를 그대로 앵커로 쓴 경우)에만 그 라벨을 유지한다.
+                    boolean realGpsUsed = completed.isEmpty() && originLon != null && originLat != null;
+                    if (anchor != null && !realGpsUsed && response.isUsedGpsOrigin()) {
+                        response.setUsedGpsOrigin(false);
+                        if (response.getMessage() != null) {
+                            response.setMessage(response.getMessage().replace("현재 위치를 출발점으로 ", ""));
+                        }
+                    }
+                    return response;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
