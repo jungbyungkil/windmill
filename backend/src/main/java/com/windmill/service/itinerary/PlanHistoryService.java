@@ -50,6 +50,20 @@ public class PlanHistoryService {
             history = new ArrayList<>();
             itinerary.setChangeHistory(history);
         }
+
+        // 직전 이력이 곧바로 앞선 "동선 재계산(ROUTE)"이면 새로 쌓지 않고 그 이력을 갱신한다 -
+        // "바람이가 동선 최적화"를 짧은 시간 안에 여러 번 눌러도 이력이 한 건만 남는다. 사이에 다른
+        // 종류의 변경(대안 추가·수동 삭제 등)이 끼면 직전 이력의 triggerType이 달라져 자연히 새로 쌓인다.
+        PlanChangeEntry last = history.isEmpty() ? null : history.get(history.size() - 1);
+        if ("ROUTE".equals(triggerType) && last != null && "ROUTE".equals(last.getTriggerType())) {
+            last.setChangedAt(nowKst());
+            last.setSnapshot(snapshotOf(itinerary));
+            last.setReason(reason);
+            log.info("[PlanHistory] 변경 이력 #{} 갱신(연속 ROUTE 병합) itineraryId={} reason={}",
+                    last.getSequence(), itinerary.getId(), reason);
+            return;
+        }
+
         PlanChangeEntry entry = PlanChangeEntry.builder()
                 .sequence(nextSequence(history))
                 .triggerType(triggerType)

@@ -5,20 +5,24 @@ import com.windmill.dto.MapRouteRequest;
 import com.windmill.dto.MapRouteResponse;
 import com.windmill.dto.TransportMode;
 import com.windmill.util.GeoUtils;
+import com.windmill.util.SimpleTtlCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Map;
 
 /**
  * 카카오 모빌리티 자동차 길찾기 프록시.
@@ -35,8 +39,18 @@ public class KakaoDirectionsClient {
     /** origin + waypoints(≤5) + destination */
     private static final int MAX_POINTS_PER_REQUEST = 7;
 
+    /** 다중 목적지 길찾기 - https://developers.kakaomobility.com/guide/navi-api/destinations */
+    private static final String DESTINATIONS_URL = "https://apis-navi.kakaomobility.com/v1/destinations/directions";
+    /** 문서상 목적지 최대 30개 */
+    private static final int MAX_DESTINATIONS_PER_REQUEST = 30;
+    /** radius는 필수 파라미터, 문서상 최대 10,000m */
+    private static final int DESTINATIONS_RADIUS_METERS = 10_000;
+
     private final WebClient webClient;
     private final String restApiKey;
+    // 좌표쌍(소수 4자리 반올림, ~11m) 단위 10분 TTL - greedy 스텝마다 후보 집합이 겹쳐도
+    // 캐시 히트만큼 호출이 줄어든다. 값은 항상 minutes()를 쓸 수 있게 실제/추정을 구분해 담는다.
+    private final SimpleTtlCache<String, DestinationEta> etaCache = new SimpleTtlCache<>(Duration.ofMinutes(10));
 
     public KakaoDirectionsClient(WebClient.Builder webClientBuilder,
                                  @Value("${kakao.rest-api-key:}") String restApiKey) {
@@ -46,6 +60,190 @@ public class KakaoDirectionsClient {
 
     public boolean isConfigured() {
         return !restApiKey.isBlank();
+    }
+
+    /**
+     * 출발지 1개 → 목적지 여럿의 실제 도로 거리/시간 - 목적지가 30개를 넘으면 청크로 나눠 호출한다.
+     * 반경(10km) 밖이거나 실패한 목적지만 1:1 길찾기로 재시도하고, 그것도 실패하면 Haversine 추정치로
+     * 채우되 {@link DestinationEta#ok()}를 false로 표시한다 - 호출자는 순위 매김에는 써도 화면에
+     * 보여주는 수치에는 ok=false 항목을 넣지 않아야 한다("틀린 숫자를 보여주지 않는 것이 핵심").
+     */
+    public List<DestinationEta> etaListFromOrigin(MapRouteRequest.MapPoint origin,
+                                                  List<MapRouteRequest.MapPoint> points) {
+        int n = points == null ? 0 : points.size();
+        if (origin == null || n == 0) {
+            return List.of();
+        }
+        DestinationEta[] out = new DestinationEta[n];
+        if (!isConfigured()) {
+            for (int i = 0; i < n; i++) {
+                out[i] = haversineEta(origin, points.get(i));
+            }
+            return Arrays.asList(out);
+        }
+
+        List<Integer> uncached = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            DestinationEta cached = etaCache.get(pairKey(origin, points.get(i)));
+            if (cached != null) {
+                out[i] = cached;
+            } else {
+                uncached.add(i);
+            }
+        }
+        if (!uncached.isEmpty()) {
+            Map<Integer, DestinationEta> fetched = fetchBatchedEta(origin, points, uncached);
+            for (Map.Entry<Integer, DestinationEta> e : fetched.entrySet()) {
+                out[e.getKey()] = e.getValue();
+                etaCache.put(pairKey(origin, points.get(e.getKey())), e.getValue());
+            }
+        }
+        for (int i = 0; i < n; i++) {
+            if (out[i] != null) {
+                continue;
+            }
+            DestinationEta single = singleEta(origin, points.get(i));
+            if (single != null) {
+                out[i] = single;
+                etaCache.put(pairKey(origin, points.get(i)), single);
+            } else {
+                out[i] = haversineEta(origin, points.get(i));
+            }
+        }
+        return Arrays.asList(out);
+    }
+
+    /**
+     * 순서대로 이어지는 경로의 각 구간(leg) 실제 거리·시간 - path[i]→path[i+1]. 화면에 보여줄
+     * "before/after" 총 거리·소요시간을 정확히 계산할 때 쓴다(순서 결정 자체는 그대로 Haversine).
+     * 각 구간은 {@link #etaListFromOrigin}과 같은 좌표쌍 캐시를 타므로, 서로 다른 두 순서(현재/재배치)
+     * 가 구간을 공유해도(예: 앵커→A) 호출이 중복되지 않는다.
+     */
+    public List<DestinationEta> etaSequential(List<MapRouteRequest.MapPoint> path) {
+        if (path == null || path.size() < 2) {
+            return List.of();
+        }
+        List<DestinationEta> out = new ArrayList<>(path.size() - 1);
+        for (int i = 0; i + 1 < path.size(); i++) {
+            List<DestinationEta> single = etaListFromOrigin(path.get(i), List.of(path.get(i + 1)));
+            out.add(single.isEmpty() ? haversineEta(path.get(i), path.get(i + 1)) : single.get(0));
+        }
+        return out;
+    }
+
+    private Map<Integer, DestinationEta> fetchBatchedEta(MapRouteRequest.MapPoint origin,
+                                                          List<MapRouteRequest.MapPoint> points,
+                                                          List<Integer> indices) {
+        Map<Integer, DestinationEta> result = new HashMap<>();
+        for (int start = 0; start < indices.size(); start += MAX_DESTINATIONS_PER_REQUEST) {
+            List<Integer> chunk = indices.subList(start, Math.min(start + MAX_DESTINATIONS_PER_REQUEST, indices.size()));
+            result.putAll(callDestinationsDirections(origin, points, chunk));
+        }
+        return result;
+    }
+
+    private Map<Integer, DestinationEta> callDestinationsDirections(MapRouteRequest.MapPoint origin,
+                                                                     List<MapRouteRequest.MapPoint> points,
+                                                                     List<Integer> indices) {
+        Map<String, Object> originMap = new LinkedHashMap<>();
+        originMap.put("x", origin.getLon());
+        originMap.put("y", origin.getLat());
+
+        List<Map<String, Object>> destList = new ArrayList<>();
+        for (int idx : indices) {
+            MapRouteRequest.MapPoint p = points.get(idx);
+            Map<String, Object> dm = new LinkedHashMap<>();
+            dm.put("key", String.valueOf(idx));
+            dm.put("x", p.getLon());
+            dm.put("y", p.getLat());
+            destList.add(dm);
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("origin", originMap);
+        body.put("destinations", destList);
+        body.put("radius", DESTINATIONS_RADIUS_METERS);
+        body.put("priority", "TIME");
+        // 0 = 유고(공사·사고·행사 등 전체 차선 통제) 정보를 경로 탐색에 반영(문서 기본값) - 실시간
+        // 변수 대응 컨셉과 맞아 명시적으로 고정한다. 통제 중인 도로가 있으면 순서·시간이 자동으로 달라짐.
+        body.put("roadevent", 0);
+
+        try {
+            JsonNode root = webClient.post()
+                    .uri(DESTINATIONS_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "KakaoAK " + restApiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block(Duration.ofSeconds(15));
+            return parseDestinationsResponse(root);
+        } catch (Exception e) {
+            log.warn("[KakaoDirections] destinations/directions 실패, 개별 재시도로 폴백: {}", e.toString());
+            return Map.of();
+        }
+    }
+
+    private Map<Integer, DestinationEta> parseDestinationsResponse(JsonNode root) {
+        Map<Integer, DestinationEta> out = new HashMap<>();
+        JsonNode routes = root == null ? null : root.path("routes");
+        if (routes != null && routes.isArray()) {
+            for (JsonNode route : routes) {
+                int idx = route.path("key").asInt(-1);
+                if (idx < 0) {
+                    continue;
+                }
+                int code = route.path("result_code").asInt(-1);
+                if (code != 0) {
+                    continue; // 반경 밖·경로 없음 등 - 호출자가 1:1 재시도
+                }
+                JsonNode summary = route.path("summary");
+                Integer dist = summary.has("distance") ? summary.get("distance").asInt() : null;
+                Integer dur = summary.has("duration") ? summary.get("duration").asInt() : null;
+                if (dur != null) {
+                    out.put(idx, new DestinationEta(true, dist, dur));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 배치 실패분 1:1 재시도 - 거리는 못 받고 소요시간만(기존 길찾기 API는 summary=true로 duration만 조회). */
+    private DestinationEta singleEta(MapRouteRequest.MapPoint origin, MapRouteRequest.MapPoint dest) {
+        try {
+            Integer sec = durationSeconds(origin, dest).block(Duration.ofSeconds(10));
+            return sec == null ? null : new DestinationEta(true, null, sec);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private DestinationEta haversineEta(MapRouteRequest.MapPoint a, MapRouteRequest.MapPoint b) {
+        int minutes = haversineMinutes(a, b);
+        Double km = GeoUtils.distanceKmSafe(
+                String.valueOf(a.getLon()), String.valueOf(a.getLat()),
+                String.valueOf(b.getLon()), String.valueOf(b.getLat()));
+        Integer meters = km == null ? null : (int) Math.round(km * 1000);
+        return new DestinationEta(false, meters, minutes * 60);
+    }
+
+    private static String pairKey(MapRouteRequest.MapPoint a, MapRouteRequest.MapPoint b) {
+        return round4(a.getLon()) + "," + round4(a.getLat()) + "|" + round4(b.getLon()) + "," + round4(b.getLat());
+    }
+
+    private static double round4(double v) {
+        return Math.round(v * 10_000.0) / 10_000.0;
+    }
+
+    /**
+     * @param ok             true면 카카오 실제 도로 데이터, false면 반경 밖·오류로 Haversine 추정
+     * @param distanceMeters 실제 거리(ok=true일 때만 신뢰) - 1:1 재시도 성공 시엔 duration만 받아 null일 수 있음
+     * @param durationSeconds 항상 값이 있음(실제 또는 추정) - {@link #minutes()}로 분 단위 조회
+     */
+    public record DestinationEta(boolean ok, Integer distanceMeters, int durationSeconds) {
+        public int minutes() {
+            return Math.max(1, (int) Math.ceil(durationSeconds / 60.0));
+        }
     }
 
     /** 도보 평균 속도(km/h) - 실제 도보 길찾기는 카카오 제휴 전용이라 미확보(브리프 참고) */
@@ -276,69 +474,49 @@ public class KakaoDirectionsClient {
     }
 
     /**
-     * 지점 간 자동차 이동시간(분) 매트릭스.
-     * n≤8 당일치기 기준 n(n-1)회 길찾기. 실패·미설정 시 Haversine×분/km 폴백.
+     * 지점 간 자동차 이동시간(분) 매트릭스. 행(i)마다 다중 목적지 길찾기 1콜로 나머지 전부를
+     * 조회한다(n행 = n콜, 예전엔 n(n-1)회 개별 호출). 각 콜은 {@link #etaListFromOrigin}과 같은
+     * 좌표쌍 캐시를 타므로, 같은 일정을 반복 재계산해도(10분 내) 캐시 히트로 호출이 줄어든다.
+     * 실패·미설정 구간은 Haversine×분/km 폴백.
      *
      * @param points lon/lat 순서 동일 인덱스
-     * @return minutes[i][j] = i→j 분 (대각 0). roadBasedRatio는 카카오 성공 비율 힌트용
+     * @return minutes[i][j] = i→j 분 (대각 0). roadBased는 실제 도로 데이터를 하나라도 구했는지
      */
     public TravelTimeMatrix buildTravelTimeMatrix(List<MapRouteRequest.MapPoint> points) {
         int n = points == null ? 0 : points.size();
         int[][] minutes = new int[n][n];
-        if (n == 0) {
-            return new TravelTimeMatrix(minutes, 0, 0, false);
-        }
-        if (!isConfigured() || n == 1) {
-            fillHaversineMinutes(points, minutes);
+        if (n <= 1) {
             return new TravelTimeMatrix(minutes, 0, 0, false);
         }
 
-        List<int[]> pairs = new ArrayList<>();
+        int roadOk = 0;
+        int totalPairs = 0;
         for (int i = 0; i < n; i++) {
+            List<MapRouteRequest.MapPoint> others = new ArrayList<>(points);
+            MapRouteRequest.MapPoint origin = others.remove(i);
+            List<DestinationEta> etas = etaListFromOrigin(origin, others);
+            int oi = 0;
             for (int j = 0; j < n; j++) {
-                if (i != j) {
-                    pairs.add(new int[]{i, j});
+                if (j == i) {
+                    continue;
+                }
+                DestinationEta eta = etas.get(oi++);
+                minutes[i][j] = eta.minutes();
+                totalPairs++;
+                if (eta.ok()) {
+                    roadOk++;
                 }
             }
         }
-        AtomicInteger ok = new AtomicInteger();
-        Flux.fromIterable(pairs)
-                .flatMap(pair -> {
-                    int i = pair[0];
-                    int j = pair[1];
-                    return durationSeconds(points.get(i), points.get(j))
-                            .map(sec -> {
-                                minutes[i][j] = Math.max(1, (int) Math.ceil(sec / 60.0));
-                                ok.incrementAndGet();
-                                return true;
-                            })
-                            .onErrorResume(e -> {
-                                minutes[i][j] = haversineMinutes(points.get(i), points.get(j));
-                                return Mono.just(false);
-                            });
-                }, 4)
-                .blockLast(Duration.ofSeconds(45));
-
-        int totalPairs = pairs.size();
-        int roadOk = ok.get();
-        if (roadOk == 0) {
-            fillHaversineMinutes(points, minutes);
-            return new TravelTimeMatrix(minutes, 0, totalPairs, false);
+        if (roadOk > 0) {
+            log.info("[KakaoDirections] travel matrix {}x{} roadOk={}/{}", n, n, roadOk, totalPairs);
         }
-        // 빠진 칸만 직선 폴백
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                if (i != j && minutes[i][j] <= 0) {
-                    minutes[i][j] = haversineMinutes(points.get(i), points.get(j));
-                }
-            }
-        }
-        log.info("[KakaoDirections] travel matrix {}x{} roadOk={}/{}", n, n, roadOk, totalPairs);
         return new TravelTimeMatrix(minutes, roadOk, totalPairs, roadOk > 0);
     }
 
     /**
-     * GPS 등 외부 시작점 → 각 지점 이동시간(분).
+     * GPS 등 외부 시작점 → 각 지점 이동시간(분). 내부적으로 {@link #etaListFromOrigin}(다중 목적지
+     * 길찾기 1콜 + 캐시)을 쓴다 - 예전엔 지점 수만큼 1:1 길찾기를 개별 호출했다.
      */
     public int[] minutesFromOrigin(MapRouteRequest.MapPoint origin, List<MapRouteRequest.MapPoint> points) {
         int n = points == null ? 0 : points.size();
@@ -346,27 +524,9 @@ public class KakaoDirectionsClient {
         if (origin == null || n == 0) {
             return out;
         }
-        if (!isConfigured()) {
-            for (int i = 0; i < n; i++) {
-                out[i] = haversineMinutes(origin, points.get(i));
-            }
-            return out;
-        }
-        Flux.range(0, n)
-                .flatMap(i -> durationSeconds(origin, points.get(i))
-                        .map(sec -> {
-                            out[i] = Math.max(1, (int) Math.ceil(sec / 60.0));
-                            return i;
-                        })
-                        .onErrorResume(e -> {
-                            out[i] = haversineMinutes(origin, points.get(i));
-                            return Mono.just(i);
-                        }), 4)
-                .blockLast(Duration.ofSeconds(30));
+        List<DestinationEta> etas = etaListFromOrigin(origin, points);
         for (int i = 0; i < n; i++) {
-            if (out[i] <= 0) {
-                out[i] = haversineMinutes(origin, points.get(i));
-            }
+            out[i] = etas.get(i).minutes();
         }
         return out;
     }
@@ -403,18 +563,6 @@ public class KakaoDirectionsClient {
                     }
                     return summary.get("duration").asInt();
                 });
-    }
-
-    private static void fillHaversineMinutes(List<MapRouteRequest.MapPoint> points, int[][] minutes) {
-        for (int i = 0; i < points.size(); i++) {
-            for (int j = 0; j < points.size(); j++) {
-                if (i == j) {
-                    minutes[i][j] = 0;
-                } else {
-                    minutes[i][j] = haversineMinutes(points.get(i), points.get(j));
-                }
-            }
-        }
     }
 
     /** 직선거리 → 분 (약 12분/km, 10~90 클램프) */

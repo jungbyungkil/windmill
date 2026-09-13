@@ -32,6 +32,8 @@ export default function ItineraryList({
   closedDayAffectedItemIds,
   hoursEndedAffectedItemIds,
   crowdAffectedItemIds,
+  /** 동선 최적화 직후 이동시간이 슬롯 간격보다 긴(무리한 배치) 항목 id - 제거하지 않고 배지만 표시 */
+  tightTimingItemIds,
   weatherAlert = false,
   /** 야외 알림이 비/폭염 중 어느 쪽인지 - 배지 다중 라벨(우천/폭염)을 나누기 위함(둘 다 켜져 있으면 둘 다 표시) */
   rainAlert = false,
@@ -60,6 +62,7 @@ export default function ItineraryList({
   const closedDayIds = toIdSet(closedDayAffectedItemIds);
   const hoursEndedIds = toIdSet(hoursEndedAffectedItemIds);
   const crowdIds = toIdSet(crowdAffectedItemIds);
+  const tightTimingIds = toIdSet(tightTimingItemIds);
 
   // 지난 일정(완료)은 별도 접이식 섹션으로 분리해 "남은 일정"에 집중시킨다.
   const activeItems = items.filter((i) => !i.completed);
@@ -77,6 +80,7 @@ export default function ItineraryList({
         closedDayAlerted={!item.completed && closedDayIds.has(id)}
         hoursEndedAlerted={!item.completed && hoursEndedIds.has(id)}
         crowdAlerted={!item.completed && crowdIds.has(id)}
+        tightTimingAlerted={!item.completed && tightTimingIds.has(id)}
         rainTrigger={rainAlert}
         heatTrigger={heatAlert}
         highlighted={highlightedItemId != null && id === Number(highlightedItemId)}

@@ -191,6 +191,9 @@ export default function App() {
   const [shareBusy, setShareBusy] = useState(false);
   const autoOptimizedRef = useRef(false);
   const autoRecordPromptedRef = useRef(false);
+  // 동선 최적화용 GPS 권한 거부를 세션(이 컴포넌트 생존 기간) 내에서 기억 - 한 번 거부하면
+  // "동선 최적화"/"이 순서 어때요?"를 다시 눌러도 재요청하지 않고 서버 폴백(남은 첫 슬롯)으로 보낸다.
+  const geoDeniedRef = useRef(false);
   const [activeDate, setActiveDate] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tripSection, setTripSection] = useState('home');
@@ -1504,25 +1507,28 @@ export default function App() {
     }
   }
 
-  /** 오늘 동선 「동선 재계산」 — GPS 시도 후 서버 TSP·시간표.
-   *  startTime을 지정했으면 GPS 위치와 무관하게 그 시각을 첫 장소 도착 시각으로 고정한다. */
+  /** 오늘 동선 「동선 재계산」 — 완료한 곳이 있으면 그 좌표가 서버 쪽 출발 앵커라 GPS를 켜지 않는다.
+   *  완료한 곳이 없을 때만 GPS를 시도하고(권한 거부는 세션 내 기억), startTime을 지정했으면
+   *  GPS 위치와 무관하게 그 시각을 첫 장소 도착 시각으로 고정한다. */
   function handleOptimizeFromGps(startTime) {
     if (!itineraryId || optimizeLoading) return;
     setOptimizeLoading(true);
     beginOptimistic('ROUTE'); // 클릭 즉시 핀휠을 성공 스킨으로 (API 응답 대기 없이)
     const done = (origin) => handleOptimizeRoute(origin, startTime, true);
-    if (!navigator.geolocation) {
+    const hasCompletedToday = visibleItems.some((i) => i.completed);
+    if (hasCompletedToday || geoDeniedRef.current || !navigator.geolocation) {
       done(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => done({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => done(null), // 위치 거부·실패여도 장소 간 매트릭스로 재계산
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      () => { geoDeniedRef.current = true; done(null); }, // 위치 거부·실패여도 서버가 남은 첫 슬롯으로 폴백
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
     );
   }
 
-  /** 「이 순서 어때요?」 — GPS 기준 그리디 제안. 확인 전까지 일정에 쓰지 않는다. */
+  /** 「이 순서 어때요?」 — 완료한 곳이 있으면 그 좌표가 출발 앵커라 GPS를 켜지 않는다.
+   *  확인 전까지 일정에 쓰지 않는다. */
   function handleSuggestRoute() {
     if (!itineraryId || suggestLoading || optimizeLoading) return;
     setSuggestOpen(true);
@@ -1535,14 +1541,15 @@ export default function App() {
         .catch((e) => setSuggestError(e.message || '순서를 제안하지 못했어요'))
         .finally(() => setSuggestLoading(false));
     };
-    if (!navigator.geolocation) {
+    const hasCompletedToday = visibleItems.some((i) => i.completed);
+    if (hasCompletedToday || geoDeniedRef.current || !navigator.geolocation) {
       run(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => run({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => run(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      () => { geoDeniedRef.current = true; run(null); },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
     );
   }
 
@@ -1843,6 +1850,7 @@ export default function App() {
                   closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
                   hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
                   crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
+                  tightTimingItemIds={itinerary?.tightTimingItemIds}
                   weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
                   rainAlert={Boolean(trigger?.weatherTrigger)}
                   heatAlert={Boolean(trigger?.heatTrigger)}

@@ -76,6 +76,13 @@ public class TriggerDetectionService {
         List<ItineraryItem> activeItems = itinerary.getItems().stream()
                 .filter(item -> !ItineraryItemStatus.isCompleted(item, visitDateOf(item, itinerary), today, nowKst))
                 .collect(Collectors.toList());
+        List<ItineraryItem> completedItems = itinerary.getItems().stream()
+                .filter(item -> ItineraryItemStatus.isCompleted(item, visitDateOf(item, itinerary), today, nowKst))
+                .collect(Collectors.toList());
+        // 동선 꼬임 감지의 "지금 Xkm → 재배치 시 Ykm"도 실제 재배치와 같은 출발 앵커를 써서
+        // 감지기가 약속한 절감폭이 실제 재배치 후에도 일치하게 한다.
+        var routeAnchor = com.windmill.service.itinerary.RouteAnchorResolver.resolve(
+                completedItems, activeItems, originLon, originLat);
 
         if (activeItems.isEmpty()) {
             return festivalsMono.map(festivals -> TriggerResult.builder()
@@ -95,7 +102,7 @@ public class TriggerDetectionService {
                         .collectList()
                         .map(perItem -> {
                             TriggerResult result = aggregate(perItem);
-                            attachRouteTangle(result, activeItems);
+                            attachRouteTangle(result, activeItems, routeAnchor);
                             return result;
                         }))
                 .zipWith(festivalsMono, (result, festivals) -> {
@@ -190,8 +197,12 @@ public class TriggerDetectionService {
         return itinerary.getStartDate() != null ? itinerary.getStartDate() : KoreaClock.today();
     }
 
-    private void attachRouteTangle(TriggerResult result, List<ItineraryItem> items) {
-        var tangle = com.windmill.service.itinerary.RouteTangleDetector.detect(items);
+    private void attachRouteTangle(TriggerResult result, List<ItineraryItem> items,
+                                   com.windmill.service.itinerary.RouteAnchorResolver.Anchor anchor) {
+        var tangle = anchor == null
+                ? com.windmill.service.itinerary.RouteTangleDetector.detect(items)
+                : com.windmill.service.itinerary.RouteTangleDetector.detect(
+                        items, String.valueOf(anchor.lon()), String.valueOf(anchor.lat()), kakaoDirectionsClient);
         result.setRouteTangle(tangle);
         result.setRouteTangleTrigger(tangle.isTangled());
         if (tangle.isTangled()) {

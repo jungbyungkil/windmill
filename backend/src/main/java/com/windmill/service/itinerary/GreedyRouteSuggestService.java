@@ -31,15 +31,16 @@ import java.util.Objects;
 
 /**
  * 현재 위치·시각 기준 그리디 재배열 제안. 일정에 쓰지 않는다.
- * 각 단계에서 남은 장소 중 직선거리 상위 {@link #CANDIDATE_LIMIT}곳만 카카오 이동시간을 조회한다.
+ * 각 단계에서 남은 장소 전체를 카카오 다중 목적지 길찾기로 한 번에 조회한다(목적지 최대 30개 -
+ * 당일치기 규모에서 스텝당 1콜). 예전엔 직선거리 상위 4곳만 추려 개별 호출했는데, 계곡·호수처럼
+ * 직선거리와 실제 도로거리가 크게 벌어지는 지형에서 진짜 최적 후보가 상위 4곳 밖으로 밀려날 수
+ * 있었다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class GreedyRouteSuggestService {
 
-    /** 단계마다 카카오 길찾기를 칠 최근접 후보 수. 품질과 호출량의 타협(오픈 퀘스천 1). */
-    static final int CANDIDATE_LIMIT = 4;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final KakaoDirectionsClient kakaoDirectionsClient;
@@ -142,14 +143,11 @@ public class GreedyRouteSuggestService {
         boolean dinnerUsed = false;
 
         while (!remaining.isEmpty()) {
+            // Haversine 사전 정렬은 동점 시 결정성(가까운 쪽 우선)만 위해 유지 - 평가 자체는
+            // 남은 전체를 대상으로 한다(다중 목적지 길찾기 1콜).
             List<ItineraryItem> ranked = rankByDistance(here, remaining);
             Candidate bestFeasible = pickBestFeasible(
-                    here, ranked.subList(0, Math.min(CANDIDATE_LIMIT, ranked.size())),
-                    cursor, visitDate, at, lunchUsed, dinnerUsed, occupants);
-            if (bestFeasible == null && ranked.size() > CANDIDATE_LIMIT) {
-                bestFeasible = pickBestFeasible(
-                        here, ranked, cursor, visitDate, at, lunchUsed, dinnerUsed, occupants);
-            }
+                    here, ranked, cursor, visitDate, at, lunchUsed, dinnerUsed, occupants);
 
             if (bestFeasible == null) {
                 for (ItineraryItem item : ranked) {

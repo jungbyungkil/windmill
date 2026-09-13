@@ -41,6 +41,8 @@ public class ItineraryResponse {
     private Double optimizedDistanceKm;
     /** 삭제 직후 자동 대체된 장소명(선택) - 프론트가 "OO로 자동 채워드렸어요" 안내에 사용 */
     private String autoReplacedPlaceName;
+    /** 동선 최적화 직후 이동시간이 슬롯 간격보다 긴(무리한 배치) 항목 id(선택) - 프론트가 배지로 표시 */
+    private List<Long> tightTimingItemIds;
 
     /** 원본 일정(Plan A) 스냅샷 - 첫 변경이 있기 전엔 null. 이력 패널 맨 위 고정 카드. */
     private PlanSnapshot originalPlan;

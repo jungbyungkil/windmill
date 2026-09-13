@@ -18,6 +18,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,6 +137,129 @@ public class RouteRecalculationService {
         log.info("[RouteRecalc] n={} roadBased={} travelMin={} closedToday={}",
                 withCoords.size(), matrix.roadBased(), totalTravel, closed.size());
         return new Result(finalOrder, message, totalTravel, matrix.roadBased());
+    }
+
+    /**
+     * 시간 슬롯 보존형 동선 재계산("방식 A") - {@code targets}의 <b>기존 시간 슬롯 배열은 그대로 두고</b>,
+     * 앵커(완료 항목 좌표·GPS·남은 첫 슬롯 중 하나)에서 가장 가까운 순서로 어느 슬롯에 어느 장소를
+     * 넣을지만 다시 정한다. 식사(맛집) 슬롯과 비식사 슬롯은 서로 섞이지 않도록 타입별로 큐를 나눠
+     * 매핑한다. 좌표 없는 항목은 자기 슬롯에 그대로 남는다.
+     *
+     * <p>슬롯 시각이 없는 항목이 섞여 있으면(레거시 데이터 등) 이 방식을 쓸 수 없어 {@code missingSlotTime}
+     * 을 켜서 돌아간다 - 호출자가 {@link #recalculate(List, Double, Double, LocalTime)}로 폴백해야 한다.
+     * 이동시간이 슬롯 간격보다 긴 구간이 과반이면 재배치를 적용하지 않고({@code applied=false}) 원본을
+     * 그대로 돌려준다(무리한 배치를 강행하지 않음).
+     */
+    public SlotResult recalculateSlotPreserving(List<ItineraryItem> targets, Double anchorLon, Double anchorLat) {
+        if (targets == null || targets.size() < 2) {
+            return SlotResult.unchanged(targets, false);
+        }
+
+        List<ItineraryItem> slots = new ArrayList<>(targets);
+        slots.sort(Comparator.comparing(RouteRecalculationService::slotTimeOf,
+                Comparator.nullsLast(Comparator.naturalOrder())));
+        List<LocalTime> slotTimes = new ArrayList<>();
+        for (ItineraryItem item : slots) {
+            LocalTime t = slotTimeOf(item);
+            if (t == null) {
+                return SlotResult.unchanged(targets, true);
+            }
+            slotTimes.add(t);
+        }
+
+        List<Integer> reorderablePositions = new ArrayList<>();
+        List<ItineraryItem> reorderableItems = new ArrayList<>();
+        for (int i = 0; i < slots.size(); i++) {
+            if (hasCoords(slots.get(i))) {
+                reorderablePositions.add(i);
+                reorderableItems.add(slots.get(i));
+            }
+        }
+        if (reorderableItems.size() < 2) {
+            return SlotResult.unchanged(targets, false);
+        }
+
+        boolean useAnchor = anchorLon != null && anchorLat != null;
+        List<ItineraryItem> newOrder = chooseShortestVisitOrder(reorderableItems, anchorLon, anchorLat);
+
+        List<Integer> mealPositions = new ArrayList<>();
+        List<Integer> nonMealPositions = new ArrayList<>();
+        for (int pos : reorderablePositions) {
+            (isMeal(slots.get(pos)) ? mealPositions : nonMealPositions).add(pos);
+        }
+        List<ItineraryItem> mealQueue = new ArrayList<>();
+        List<ItineraryItem> nonMealQueue = new ArrayList<>();
+        for (ItineraryItem item : newOrder) {
+            (isMeal(item) ? mealQueue : nonMealQueue).add(item);
+        }
+
+        List<ItineraryItem> ordered = new ArrayList<>(slots);
+        for (int i = 0; i < mealPositions.size(); i++) {
+            ordered.set(mealPositions.get(i), mealQueue.get(i));
+        }
+        for (int i = 0; i < nonMealPositions.size(); i++) {
+            ordered.set(nonMealPositions.get(i), nonMealQueue.get(i));
+        }
+        for (int i = 0; i < ordered.size(); i++) {
+            ordered.get(i).setScheduledTime(slotTimes.get(i).format(TIME_FMT));
+        }
+
+        // 순서는 이미 확정 - 카카오 실제 이동시간은 슬롯 간격 초과(무리한 배치) 판정에만 쓴다.
+        // 완료 항목이 후보에서 이미 빠져 있어 호출량은 그만큼 줄어든다.
+        List<ItineraryItem> orderedWithCoords = ordered.stream().filter(RouteRecalculationService::hasCoords).toList();
+        Map<Long, Integer> coordIdx = new HashMap<>();
+        for (int i = 0; i < orderedWithCoords.size(); i++) {
+            coordIdx.put(orderedWithCoords.get(i).getId(), i);
+        }
+        KakaoDirectionsClient.TravelTimeMatrix matrix = orderedWithCoords.size() >= 2
+                ? kakaoDirectionsClient.buildTravelTimeMatrix(orderedWithCoords.stream().map(this::toPoint).toList())
+                : null;
+
+        List<Long> flaggedItemIds = new ArrayList<>();
+        int totalTravel = 0;
+        ItineraryItem prevItem = null;
+        LocalTime prevTime = null;
+        for (int i = 0; i < ordered.size(); i++) {
+            ItineraryItem item = ordered.get(i);
+            if (matrix != null && prevItem != null && hasCoords(prevItem) && hasCoords(item)) {
+                Integer a = coordIdx.get(prevItem.getId());
+                Integer b = coordIdx.get(item.getId());
+                if (a != null && b != null) {
+                    int travel = matrix.minutes()[a][b];
+                    totalTravel += travel;
+                    int gap = VisitTiming.minutesOf(slotTimes.get(i)) - VisitTiming.minutesOf(prevTime);
+                    if (travel > gap) {
+                        flaggedItemIds.add(item.getId());
+                    }
+                }
+            }
+            prevItem = item;
+            prevTime = slotTimes.get(i);
+        }
+
+        if (flaggedItemIds.size() * 2 > ordered.size()) {
+            return new SlotResult(targets, "이동시간이 빠듯한 구간이 많아 이번엔 순서를 그대로 두었어요.",
+                    null, matrix != null && matrix.roadBased(), flaggedItemIds, false, false);
+        }
+
+        String message = useAnchor
+                ? String.format("다녀온 곳은 그대로 두고, 남은 장소만 최단 순서로 다시 잡았어요. (이동 약 %d분)", totalTravel)
+                : String.format("남은 장소만 최단 순서로 다시 잡았어요. (이동 약 %d분)", totalTravel);
+        return new SlotResult(ordered, message, totalTravel, matrix != null && matrix.roadBased(),
+                flaggedItemIds, true, false);
+    }
+
+    private static LocalTime slotTimeOf(ItineraryItem item) {
+        return ClosingTimeGate.parseHhMm(item.getScheduledTime());
+    }
+
+    public record SlotResult(List<ItineraryItem> ordered, String message, Integer totalTravelMinutes,
+                             boolean roadBased, List<Long> flaggedItemIds, boolean applied,
+                             boolean missingSlotTime) {
+        static SlotResult unchanged(List<ItineraryItem> targets, boolean missingSlotTime) {
+            return new SlotResult(targets == null ? List.of() : targets, null, null, false,
+                    List.of(), false, missingSlotTime);
+        }
     }
 
     /**
@@ -273,8 +397,7 @@ public class RouteRecalculationService {
                 LocalTime[] candArrivals = simulateArrivals(candidate, minutes, idToIdx, overrideStartTime);
                 if (ClosingTimeGate.check(close, candArrivals[p]).allowed()
                         && closingViolations(candidate, candArrivals).size() < violations.size()) {
-                    double distanceKm = VisitOrderOptimizer.pathDistanceKm(
-                            candidate, null, null, ItineraryItem::getMapX, ItineraryItem::getMapY);
+                    double distanceKm = pathCostKm(candidate);
                     if (distanceKm < bestDistanceKm) {
                         bestDistanceKm = distanceKm;
                         bestPos = p;
@@ -348,10 +471,64 @@ public class RouteRecalculationService {
     }
 
     /**
-     * 바람개비 동선 꼬임 감지기와 동일한 직선거리 최단 방문 순서.
+     * 경로 총 거리(km) - 실제 도로 데이터가 전 구간에서 다 잡히면 그 합, 하나라도 못 구하면(반경
+     * 밖·실패) 직선거리(Haversine) 합으로 폴백한다. 후보 자리들 사이의 상대적인 짧음만 비교하는
+     * 용도라 두 방식을 섞어 쓰지 않는다(같은 호출 안에서는 항상 같은 기준으로 비교됨).
      */
-    static List<ItineraryItem> chooseShortestVisitOrder(List<ItineraryItem> withCoords,
-                                                        Double originLon, Double originLat) {
+    private double pathCostKm(List<ItineraryItem> candidate) {
+        if (kakaoDirectionsClient != null && kakaoDirectionsClient.isConfigured()) {
+            List<MapRouteRequest.MapPoint> path = candidate.stream().map(this::toPoint).toList();
+            if (path.size() >= 2) {
+                List<KakaoDirectionsClient.DestinationEta> legs = kakaoDirectionsClient.etaSequential(path);
+                int totalMeters = 0;
+                boolean allOk = true;
+                for (KakaoDirectionsClient.DestinationEta leg : legs) {
+                    if (!leg.ok() || leg.distanceMeters() == null) {
+                        allOk = false;
+                        break;
+                    }
+                    totalMeters += leg.distanceMeters();
+                }
+                if (allOk) {
+                    return totalMeters / 1000.0;
+                }
+            }
+        }
+        return VisitOrderOptimizer.pathDistanceKm(
+                candidate, null, null, ItineraryItem::getMapX, ItineraryItem::getMapY);
+    }
+
+    /**
+     * 방문 순서 결정 - 카카오 실제 도로 이동시간(분) 기준 TSP. 계곡·호수·해안선처럼 직선거리와
+     * 실제 도로거리가 크게 벌어지는 지형에서 직선거리 기준 순서가 실제로는 최단이 아닌 문제를
+     * 막는다(사용자 피드백). 키 미설정이거나 실제 도로 데이터를 하나도 못 구하면(roadBased=false)
+     * 기존 직선거리(Haversine) 방식으로 그대로 폴백한다.
+     *
+     * <p>바람개비 동선 꼬임 감지기({@link RouteTangleDetector})는 여전히 직선거리 기준이라, 이
+     * 메서드가 고른 순서가 감지기 기준으로는 "안 꼬인" 것으로 보이지 않을 수 있다 - declump 단계의
+     * 재검증({@link #declumpIfItDoesNotRetangle})이 그 경우를 이미 처리한다.
+     */
+    List<ItineraryItem> chooseShortestVisitOrder(List<ItineraryItem> withCoords,
+                                                 Double originLon, Double originLat) {
+        if (kakaoDirectionsClient == null || !kakaoDirectionsClient.isConfigured()) {
+            return chooseShortestVisitOrderHaversine(withCoords, originLon, originLat);
+        }
+        List<MapRouteRequest.MapPoint> points = withCoords.stream().map(this::toPoint).toList();
+        KakaoDirectionsClient.TravelTimeMatrix matrix = kakaoDirectionsClient.buildTravelTimeMatrix(points);
+        if (!matrix.roadBased()) {
+            return chooseShortestVisitOrderHaversine(withCoords, originLon, originLat);
+        }
+        int[] fromOrigin = null;
+        if (originLon != null && originLat != null) {
+            MapRouteRequest.MapPoint origin = MapRouteRequest.MapPoint.builder()
+                    .lon(originLon).lat(originLat).name("현재 위치").build();
+            fromOrigin = kakaoDirectionsClient.minutesFromOrigin(origin, points);
+        }
+        return VisitOrderOptimizer.optimizeWithTravelMinutes(withCoords, matrix.minutes(), fromOrigin);
+    }
+
+    private static List<ItineraryItem> chooseShortestVisitOrderHaversine(List<ItineraryItem> withCoords,
+                                                                         Double originLon, Double originLat) {
         if (originLon != null && originLat != null) {
             return VisitOrderOptimizer.optimizeFromOrigin(
                     withCoords,

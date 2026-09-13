@@ -151,10 +151,9 @@ export default function PinwheelHero({
     if (heatMode) return '야외 일정이 있어요. 실내 활동으로 전환을 권해요.';
     if (rainMode) return '야외 일정이 있어요. 비에 맞는 실내 코스를 추천할게요.';
     if (crowdMode) return '붐비는 장소가 있어요. 한산한 일정으로 바꿀 수 있어요.';
-    if (tangleMode) {
-      return trigger?.routeTangle?.message
-        || '방문 순서를 다시 잡아 이동 거리를 줄일 수 있어요.';
-    }
+    // 꼬임 상세 수치("지금 Xkm → 재배치 시 Ykm")는 아래 pinwheel-details(노란 박스)에서 한 번만
+    // 보여준다 - 여기서 또 보여주면 같은 문장이 두 번 뜬다.
+    if (tangleMode) return '방문 순서를 다시 잡아 이동 거리를 줄일 수 있어요.';
     return meta.sub;
   }
 

@@ -1,7 +1,9 @@
 package com.windmill.service.itinerary;
 
+import com.windmill.client.KakaoDirectionsClient;
 import com.windmill.domain.ItineraryItem;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -21,6 +23,10 @@ class RouteRecalculationServiceTest {
 
     private static final LocalDate TOMORROW = LocalDate.now().plusDays(1);
     private final RouteRecalculationService service = new RouteRecalculationService(null);
+    // 카카오 키 미설정 상태의 실제 클라이언트 - buildTravelTimeMatrix가 네트워크 없이 직선거리로 폴백한다
+    // (recalculateSlotPreserving은 플래그 판정에 이 매트릭스를 쓰므로 null을 넣으면 NPE).
+    private final RouteRecalculationService slotPreservingService =
+            new RouteRecalculationService(new KakaoDirectionsClient(WebClient.builder(), ""));
 
     private static ItineraryItem place(long id, String placeName, boolean meal) {
         return ItineraryItem.builder()
@@ -218,13 +224,32 @@ class RouteRecalculationServiceTest {
 
         assertEquals(true, RouteTangleDetector.detect(List.of(a, d, b, c)).isTangled());
 
-        List<ItineraryItem> ordered = RouteRecalculationService.chooseShortestVisitOrder(
+        List<ItineraryItem> ordered = service.chooseShortestVisitOrder(
                 List.of(a, d, b, c), null, null);
         for (int i = 0; i < ordered.size(); i++) {
             ordered.get(i).setDisplayOrder(i);
         }
 
         assertEquals(false, RouteTangleDetector.detect(ordered).isTangled());
+    }
+
+    @Test
+    void chooseShortestVisitOrder_unconfiguredClient_fallsBackToHaversineWithoutNetworkCall() {
+        // client가 null이 아니라 "실제 클라이언트인데 키가 없는" 경로도 같은 폴백 분기를 타야 함
+        // (kakaoDirectionsClient == null과는 다른 조건문 - 둘 다 커버).
+        ItineraryItem a = coord(1, "A", "127.00", "37.00", false);
+        ItineraryItem b = coord(2, "B", "127.02", "37.00", false);
+        ItineraryItem c = coord(3, "C", "127.04", "37.00", false);
+        ItineraryItem d = coord(4, "D", "127.06", "37.00", false);
+        a.setDisplayOrder(0);
+        d.setDisplayOrder(1);
+        b.setDisplayOrder(2);
+        c.setDisplayOrder(3);
+
+        List<ItineraryItem> ordered = slotPreservingService.chooseShortestVisitOrder(
+                List.of(a, d, b, c), null, null);
+
+        assertEquals(List.of(a, b, c, d), ordered);
     }
 
     @Test
@@ -272,7 +297,7 @@ class RouteRecalculationServiceTest {
         ItineraryItem d = coord(4, "D", "127.06", "37.00", false);
         d.setCloseTime("11:00");
 
-        List<ItineraryItem> chosen = RouteRecalculationService.chooseShortestVisitOrder(
+        List<ItineraryItem> chosen = service.chooseShortestVisitOrder(
                 List.of(a, d, b, c), null, null);
         for (int i = 0; i < chosen.size(); i++) {
             chosen.get(i).setDisplayOrder(i);
@@ -299,5 +324,48 @@ class RouteRecalculationServiceTest {
         List<ItineraryItem> repaired = service.repairClosingTimeConflicts(ordered, null, null);
 
         assertEquals(ordered, repaired);
+    }
+
+    @Test
+    void recalculateSlotPreserving_keepsSlotTimesFixed_andSwapsOnlyWithinSameSlotType() {
+        // 시간 슬롯 보존(방식 A) - 완료 항목을 뺀 나머지의 시각([09:00,12:00,15:00,18:00])은 그대로 두고,
+        // 앵커에서 가까운 순서로 "누가 어느 슬롯에 들어갈지"만 다시 정한다. 식사 슬롯(12:00,18:00)엔
+        // 식사(맛집) 항목만, 비식사 슬롯(09:00,15:00)엔 비식사 항목만 들어가야 한다.
+        ItineraryItem n1 = coord(1, "N1", "0.04", "0.0", false);
+        n1.setScheduledTime("09:00");
+        ItineraryItem m1 = coord(2, "M1", "0.03", "0.0", true);
+        m1.setScheduledTime("12:00");
+        ItineraryItem n2 = coord(3, "N2", "0.02", "0.0", false);
+        n2.setScheduledTime("15:00");
+        ItineraryItem m2 = coord(4, "M2", "0.01", "0.0", true);
+        m2.setScheduledTime("18:00");
+
+        RouteRecalculationService.SlotResult result = slotPreservingService.recalculateSlotPreserving(
+                List.of(n1, m1, n2, m2), 0.0, 0.0);
+
+        assertTrue(result.applied());
+        // 앵커(0,0)에서 가까운 순서: M2(0.01) < N2(0.02) < M1(0.03) < N1(0.04) - 일직선이라 되돌아가지
+        // 않는 순서가 최단이다. 식사 큐[M2,M1]은 식사 슬롯[12:00,18:00]에, 비식사 큐[N2,N1]은
+        // 비식사 슬롯[09:00,15:00]에 순서대로 매핑된다.
+        assertEquals("12:00", m2.getScheduledTime());
+        assertEquals("18:00", m1.getScheduledTime());
+        assertEquals("09:00", n2.getScheduledTime());
+        assertEquals("15:00", n1.getScheduledTime());
+        // 원래 존재하던 시각 집합 자체는 바뀌지 않는다(재배정만 일어남)
+        assertEquals(List.of("09:00", "12:00", "15:00", "18:00"),
+                result.ordered().stream().map(ItineraryItem::getScheduledTime).toList());
+    }
+
+    @Test
+    void recalculateSlotPreserving_missingSlotTime_signalsFallbackInsteadOfGuessing() {
+        ItineraryItem withTime = coord(1, "A", "0.01", "0.0", false);
+        withTime.setScheduledTime("09:00");
+        ItineraryItem withoutTime = coord(2, "B", "0.02", "0.0", false); // scheduledTime 없음(레거시)
+
+        RouteRecalculationService.SlotResult result = slotPreservingService.recalculateSlotPreserving(
+                List.of(withTime, withoutTime), null, null);
+
+        assertTrue(result.missingSlotTime());
+        assertTrue(!result.applied());
     }
 }

@@ -47,6 +47,8 @@ export default function ItineraryItemCard({
   closedDayAlerted = false,
   hoursEndedAlerted = false,
   crowdAlerted = false,
+  /** 동선 최적화 직후 이동시간이 슬롯 간격보다 긴(무리한 배치) 항목 - 순서를 바꾸지 않고 배지만 띄운다 */
+  tightTimingAlerted = false,
   /** weatherAlerted가 비/폭염 중 어느 쪽인지 - 배지 라벨을 "우천"/"폭염"으로 나누기 위함 */
   rainTrigger = false,
   heatTrigger = false,
@@ -214,6 +216,14 @@ export default function ItineraryItemCard({
           {foodInfo && <span className="item-food-info">{foodInfo}</span>}
         </span>
         <span className={`item-status-chip ${statusClass}`}>{summaryStatusLabel()}</span>
+        {!completed && tightTimingAlerted && (
+          <span
+            className="item-tight-timing-badge"
+            title="이동시간이 슬롯 간격보다 빠듯해요 - 순서는 그대로 두었어요"
+          >
+            ⏱ 이동시간 빠듯
+          </span>
+        )}
         {!editing && (
           <span className="item-card-chevron" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
         )}

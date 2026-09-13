@@ -27,6 +27,9 @@ import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.GreedyRouteSuggestService;
 import com.windmill.service.itinerary.ItineraryService;
 import com.windmill.service.itinerary.PlaceHoursCheckService;
+import com.windmill.service.itinerary.RouteAnchorResolver;
+import com.windmill.util.ItineraryItemStatus;
+import com.windmill.util.KoreaClock;
 import com.windmill.service.notification.AlertFeedService;
 import com.windmill.service.recommendation.AnchorPlanService;
 import com.windmill.service.recommendation.InitialPlanService;
@@ -270,6 +273,7 @@ public class ItineraryController {
                     ItineraryResponse body = toResponse(result.itinerary());
                     body.setRouteHint(result.message());
                     body.setOptimizedDistanceKm(result.totalDistanceKm());
+                    body.setTightTimingItemIds(result.flaggedItemIds());
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -315,6 +319,7 @@ public class ItineraryController {
                     ItineraryResponse body = toResponse(result.itinerary());
                     body.setRouteHint(result.message());
                     body.setOptimizedDistanceKm(result.totalDistanceKm());
+                    body.setTightTimingItemIds(result.flaggedItemIds());
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -337,6 +342,8 @@ public class ItineraryController {
 
     /**
      * "이 순서 어때요?" 미리보기. 현재 위치·시각 기준 그리디 재배열만 계산하고 일정에는 쓰지 않는다.
+     * 다녀온(완료) 곳은 후보에서 빼고 출발 앵커로만 쓴다({@link RouteAnchorResolver}, optimize-route/
+     * apply-reroute와 동일 우선순위).
      */
     @GetMapping("/{id}/suggest-route")
     public Mono<ResponseEntity<SuggestedRouteResponse>> suggestRoute(
@@ -346,12 +353,27 @@ public class ItineraryController {
             @RequestParam(required = false) Double originLat) {
         return Mono.fromCallable(() -> {
                     Itinerary itinerary = itineraryService.get(id);
-                    List<ItineraryItem> targets = itinerary.getItems().stream()
+                    List<ItineraryItem> dayItems = itinerary.getItems().stream()
                             .filter(i -> date == null
                                     || date.equals(i.getVisitDate())
                                     || (i.getVisitDate() == null && date.equals(itinerary.getStartDate())))
                             .collect(Collectors.toList());
-                    return greedyRouteSuggestService.suggest(targets, originLon, originLat);
+                    LocalDate today = KoreaClock.today();
+                    java.time.LocalTime nowKst = KoreaClock.nowTime();
+                    List<ItineraryItem> completed = dayItems.stream()
+                            .filter(i -> ItineraryItemStatus.isCompleted(i, i.getVisitDate(), today, nowKst))
+                            .collect(Collectors.toList());
+                    List<ItineraryItem> targets = dayItems.stream()
+                            .filter(i -> !completed.contains(i))
+                            .collect(Collectors.toList());
+                    if (targets.size() < 2) {
+                        return greedyRouteSuggestService.suggest(targets, originLon, originLat);
+                    }
+                    RouteAnchorResolver.Anchor anchor =
+                            RouteAnchorResolver.resolve(completed, targets, originLon, originLat);
+                    Double anchorLon = anchor == null ? null : anchor.lon();
+                    Double anchorLat = anchor == null ? null : anchor.lat();
+                    return greedyRouteSuggestService.suggest(targets, anchorLon, anchorLat);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);

@@ -28,6 +28,7 @@ import com.windmill.service.recommendation.SituationalTagService;
 import com.windmill.service.tourapi.TourAttractionService;
 import com.windmill.util.ClosingTimeGate;
 import com.windmill.util.GeoUtils;
+import com.windmill.util.ItineraryItemStatus;
 import com.windmill.util.KoreaClock;
 import com.windmill.util.PlaceTagSanitizer;
 import com.windmill.util.TimeConflictGate;
@@ -936,31 +937,77 @@ public class ItineraryService {
                 .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
                 .collect(Collectors.toList());
         if (dayItems.size() < 2) {
-            return new OptimizeRouteResult(itinerary, null, null);
+            return new OptimizeRouteResult(itinerary, null, null, List.of());
+        }
+
+        // 다녀온(완료) 곳은 재정렬 후보에서 빼고, 출발 앵커로만 쓴다 - 자리·시각을 바꾸지 않는다.
+        LocalDate today = KoreaClock.today();
+        LocalTime nowKst = KoreaClock.nowTime();
+        List<ItineraryItem> completed = dayItems.stream()
+                .filter(i -> ItineraryItemStatus.isCompleted(i, i.getVisitDate(), today, nowKst))
+                .collect(Collectors.toList());
+        List<ItineraryItem> remaining = dayItems.stream()
+                .filter(i -> !completed.contains(i))
+                .collect(Collectors.toList());
+        if (remaining.size() < 2) {
+            // 남은 곳이 하나뿐(또는 없음) - 다시 잡을 게 없다
+            return new OptimizeRouteResult(itinerary, null, null, List.of());
         }
 
         // 고정(pin)한 앵커 - 시각이 박혀 있으면 자리·시각을 그대로 두고, 나머지만 최단 순서로 다시 잡는다.
-        List<ItineraryItem> pinned = dayItems.stream()
+        List<ItineraryItem> pinned = remaining.stream()
                 .filter(i -> i.isPinned() && ClosingTimeGate.parseHhMm(i.getScheduledTime()) != null)
                 .collect(Collectors.toList());
-        List<ItineraryItem> movable = dayItems.stream()
+        List<ItineraryItem> movable = remaining.stream()
                 .filter(i -> !pinned.contains(i))
                 .collect(Collectors.toList());
 
         LocalTime overrideStartTime = ClosingTimeGate.parseHhMm(startTime);
         List<ItineraryItem> finalOrder;
         String message;
+        RouteAnchorResolver.Anchor anchor = null;
+        List<ItineraryItem> reorderedForKm = List.of();
+        List<Long> flaggedItemIds = List.of();
         if (movable.size() < 2) {
             // 다시 잡을 게 없다(전부 고정이거나 이동 가능 1곳뿐) - 순서만 유지
             finalOrder = dayItems;
             message = null;
         } else {
-            RouteRecalculationService.Result recalc =
-                    routeRecalculationService.recalculate(movable, originLon, originLat, overrideStartTime);
-            finalOrder = pinned.isEmpty()
-                    ? recalc.ordered()
-                    : mergeByScheduledTime(recalc.ordered(), pinned);
-            message = recalc.message();
+            anchor = RouteAnchorResolver.resolve(completed, remaining, originLon, originLat);
+            List<ItineraryItem> reordered;
+            if (anchor == null) {
+                // 출발 앵커를 못 구했음(완료 항목 없음 + GPS 실패 + 남은 항목 좌표도 없음, 예: 좌표가 아직
+                // 없는 최초 일정 생성) - 슬롯 보존을 적용할 기준이 없으니 기존 방식(GPS 원본 그대로)으로 처리.
+                RouteRecalculationService.Result recalc =
+                        routeRecalculationService.recalculate(movable, originLon, originLat, overrideStartTime);
+                reordered = recalc.ordered();
+                message = recalc.message();
+            } else {
+                RouteRecalculationService.SlotResult slotResult =
+                        routeRecalculationService.recalculateSlotPreserving(movable, anchor.lon(), anchor.lat());
+                if (slotResult.applied()) {
+                    reordered = slotResult.ordered();
+                    message = slotResult.message();
+                    // 순서를 실제로 적용했을 때만 플래그가 최종 배치와 일치 - 거부된(applied=false) 시도의
+                    // 플래그는 반영되지 않은 순서를 가리키므로 노출하지 않는다.
+                    flaggedItemIds = slotResult.flaggedItemIds();
+                } else if (slotResult.missingSlotTime()) {
+                    // 슬롯 시각이 없는 레거시 항목이 섞여 있어 슬롯 보존 방식을 쓸 수 없음 - 기존 방식으로 폴백
+                    RouteRecalculationService.Result recalc =
+                            routeRecalculationService.recalculate(movable, anchor.lon(), anchor.lat(), overrideStartTime);
+                    reordered = recalc.ordered();
+                    message = recalc.message();
+                } else {
+                    // 이동시간이 빠듯한 구간이 과반 - 무리한 배치를 강행하지 않고 그대로 둔다
+                    reordered = movable;
+                    message = slotResult.message();
+                }
+            }
+            reorderedForKm = reordered;
+
+            List<ItineraryItem> fixedAnchors = new ArrayList<>(completed);
+            fixedAnchors.addAll(pinned);
+            finalOrder = fixedAnchors.isEmpty() ? reordered : mergeByScheduledTime(reordered, fixedAnchors);
             if (message != null && !pinned.isEmpty()) {
                 message = message + " 고정한 일정은 그대로 뒀어요.";
             }
@@ -976,13 +1023,17 @@ public class ItineraryService {
         }
         Itinerary saved = itineraryRepository.save(itinerary);
 
-        String oLon = originLon != null ? String.valueOf(originLon) : null;
-        String oLat = originLat != null ? String.valueOf(originLat) : null;
-        double km = VisitOrderOptimizer.pathDistanceKm(
-                finalOrder.stream().filter(this::itemHasCoords).toList(),
-                oLon, oLat,
+        // 절감 거리는 앵커 → 남은(미완료) 구간만 - 다녀온 곳은 이미 지나간 거리라 셈에서 뺀다.
+        // 앵커를 못 구한 경우(좌표 없는 최초 생성 등)엔 있으면 GPS 원본 기준으로, 없으면 null.
+        String kmOriginLon = anchor != null ? String.valueOf(anchor.lon())
+                : originLon != null ? String.valueOf(originLon) : null;
+        String kmOriginLat = anchor != null ? String.valueOf(anchor.lat())
+                : originLat != null ? String.valueOf(originLat) : null;
+        Double km = reorderedForKm.isEmpty() ? null : VisitOrderOptimizer.pathDistanceKm(
+                reorderedForKm.stream().filter(this::itemHasCoords).toList(),
+                kmOriginLon, kmOriginLat,
                 ItineraryItem::getMapX, ItineraryItem::getMapY);
-        return new OptimizeRouteResult(saved, message, km);
+        return new OptimizeRouteResult(saved, message, km, flaggedItemIds);
     }
 
     /**
@@ -1065,7 +1116,10 @@ public class ItineraryService {
         return optimizeRoute(itineraryId, date, null, null).itinerary();
     }
 
-    public record OptimizeRouteResult(Itinerary itinerary, String message, Double totalDistanceKm) {
+    /** @param flaggedItemIds 이동시간이 슬롯 간격보다 긴(무리한 배치) 항목 id - 슬롯 보존 재배치가 실제로
+     *                        적용됐을 때만 채워진다(선택). */
+    public record OptimizeRouteResult(Itinerary itinerary, String message, Double totalDistanceKm,
+                                      List<Long> flaggedItemIds) {
     }
 
     // ── 대안 일정(원본 + 변경 이력) ──────────────────────────────────────────────
@@ -1132,7 +1186,7 @@ public class ItineraryService {
         }
         Itinerary saved = itineraryRepository.save(after);
         String msg = changed ? r.message() : "이미 이동을 최소화한 순서예요. 그대로 두었어요.";
-        return new OptimizeRouteResult(saved, msg, r.totalDistanceKm());
+        return new OptimizeRouteResult(saved, msg, r.totalDistanceKm(), r.flaggedItemIds());
     }
 
     /**

@@ -121,6 +121,31 @@ class PlanHistoryServiceTest {
     }
 
     @Test
+    void recordChange_consecutiveRouteChanges_mergeIntoOneEntry() {
+        // "바람이가 동선 최적화"를 짧은 시간 안에 여러 번 눌러도 변경 이력은 한 건만 남아야 한다
+        // (직전 이력을 새 결과·시각으로 갱신) - 사이에 다른 종류의 변경이 끼면 다시 새 이력이 쌓인다.
+        Itinerary it = itineraryWith("A", "B", "C");
+
+        service.recordChange(it, service.snapshotOf(it), "ROUTE", "동선 재계산 1", null, null);
+        assertEquals(1, it.getChangeHistory().size());
+        assertEquals(1, it.getChangeHistory().get(0).getSequence());
+
+        it.getItems().get(1).setScheduledTime("15:00");
+        service.recordChange(it, service.snapshotOf(it), "ROUTE", "동선 재계산 2", null, null);
+        assertEquals(1, it.getChangeHistory().size(), "연속 ROUTE는 새로 쌓이지 않고 갱신됨");
+        assertEquals(1, it.getChangeHistory().get(0).getSequence(), "sequence도 그대로");
+        assertEquals("동선 재계산 2", it.getChangeHistory().get(0).getReason());
+        assertEquals("15:00", it.getChangeHistory().get(0).getSnapshot().getStops().get(1).getScheduledTime(),
+                "갱신된 이력의 스냅샷은 최신 결과를 담아야 함");
+
+        // 사이에 다른 종류(CROWD)가 끼면 그다음 ROUTE는 다시 새 이력으로 쌓인다
+        service.recordChange(it, service.snapshotOf(it), "CROWD", "혼잡", "CX", "X");
+        assertEquals(2, it.getChangeHistory().size());
+        service.recordChange(it, service.snapshotOf(it), "ROUTE", "동선 재계산 3", null, null);
+        assertEquals(3, it.getChangeHistory().size(), "직전 이력이 ROUTE가 아니면 새로 쌓임");
+    }
+
+    @Test
     void sameStops_trueOnlyWhenOrderAndTimesMatch() {
         Itinerary it = itineraryWith("A", "B", "C");
         PlanSnapshot s1 = service.snapshotOf(it);
