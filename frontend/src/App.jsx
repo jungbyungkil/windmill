@@ -285,7 +285,8 @@ export default function App() {
     // 알림 탭으로 콜드스타트할 때는 모바일 네트워크 스택이 막 깨어나는 시점이라 첫 조회가 실패하는
     // 경우가 흔하다 - 재시도 없이 바로 itineraryId를 null로 되돌리면(구 로직) "여행 마무리" 딥링크
     // (pendingFinishOpen)가 다시는 실행되지 못해 조용히 홈 화면으로 떨어진다(2026-09-13 사용자
-    // 제보). 확정 실패(404 - 삭제됐거나 없는 일정)만 즉시 정리하고, 그 외는 지수 백오프로 재시도.
+    // 제보). 확정 실패(404 - 삭제됐거나 없는 일정)만 즉시 정리하고, 그 외는 1.5s·3s·4.5s로 점점
+    // 늘려가며(선형 백오프) 최대 3회 재시도.
     function load(attempt) {
       api.getItinerary(itineraryId)
         .then((data) => {
@@ -1520,50 +1521,50 @@ export default function App() {
     }
   }
 
-  /** 오늘 동선 「동선 재계산」 — 완료한 곳이 있으면 그 좌표가 서버 쪽 출발 앵커라 GPS를 켜지 않는다.
-   *  완료한 곳이 없을 때만 GPS를 시도하고(권한 거부는 세션 내 기억), startTime을 지정했으면
-   *  GPS 위치와 무관하게 그 시각을 첫 장소 도착 시각으로 고정한다. */
-  function handleOptimizeFromGps(startTime) {
-    if (!itineraryId || optimizeLoading) return;
-    setOptimizeLoading(true);
-    beginOptimistic('ROUTE'); // 클릭 즉시 핀휠을 성공 스킨으로 (API 응답 대기 없이)
-    const done = (origin) => handleOptimizeRoute(origin, startTime, true);
-    const hasCompletedToday = visibleItems.some((i) => i.completed);
-    if (hasCompletedToday || geoDeniedRef.current || !navigator.geolocation) {
-      done(null);
+  /** 동선 최적화/제안 공용 — 오늘 완료한 곳 중 좌표(mapX/mapY)가 있는 곳이 하나라도 있으면 그
+   *  좌표가 서버 쪽 출발 앵커(RouteAnchorResolver 1순위)라 GPS를 켜지 않는다. 완료 항목이 전부
+   *  좌표가 없거나 없을 때만 GPS를 시도한다(2순위 폴백 - 서버 우선순위와 맞춤). 권한 거부(코드 1)만
+   *  세션 내 기억해 재요청하지 않고, 타임아웃·위치 확인 실패(코드 2·3)는 다음에 다시 시도한다 -
+   *  둘 다 뭉뚱그려 "거부"로 기억하면 실외로 나가 GPS가 잡혀도 남은 슬롯 좌표로만 계속 폴백한다.
+   */
+  function resolveGpsOrigin(callback) {
+    const hasCompletedCoords = visibleItems.some((i) => i.completed && i.mapX && i.mapY);
+    if (hasCompletedCoords || geoDeniedRef.current || !navigator.geolocation) {
+      callback(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => done({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => { geoDeniedRef.current = true; done(null); }, // 위치 거부·실패여도 서버가 남은 첫 슬롯으로 폴백
+      (pos) => callback({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
+      (err) => {
+        if (err?.code === 1) geoDeniedRef.current = true; // GeolocationPositionError.PERMISSION_DENIED만 기억
+        callback(null); // 위치 거부·실패여도 서버가 완료 항목/남은 첫 슬롯으로 폴백
+      },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
     );
   }
 
-  /** 「이 순서 어때요?」 — 완료한 곳이 있으면 그 좌표가 출발 앵커라 GPS를 켜지 않는다.
-   *  확인 전까지 일정에 쓰지 않는다. */
+  /** 오늘 동선 「동선 재계산」 — startTime을 지정했으면 GPS 위치와 무관하게 그 시각을
+   *  첫 장소 도착 시각으로 고정한다. */
+  function handleOptimizeFromGps(startTime) {
+    if (!itineraryId || optimizeLoading) return;
+    setOptimizeLoading(true);
+    beginOptimistic('ROUTE'); // 클릭 즉시 핀휠을 성공 스킨으로 (API 응답 대기 없이)
+    resolveGpsOrigin((origin) => handleOptimizeRoute(origin, startTime, true));
+  }
+
+  /** 「이 순서 어때요?」 — 확인 전까지 일정에 쓰지 않는다. */
   function handleSuggestRoute() {
     if (!itineraryId || suggestLoading || optimizeLoading) return;
     setSuggestOpen(true);
     setSuggestLoading(true);
     setSuggestError(null);
     setSuggestResult(null);
-    const run = (origin) => {
+    resolveGpsOrigin((origin) => {
       api.suggestRoute(itineraryId, activeDate, origin)
         .then((result) => setSuggestResult(result))
         .catch((e) => setSuggestError(e.message || '순서를 제안하지 못했어요'))
         .finally(() => setSuggestLoading(false));
-    };
-    const hasCompletedToday = visibleItems.some((i) => i.completed);
-    if (hasCompletedToday || geoDeniedRef.current || !navigator.geolocation) {
-      run(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => run({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => { geoDeniedRef.current = true; run(null); },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
-    );
+    });
   }
 
   async function handleApplySuggestedRoute() {

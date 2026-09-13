@@ -114,8 +114,9 @@ export default function PinwheelHero({
     runCta(primaryCta);
   }
 
-  // 변수별 문구는 이제 이 캡션에서 안 보여준다 - 트리거가 있으면 헤드라인 자체를 숨기므로
-  // (아래 pinwheel-headline 렌더 조건 참고) 낙관적 성공 스킨과 "변수 없음" 대기 상태만 여기로 들어온다.
+  // 변수별 문구는 이제 이 캡션에서 안 보여준다 - interactive(트리거 있고 NORMAL이 아님)면 헤드라인
+  // 자체를 숨기므로(아래 pinwheel-headline 렌더 조건 참고) 낙관적 성공 스킨과 "변수 없음"(트리거가
+  // NORMAL이거나 아직 안 왔을 때) 대기 상태만 여기로 들어온다.
   function caption() {
     if (showOptimistic) return optimistic.message;
     return meta.caption;
@@ -161,8 +162,11 @@ export default function PinwheelHero({
         </div>
 
         {/* 변수 카드는 아래 상태 문구를 없앴으니(2026-09-13) 캡션도 같이 걷어낸다 - 낙관적 성공
-            스킨("✅ ...")과 대기 상태(compactWhenIdle, 변수 없음)에서만 캡션을 보여준다. */}
-        {(showOptimistic || !trigger) && (trigger || compactWhenIdle) && (
+            스킨("✅ ...")과 대기 상태(compactWhenIdle, 변수 없음)에서만 캡션을 보여준다.
+            "변수 없음"은 trigger가 아직 안 왔을 때(!trigger)뿐 아니라 trigger.level이 NORMAL일
+            때(흔한 정상 상태)도 포함하므로 !interactive로 판정한다 - !trigger만 보면 trigger가
+            NORMAL로 로드된 뒤에는 이 캡션이 영원히 숨어버린다(2026-09-13 리뷰에서 발견). */}
+        {!interactive && (trigger || compactWhenIdle) && (
           <div className="pinwheel-headline">
             {!calm && <div className="pinwheel-eyebrow">실시간 변수</div>}
             <div className="pinwheel-caption">
