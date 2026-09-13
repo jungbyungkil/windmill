@@ -37,6 +37,7 @@ import TravelerProfileScreen from './components/TravelerProfileScreen';
 import { recordView } from './utils/viewHistory';
 import { placeSnapshotFields } from './utils/placeSnapshot';
 import { syncPushSubscription } from './utils/webPush';
+import { hasValidCoords } from './utils/kakaoMap';
 import { useResolveFeedback } from './hooks/useResolveFeedback';
 import './App.css';
 
@@ -282,12 +283,14 @@ export default function App() {
       return;
     }
     let cancelled = false;
+    let retryTimer = null;
     // 알림 탭으로 콜드스타트할 때는 모바일 네트워크 스택이 막 깨어나는 시점이라 첫 조회가 실패하는
     // 경우가 흔하다 - 재시도 없이 바로 itineraryId를 null로 되돌리면(구 로직) "여행 마무리" 딥링크
     // (pendingFinishOpen)가 다시는 실행되지 못해 조용히 홈 화면으로 떨어진다(2026-09-13 사용자
     // 제보). 확정 실패(404 - 삭제됐거나 없는 일정)만 즉시 정리하고, 그 외는 1.5s·3s·4.5s로 점점
     // 늘려가며(선형 백오프) 최대 3회 재시도.
     function load(attempt) {
+      if (cancelled) return; // itineraryId가 바뀌었거나 언마운트된 뒤 예약된 재시도는 새 조회를 걸지 않는다
       api.getItinerary(itineraryId)
         .then((data) => {
           if (!cancelled) setItinerary(data);
@@ -299,14 +302,17 @@ export default function App() {
             return;
           }
           if (attempt < 3) {
-            setTimeout(() => load(attempt + 1), 1500 * (attempt + 1));
+            retryTimer = setTimeout(() => load(attempt + 1), 1500 * (attempt + 1));
           } else {
             setItineraryId(null);
           }
         });
     }
     load(0);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itineraryId]);
 
@@ -996,7 +1002,7 @@ export default function App() {
   /** 파이프라인 대안이 비면 근처 아무 장소(맛집·카페·쇼핑·관광)로라도 채운다 - "무조건 보여주기". */
   async function nearbyAnyCandidates() {
     const items = itinerary?.items || [];
-    const origin = [...items].reverse().find((i) => i.mapX && i.mapY);
+    const origin = [...items].reverse().find(hasValidCoords);
     if (!origin) return [];
     const nearby = await api
       .searchNearbyPlaces({ mapX: origin.mapX, mapY: origin.mapY, radius: 3000, numOfRows: 15 })
@@ -1528,7 +1534,7 @@ export default function App() {
    *  둘 다 뭉뚱그려 "거부"로 기억하면 실외로 나가 GPS가 잡혀도 남은 슬롯 좌표로만 계속 폴백한다.
    */
   function resolveGpsOrigin(callback) {
-    const hasCompletedCoords = visibleItems.some((i) => i.completed && i.mapX && i.mapY);
+    const hasCompletedCoords = visibleItems.some((i) => i.completed && hasValidCoords(i));
     if (hasCompletedCoords || geoDeniedRef.current || !navigator.geolocation) {
       callback(null);
       return;
@@ -1870,7 +1876,6 @@ export default function App() {
                   weatherAlert={Boolean(trigger?.weatherTrigger || trigger?.heatTrigger)}
                   rainAlert={Boolean(trigger?.weatherTrigger)}
                   heatAlert={Boolean(trigger?.heatTrigger)}
-                  trigger={trigger}
                   dayLabel={isTripToday(tripDate) ? '오늘' : (tripDate ? formatTripDate(tripDate) : null)}
                   highlightedItemId={highlightItemId}
                   onUpdateTime={handleUpdateTime}
@@ -1882,8 +1887,6 @@ export default function App() {
                   onOpenHistory={itinerary.changeHistory?.length > 0 ? () => setHistoryOpen(true) : undefined}
                   onSortByTime={handleSortByTime}
                   sortByTimeLoading={sortByTimeLoading}
-                  onOptimizeFromGps={handleOptimizeFromGps}
-                  gpsOptimizing={optimizeLoading}
                 />
 
                 <FestivalBanner

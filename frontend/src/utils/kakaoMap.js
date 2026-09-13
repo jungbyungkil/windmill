@@ -14,6 +14,12 @@ function parseCoords(mapX, mapY) {
   return { lat, lon };
 }
 
+/** 유효한 좌표(숫자·(0,0) 아님) 보유 여부 - GPS 앵커 판단 등에서 place.mapX/mapY를 곧이곧대로
+ * truthy 체크하면 "0"/"0" 같은 무좌표 센티널을 좌표 있음으로 오판한다. */
+export function hasValidCoords(place) {
+  return Boolean(place && parseCoords(place.mapX, place.mapY));
+}
+
 export function isMobileKakaoClient() {
   if (typeof navigator === 'undefined') return false;
   return MOBILE_UA.test(navigator.userAgent || '');
