@@ -1196,14 +1196,7 @@ export default function App() {
     setAutoReplaceNotice(null);
     beginOptimistic(avoidHint); // 클릭 즉시 핀휠 성공 스킨 (대안이 없으면 아래에서 조용히 걷어냄)
     try {
-      const { candidates, reason } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
-      const note = reason === 'RAIN_ALTERNATIVE'
-        ? '비 소식에 맞춰 실내 일정으로 바꿨어요.'
-        : reason === 'HEAT_ALTERNATIVE'
-          ? '폭염 소식에 맞춰 실내 일정으로 바꿨어요.'
-          : avoidHint === 'CROWD'
-            ? '혼잡한 곳을 한산한 일정으로 바꿨어요.'
-            : '대체 일정으로 바꿨어요.';
+      const { candidates } = await api.getAlternatives(itineraryId, { avoid: avoidHint });
 
       if (!candidates?.length) {
         cancelOptimistic(); // 성공 아님 — 낙관적 스킨만 조용히 걷어냄(원래 트리거 복원)
@@ -1298,15 +1291,13 @@ export default function App() {
 
       setItinerary(result);
       setRerouteCount((n) => n + used.size);
-      // 폴링을 기다리지 않고 방금 해소한 변수를 즉시 제거 + 2초 토스트
+      // 폴링을 기다리지 않고 방금 해소한 변수를 즉시 제거 + 토스트. 상단 배너(autoReplaceNotice)로
+      // 같은 내용을 또 띄우면 화면에 같은 성공 안내가 두 번 뜬다는 피드백(2026-09-13)에 따라
+      // 토스트 하나로 통일했다 - handleOptimizeRoute의 수동 액션 경로와 같은 패턴.
       commitResolve(avoidHint, rerouteToastText(avoidHint, plannedTargets, used.size));
-
-      setAutoReplaceNotice(
-        `${note} (${used.size}곳 교체) ${result.routeHint || '이동시간 기준으로 시간표도 다시 짰어요.'}`,
-      );
     } catch (e) {
-      rollbackResolve(avoidHint); // 성공 상태 → 원래 상태로 되돌리는 트랜지션 + 실패 토스트
-      setAutoReplaceNotice(`일정 교체 실패: ${e.message}`);
+      // 실패 토스트도 commitResolve와 대칭으로 rollbackResolve 하나로 통일(중복 배너 제거).
+      rollbackResolve(avoidHint, `일정 교체 실패: ${e.message}`);
     } finally {
       setRerouteLoading(false);
       setTimeout(() => setAutoReplaceNotice(null), 6000);
@@ -1588,7 +1579,9 @@ export default function App() {
       setItinerary(result);
       setSuggestOpen(false);
       setSuggestResult(null);
-      setAutoReplaceNotice(suggestResult.message || '제안한 순서로 오늘 일정을 바꿨어요.');
+      // 방금 닫은 모달(SuggestRouteCompare)에서 이미 suggestResult.message를 보여줬으니 여기서
+      // 그대로 재사용하면 같은 문장을 또 보게 된다(2026-09-13 피드백) - 결과 확인 짧은 확정 문구로.
+      setAutoReplaceNotice('이 순서로 반영했어요 🍃');
       refreshTrigger();
       setTimeout(() => setAutoReplaceNotice(null), 6000);
     } catch (e) {
