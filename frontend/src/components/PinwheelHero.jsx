@@ -104,6 +104,11 @@ export default function PinwheelHero({
   const travelTimeMode = Boolean(trigger?.travelTimeTrigger);
   const weatherAlert = heatMode || rainMode;
   const calm = showOptimistic || (Boolean(trigger) && !interactive) || (compactWhenIdle && !interactive);
+  // 동선 꼬임 카드는 같은 "Xkm→Ykm" 문장이 캡션 아래·노란 박스·바람이 말풍선까지 세 번 반복돼
+  // 눈에 거슬린다는 피드백(2026-09-13) - 바람개비 도형과 두 버튼만 남기고 나머지 텍스트(캡션·
+  // 서브·원인 라벨·상세 목록·말풍선)는 걷어낸다. 비·폭염·혼잡 카드도 같은 방식으로 단순화
+  // (2026-09-13 후속 요청). 액션 직후 낙관적 성공 스킨은 별개 상태라 그대로 보여준다.
+  const simplifyCard = (tangleMode || heatMode || rainMode || crowdMode) && !showOptimistic;
 
   const ctas = interactive ? resolveCtas(trigger) : [];
   const primaryCta = ctas[0] || null;
@@ -196,7 +201,7 @@ export default function PinwheelHero({
           </svg>
         </div>
 
-        {(trigger || compactWhenIdle) && (
+        {!simplifyCard && (trigger || compactWhenIdle) && (
           <div className="pinwheel-headline">
             {!calm && <div className="pinwheel-eyebrow">실시간 변수</div>}
             <div className="pinwheel-caption">
@@ -209,9 +214,9 @@ export default function PinwheelHero({
 
       {trigger && !calm && (
         <div className="pinwheel-status">
-          <p className="pinwheel-sub">{sub()}</p>
+          {!simplifyCard && <p className="pinwheel-sub">{sub()}</p>}
 
-          {causes.length > 0 && (
+          {!simplifyCard && causes.length > 0 && (
             <div className="pinwheel-cause-labels">
               {causes.map(([key, c]) => (
                 <span key={key} className="cause-label">
@@ -221,7 +226,7 @@ export default function PinwheelHero({
             </div>
           )}
 
-          {trigger.triggerDetails?.length > 0 && (
+          {!simplifyCard && trigger.triggerDetails?.length > 0 && (
             <ul className="pinwheel-details">
               {trigger.triggerDetails.map((d, i) => <li key={i}>{d}</li>)}
             </ul>
@@ -245,12 +250,14 @@ export default function PinwheelHero({
             </div>
           )}
 
-          <BaramiBubble
-            comment={baramiCommentFromTrigger(trigger)}
-            compact
-            onActivate={interactive && primaryCta && !ctaBusy(primaryCta) ? handleActivate : undefined}
-            actionLabel={interactive && primaryCta ? primaryCta.label : undefined}
-          />
+          {!simplifyCard && (
+            <BaramiBubble
+              comment={baramiCommentFromTrigger(trigger)}
+              compact
+              onActivate={interactive && primaryCta && !ctaBusy(primaryCta) ? handleActivate : undefined}
+              actionLabel={interactive && primaryCta ? primaryCta.label : undefined}
+            />
+          )}
         </div>
       )}
     </div>
