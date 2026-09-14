@@ -267,7 +267,7 @@ export default function ItineraryItemCard({
               inferredSource={item.inferredSource}
             />
 
-            <PlaceOverview text={item.overview} />
+            <PlaceOverview text={item.overview} className="place-overview-full" />
 
             <div className="reco-info">
               {item.addr1 && (

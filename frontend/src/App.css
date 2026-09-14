@@ -4566,6 +4566,14 @@
   color: var(--muted);
 }
 
+/* 일정 카드는 이미 펼친(자세히 보기) 상태라 4줄로 또 잘릴 이유가 없다 - 전체 노출
+   (2026-09-14 사용자 제보: 부엉이전시관 개요가 "5,000…"에서 잘려 보임) */
+.place-overview-full {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
 .place-facts {
   display: flex;
   flex-direction: column;
