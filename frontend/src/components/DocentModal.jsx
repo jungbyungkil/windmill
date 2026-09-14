@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import useModalHistory from '../hooks/useModalHistory';
 import { DocentIcon } from './Icons';
 
+// 한국어만 지원(2026-09-14 사용자 요청 - 영어/일본어/중국어 도슨트 제거)
 const LANGS = [
   { value: 'ko', label: '한국어', speech: 'ko-KR' },
-  { value: 'en', label: 'English', speech: 'en-US' },
-  { value: 'ja', label: '日本語', speech: 'ja-JP' },
-  { value: 'zh', label: '中文', speech: 'zh-CN' },
 ];
 
 function pickVoice(langCode) {
@@ -117,25 +115,23 @@ export default function DocentModal({
           <button className="icon-btn" type="button" onClick={handleClose}>✕</button>
         </div>
 
-        <div className="docent-lang-row" role="group" aria-label="Language">
-          {LANGS.map((l) => (
-            <button
-              key={l.value}
-              type="button"
-              className={`docent-lang-btn ${language === l.value ? 'selected' : ''}`}
-              onClick={() => onLanguageChange?.(l.value)}
-              disabled={loading}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
+        {LANGS.length > 1 && (
+          <div className="docent-lang-row" role="group" aria-label="Language">
+            {LANGS.map((l) => (
+              <button
+                key={l.value}
+                type="button"
+                className={`docent-lang-btn ${language === l.value ? 'selected' : ''}`}
+                onClick={() => onLanguageChange?.(l.value)}
+                disabled={loading}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <p className="modal-desc docent-concept">
-          {language === 'ko'
-            ? 'K-pop 브이로그 톤으로 안내해요.'
-            : 'K-pop style travel buddy — bright, short, and fun for visitors.'}
-        </p>
+        <p className="modal-desc docent-concept">K-pop 브이로그 톤으로 안내해요.</p>
 
         <div className="docent-card">
           <div className="docent-avatar">🌬️</div>
