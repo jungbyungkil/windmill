@@ -335,31 +335,53 @@ export default function App() {
     navigate('/');
   }
 
-  /**
-   * 홈 화면(아직 일정 없음)의 하단 탭 - "홈"만 실제 이동이고 나머지(일정/지도/검색/알림/프로필)는
-   * 진행 중인 일정이 있어야 의미가 있는 화면이라 안내 토스트만 띄운다(2026-09-14 사용자 요청,
-   * 동작 방식은 사용자가 직접 선택함).
-   */
-  function handleHomeTabSelect(key) {
-    if (key === 'main') return;
-    setHomeTabHint('먼저 여행을 만들어주세요');
+  function showHomeTabHint(text) {
+    setHomeTabHint(text);
     setTimeout(() => setHomeTabHint(null), 2000);
   }
 
   /**
-   * 특정 일정을 "항상 최신 상태로" 열어 /trip으로 이동한다.
+   * 홈 화면(아직 일정을 안 열어본 상태)의 하단 탭 - "홈"만 제자리(이미 홈)라 무시.
+   * 나머지(일정/지도/검색/알림/프로필)는 2026-09-14 사용자 요청으로 더 똑똑하게 동작:
+   * ① 오늘 날짜 진행 중인 여행이 있으면 그 여행의 해당 탭으로 바로 이동
+   * ② 없으면 가장 가까운 날짜의 진행 중인 여행(목록이 날짜 오름차순이라 첫 번째)의 해당 탭으로
+   * ③ 진행 중인 여행이 아예 없으면 "먼저 여행을 만들어주세요" 안내만
+   */
+  async function handleHomeTabSelect(key) {
+    if (key === 'main') return;
+    if (!sessionId) {
+      showHomeTabHint('먼저 여행을 만들어주세요');
+      return;
+    }
+    try {
+      const trips = await api.getOngoingItineraries(sessionId);
+      const list = Array.isArray(trips) ? trips : [];
+      if (list.length === 0) {
+        showHomeTabHint('먼저 여행을 만들어주세요');
+        return;
+      }
+      const target = list.find((t) => isTripToday(t.startDate)) || list[0];
+      await openItineraryFresh(target.itineraryId, key);
+    } catch {
+      showHomeTabHint('먼저 여행을 만들어주세요');
+    }
+  }
+
+  /**
+   * 특정 일정을 "항상 최신 상태로" 열어 /trip(또는 지정한 섹션)으로 이동한다.
    * resumeDraftItinerary만 쓰면 itineraryId가 이미 그 값일 때(재개) [itineraryId] 로드 이펙트가
    * 재실행되지 않아 이전에 화면에 있던 옛 itinerary가 그대로 보이는 문제가 있었다
    * (중복 일정 모달 "기존 일정 수정"에서 재현). 여기서 명시적으로 새로 받아 상태를 갱신한다.
+   * @param section TRIP_SECTIONS 중 하나 - 주면 그 탭으로 바로 이동(홈 화면 하단 탭 진입용), 없으면 기본(홈)
    */
-  async function openItineraryFresh(id) {
+  async function openItineraryFresh(id, section) {
     if (id == null) return;
     try {
       const fresh = await api.getItinerary(id);
       resumeDraftItinerary(id);
       setItinerary(fresh);
       setActiveDate(fresh.startDate);
-      navigate('/trip');
+      navigate(section ? tripSectionPath(section) : '/trip');
     } catch (e) {
       setCreateError(e.message || '일정을 불러오지 못했어요');
     }
