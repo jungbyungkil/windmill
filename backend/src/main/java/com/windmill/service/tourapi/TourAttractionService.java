@@ -81,7 +81,19 @@ public class TourAttractionService {
         return Mono.zip(commonMono.defaultIfEmpty(NullNode.getInstance()),
                         introMono.defaultIfEmpty(NullNode.getInstance()))
                 .map(tuple -> buildDetail(contentId, contentTypeId, tuple.getT1(), tuple.getT2(), List.of()))
-                .doOnNext(detail -> detailCache.put(contentId, detail));
+                .doOnNext(detail -> {
+                    // detailIntro2가 실패/타임아웃이면(KorServiceClient가 onErrorResume(Mono.empty())로
+                    // 조용히 삼킴) introFields가 빈 맵으로 내려온다. 이걸 그대로 캐싱하면 "정보 없음"이
+                    // statusAt()의 fail-open(빈 맵 → OPEN)과 맞물려 최대 30분간 "영업중(정보 없음)"이
+                    // 실제 휴무/영업종료를 덮어써버린다(2026-09-14 사용자 제보: 알림은 정기휴무를 잡았는데
+                    // 일정 화면은 순풍으로 표시). 빈 응답은 캐싱하지 않고 다음 호출에서 재시도한다.
+                    if (detail.getIntroFields() == null || detail.getIntroFields().isEmpty()) {
+                        log.warn("[TourAttraction] contentId={} 소개정보 조회 실패/빈 응답 - 캐싱 생략(다음 호출에서 재시도)",
+                                contentId);
+                        return;
+                    }
+                    detailCache.put(contentId, detail);
+                });
     }
 
     private TourAttractionDetail buildDetail(String contentId, int contentTypeId,
