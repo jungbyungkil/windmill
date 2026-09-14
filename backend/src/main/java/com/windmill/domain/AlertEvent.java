@@ -47,6 +47,25 @@ public class AlertEvent {
     private String detail;
 
     /**
+     * 이 알림이 가리키는 대표 장소(카드 CTA용) - {@link com.windmill.service.notification.NotificationSchedulerService}의
+     * primaryAffectedItemId와 동일 기준. 구버전 알림(이 필드 도입 전)은 null이라 프론트가 CTA를 숨긴다.
+     */
+    @Column
+    private Long affectedItemId;
+
+    /**
+     * affectedItemId 당시의 contentId 스냅샷. 알림 발송 이후 그 슬롯이 다른 장소로 교체되면(같은 itemId를
+     * 재사용하지 않고 삭제+새 항목 추가가 일반적이라) 현재 일정에서 이 contentId를 더는 찾을 수 없게 되고,
+     * 프론트는 그 알림 카드를 회색 처리 + CTA 숨김 처리한다(2026-09-14 핸드오프 브리프 D5).
+     */
+    @Column(length = 50)
+    private String affectedContentId;
+
+    /** affectedItemId 당시의 장소명 스냅샷 - 슬롯이 삭제된 뒤에도 카드 문구는 그대로 보여주기 위함 */
+    @Column(length = 100)
+    private String affectedPlaceName;
+
+    /**
      * UTC 벽시계(타임존 없는 TIMESTAMP). Render JVM 기본 TZ가 UTC라 기존 행도 이 의미다.
      * 응답은 {@link com.windmill.util.KoreaClock#toKstOffset}으로 +09:00을 붙인다.
      */

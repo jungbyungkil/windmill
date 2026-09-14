@@ -1,6 +1,7 @@
 package com.windmill.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.TourApiWebClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,7 +46,10 @@ public class WeatherClient {
 
     /** 가장 최근 발표된 단기예보 회차 기준 예보 목록 조회 */
     public Mono<List<JsonNode>> getVillageForecast(String nx, String ny) {
-        LocalDateTime base = latestAnnouncedBaseTime(LocalDateTime.now());
+        // 3시간 발표 주기는 KST 기준(02/05/08.../23시) - Render(UTC 기본 타임존)에서 LocalDateTime.now()를
+        // 쓰면 최대 9시간 어긋난 회차를 골라, 비·폭염 트리거가 낡은 예보로 판정될 수 있다
+        // (2026-09-14 브리프 Phase 1 전수 검색에서 발견).
+        LocalDateTime base = latestAnnouncedBaseTime(KoreaClock.now());
         String baseDate = base.format(DATE_FORMAT);
         String baseTime = String.format("%02d00", base.getHour());
         return getVillageForecast(nx, ny, baseDate, baseTime);

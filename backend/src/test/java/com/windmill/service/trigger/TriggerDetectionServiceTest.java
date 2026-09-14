@@ -1,14 +1,18 @@
 package com.windmill.service.trigger;
 
 import com.windmill.domain.ItineraryItem;
+import com.windmill.dto.TriggerLevel;
 import com.windmill.dto.TriggerResult;
 import com.windmill.util.KoreaClock;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.AbstractMap;
+import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -89,5 +93,36 @@ class TriggerDetectionServiceTest {
 
     private static RegionCondition emptyCondition() {
         return RegionCondition.builder().crowdRateByPlaceName(Map.of()).build();
+    }
+
+    /**
+     * 2026-09-14 핸드오프 브리프 확정 결정: 휴무 장소가 1곳이라도 있으면 핀휠은 항상 🔴 긴급이어야
+     * 한다(그동안은 다른 트리거와 겹쳐야만(count>=2) DANGER로 승격돼, 휴무 단독이면 🟡로 표시됐음).
+     */
+    @Test
+    void closedDayAloneEscalatesToDanger() {
+        ItineraryItem museum = ItineraryItem.builder().id(1L).placeName("부엉이전시관").build();
+        TriggerResult perItem = TriggerResult.builder().closedDayTrigger(true).build();
+
+        TriggerResult aggregated = service.aggregate(
+                List.of(new AbstractMap.SimpleEntry<>(1L, perItem)), List.of(museum));
+
+        assertEquals(TriggerLevel.DANGER, aggregated.getLevel());
+        assertTrue(aggregated.getTriggerDetails().get(0).contains("부엉이전시관"));
+    }
+
+    @Test
+    void closedDayHeadlineListsAllPlacesWithoutTruncation() {
+        String single = TriggerDetectionService.closedDayHeadline(List.of("부엉이전시관"));
+        assertEquals("부엉이전시관이 오늘 휴무예요.", single);
+
+        String multiple = TriggerDetectionService.closedDayHeadline(
+                List.of("부엉이전시관", "속초시립박물관"));
+        assertEquals("부엉이전시관, 속초시립박물관이 오늘 휴무예요.", multiple);
+    }
+
+    @Test
+    void closedDayHeadlineFallsBackToGenericTextWhenNamesUnavailable() {
+        assertEquals("방문일이 정기휴무인 장소가 있어요.", TriggerDetectionService.closedDayHeadline(List.of()));
     }
 }

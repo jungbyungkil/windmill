@@ -12,6 +12,9 @@ import com.windmill.service.region.RegionCodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -25,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -163,6 +167,46 @@ class ItineraryServiceTest {
         assertEquals(1, anchor.getDisplayOrder());
         assertEquals(2, after.getDisplayOrder());
         assertEquals("12:30", anchor.getScheduledTime());
+    }
+
+    /**
+     * 2026-09-14 핸드오프 브리프 Phase 7 - 미리보기는 optimizeRoute()를 그대로 재사용하고 트랜잭션을
+     * 롤백해 저장하지 않는다. 실제 트랜잭션 매니저 없이 도는 단위 테스트라 TransactionAspectSupport의
+     * currentTransactionStatus()를 스텁해, "저장 없이 계산만" 계약(before/after 스냅샷 + rollback 호출)을
+     * 검증한다.
+     */
+    @Test
+    void previewOptimizeRoute_returnsBeforeAfterSnapshotsAndMarksRollbackOnly() {
+        ItineraryItem item1 = ItineraryItem.builder().id(1L).displayOrder(0).visitDate(TOMORROW)
+                .placeName("A").scheduledTime("10:00").build();
+        ItineraryItem item2 = ItineraryItem.builder().id(2L).displayOrder(1).visitDate(TOMORROW)
+                .placeName("B").scheduledTime("11:00").build();
+        Itinerary itinerary = Itinerary.builder()
+                .id(9L).sessionUuid(SESSION).startDate(TOMORROW)
+                .items(new ArrayList<>(List.of(item1, item2)))
+                .build();
+        when(itineraryRepository.findById(9L)).thenReturn(Optional.of(itinerary));
+        when(routeRecalculationService.recalculate(any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    item2.setScheduledTime("10:00");
+                    item1.setScheduledTime("11:00");
+                    return new RouteRecalculationService.Result(List.of(item2, item1), "재계산 완료", 10, true);
+                });
+
+        try (MockedStatic<TransactionAspectSupport> txStatic = mockStatic(TransactionAspectSupport.class)) {
+            TransactionStatus status = mock(TransactionStatus.class);
+            txStatic.when(TransactionAspectSupport::currentTransactionStatus).thenReturn(status);
+
+            ItineraryService.RouteReorderPreview preview =
+                    service.previewOptimizeRoute(9L, TOMORROW, null, null, null);
+
+            verify(status).setRollbackOnly();
+            assertEquals(List.of("A", "B"), preview.before().stream()
+                    .map(ItineraryService.RouteStopSummary::placeName).toList());
+            assertEquals(List.of("B", "A"), preview.after().stream()
+                    .map(ItineraryService.RouteStopSummary::placeName).toList());
+            assertEquals("10:00", preview.after().get(0).scheduledTime());
+        }
     }
 
     @Test

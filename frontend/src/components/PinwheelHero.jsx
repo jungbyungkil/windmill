@@ -192,7 +192,7 @@ export default function PinwheelHero({
                 disabled={ctaBusy(cta)}
               >
                 {ctaBusy(cta)
-                  ? (cta.kind === 'route' ? '동선 최적화 중...' : cta.kind === 'reroute' ? '바꾸는 중...' : '대안 찾는 중...')
+                  ? (cta.kind === 'route' ? '불러오는 중...' : cta.kind === 'reroute' ? '바꾸는 중...' : '대안 찾는 중...')
                   : cta.label}
               </button>
             ))}

@@ -1,5 +1,6 @@
 package com.windmill.domain;
 
+import com.windmill.util.KoreaClock;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -42,7 +43,7 @@ public class DocentAudio {
     @PrePersist
     void onCreate() {
         if (generatedAt == null) {
-            generatedAt = LocalDateTime.now();
+            generatedAt = KoreaClock.utcNow(); // 2026-09-14 브리프 Phase 1 전수 검색 - KST JVM 로컬환경 대비
         }
     }
 }

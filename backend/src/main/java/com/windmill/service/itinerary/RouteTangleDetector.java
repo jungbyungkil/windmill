@@ -60,15 +60,24 @@ public final class RouteTangleDetector {
         }
         double ratio = current / best;
         boolean tangled = ratio >= WASTE_RATIO_THRESHOLD;
+        List<String> currentNames = tangled ? placeNames(withCoords) : null;
+        List<String> optimizedNames = tangled ? placeNames(optimized) : null;
         return RouteTangleResult.builder()
                 .tangled(tangled)
                 .currentDistanceKm(round(current))
                 .optimizedDistanceKm(round(best))
                 .wasteRatio(Math.round(ratio * 100.0) / 100.0)
+                .currentOrderPlaceNames(currentNames)
+                .optimizedOrderPlaceNames(optimizedNames)
                 .message(tangled
-                        ? String.format("동선이 꼬였어요. 지금 %.1fkm → 재배치 시 약 %.1fkm로 줄일 수 있어요.", current, best)
+                        ? String.format("동선이 꼬였어요. 지금 순서(%s)로는 약 %.1fkm → 재배치 순서(%s)로 하면 약 %.1fkm로 줄일 수 있어요.",
+                                String.join(" → ", currentNames), current, String.join(" → ", optimizedNames), best)
                         : null)
                 .build();
+    }
+
+    private static List<String> placeNames(List<ItineraryItem> items) {
+        return items.stream().map(ItineraryItem::getPlaceName).toList();
     }
 
     /**
@@ -100,11 +109,15 @@ public final class RouteTangleDetector {
             return base;
         }
 
+        List<String> currentNames = placeNames(withCoords);
+        List<String> optimizedNames = placeNames(optimizedOrder);
         String message = (current.km != null && optimized.km != null)
-                ? String.format("동선이 꼬였어요. 지금 순서로는 약 %d분(%.1fkm) → 재배치하면 약 %d분(%.1fkm)으로 줄어요.",
-                        current.minutes, current.km, optimized.minutes, optimized.km)
-                : String.format("동선이 꼬였어요. 지금 순서로는 약 %d분 → 재배치하면 약 %d분으로 줄어요.",
-                        current.minutes, optimized.minutes);
+                ? String.format("동선이 꼬였어요. 지금 순서(%s)로는 약 %d분(%.1fkm) → 재배치 순서(%s)로 하면 약 %d분(%.1fkm)으로 줄어요.",
+                        String.join(" → ", currentNames), current.minutes, current.km,
+                        String.join(" → ", optimizedNames), optimized.minutes, optimized.km)
+                : String.format("동선이 꼬였어요. 지금 순서(%s)로는 약 %d분 → 재배치 순서(%s)로 하면 약 %d분으로 줄어요.",
+                        String.join(" → ", currentNames), current.minutes,
+                        String.join(" → ", optimizedNames), optimized.minutes);
         return RouteTangleResult.builder()
                 .tangled(true)
                 .currentDistanceKm(current.km)
@@ -112,6 +125,9 @@ public final class RouteTangleDetector {
                 .currentDurationMinutes(current.minutes)
                 .optimizedDurationMinutes(optimized.minutes)
                 .wasteRatio(base.getWasteRatio())
+                .currentOrderPlaceNames(currentNames)
+                .optimizedOrderPlaceNames(optimizedNames)
+                .savingsMinutes(current.minutes - optimized.minutes)
                 .message(message)
                 .build();
     }

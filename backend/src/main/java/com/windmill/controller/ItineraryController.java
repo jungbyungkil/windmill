@@ -302,6 +302,23 @@ public class ItineraryController {
     }
 
     /**
+     * 동선 재배치 미리보기(저장 안 함) - 핀휠 동선 배너의 "변경 전/후 미리보기" 시트용.
+     * 실제 적용은 사용자가 확인 후 {@code /apply-reroute}를 호출한다(2026-09-14 핸드오프 브리프 Phase 7).
+     */
+    @GetMapping("/{id}/preview-reroute")
+    public Mono<ResponseEntity<ItineraryService.RouteReorderPreview>> previewReroute(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) Double originLon,
+            @RequestParam(required = false) Double originLat,
+            @RequestParam(required = false) String startTime) {
+        return Mono.fromCallable(() ->
+                        itineraryService.previewOptimizeRoute(id, date, originLon, originLat, startTime))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
      * "동선 다시" 전용 - 동선을 재계산하고 그 자체를 변경 이력(ROUTE)으로 남긴다.
      * 이력을 남기지 않는 일반 재계산은 {@code /optimize-route}를 쓴다.
      */

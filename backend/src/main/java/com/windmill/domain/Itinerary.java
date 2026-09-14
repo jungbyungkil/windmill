@@ -3,6 +3,7 @@ package com.windmill.domain;
 import com.windmill.dto.PlanChangeEntry;
 import com.windmill.dto.PlanSnapshot;
 import com.windmill.dto.TriggerLevel;
+import com.windmill.util.KoreaClock;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -171,7 +172,10 @@ public class Itinerary {
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            // KoreaClock.utcNow() - JVM 기본 타임존이 KST인 로컬 개발환경에서 LocalDateTime.now()를
+            // 쓰면 "UTC 벽시계" 규약(KoreaClock 클래스 주석 참고)이 깨져 나중에 +09:00을 또 붙이면
+            // 9시간 밀린다(2026-09-14 핸드오프 브리프 Phase 1 전수 검색에서 발견).
+            createdAt = KoreaClock.utcNow();
         }
     }
 }

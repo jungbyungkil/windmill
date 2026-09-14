@@ -1,5 +1,6 @@
 package com.windmill.domain;
 
+import com.windmill.util.KoreaClock;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -42,7 +43,7 @@ public class PushSubscription {
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = KoreaClock.utcNow(); // 2026-09-14 브리프 Phase 1 전수 검색 - KST JVM 로컬환경 대비
         }
     }
 }

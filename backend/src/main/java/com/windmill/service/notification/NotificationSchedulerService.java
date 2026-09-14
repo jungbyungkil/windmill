@@ -160,8 +160,20 @@ public class NotificationSchedulerService {
         String nudgeId = "STATUS:" + newSig + "@" + minuteKey(now);
         String title = composer.statusTitle(newLevel);
         String body = composer.statusBody(result);
-        recordAlertEvent(itinerary, "STATUS", result, title, body, now);
-        dispatch(itinerary, subs, title, body, nudgeId, now, false, primaryAffectedItemId(result));
+        Long affectedItemId = primaryAffectedItemId(result);
+        recordAlertEvent(itinerary, "STATUS", result, title, body, now, affectedItemId);
+        dispatch(itinerary, subs, title, body, nudgeId, now, false, affectedItemId);
+    }
+
+    /** affectedItemId가 가리키는 항목의 contentId·장소명 - CTA용 슬롯 컨텍스트 스냅샷(대안 카드 없으면 둘 다 null) */
+    private static ItineraryItem findById(Itinerary itinerary, Long itemId) {
+        if (itemId == null) {
+            return null;
+        }
+        return itinerary.getItems().stream()
+                .filter(item -> itemId.equals(item.getId()))
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -335,7 +347,8 @@ public class NotificationSchedulerService {
     }
 
     private void recordAlertEvent(Itinerary itinerary, String kind, TriggerResult result, String title, String body,
-                                  LocalDateTime now) {
+                                  LocalDateTime now, Long affectedItemId) {
+        ItineraryItem affected = findById(itinerary, affectedItemId);
         alertEventRepository.save(AlertEvent.builder()
                 .itineraryId(itinerary.getId())
                 .kind(kind)
@@ -343,6 +356,9 @@ public class NotificationSchedulerService {
                 .icon(AlertIconResolver.resolve(result))
                 .headline(title)
                 .detail(body)
+                .affectedItemId(affected != null ? affected.getId() : null)
+                .affectedContentId(affected != null ? affected.getContentId() : null)
+                .affectedPlaceName(affected != null ? affected.getPlaceName() : null)
                 .createdAt(KoreaClock.toUtcWall(now))
                 .build());
     }

@@ -227,6 +227,20 @@ export function applyAlternative(itineraryId, { removedItemId, newPlace, trigger
   });
 }
 
+/**
+ * 동선 재배치 미리보기(저장 안 함) - 변경 전/후 순서를 확인만 하고 싶을 때. 실제 적용은 applyReroute.
+ * 2026-09-14 핸드오프 브리프 Phase 7 - 동선 액션 배너의 "변경 전/후 미리보기" 시트용.
+ */
+export function previewReroute(itineraryId, date, origin, startTime) {
+  const params = { date };
+  if (origin?.lon != null && origin?.lat != null) {
+    params.originLon = origin.lon;
+    params.originLat = origin.lat;
+  }
+  if (startTime) params.startTime = startTime;
+  return request(`/itineraries/${itineraryId}/preview-reroute${qs(params)}`);
+}
+
 /** "동선 다시" 전용 - 동선 재계산 + 변경 이력(ROUTE) 기록. 이력 없는 재계산은 optimizeRoute. */
 export function applyReroute(itineraryId, date, origin, startTime, reason) {
   const params = { date, reason };

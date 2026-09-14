@@ -39,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -1122,6 +1123,39 @@ public class ItineraryService {
      *                        적용됐을 때만 채워진다(선택). */
     public record OptimizeRouteResult(Itinerary itinerary, String message, Double totalDistanceKm,
                                       List<Long> flaggedItemIds) {
+    }
+
+    public record RouteStopSummary(Long itemId, String placeName, String scheduledTime) {
+    }
+
+    public record RouteReorderPreview(List<RouteStopSummary> before, List<RouteStopSummary> after,
+                                      String message, Double totalDistanceKm) {
+    }
+
+    /**
+     * 동선 재배치 미리보기 - {@link #optimizeRoute}와 완전히 같은 로직을 그대로 돌리되, 트랜잭션을
+     * 롤백해 아무것도 저장하지 않는다("적용 시 기존 로직 재사용" 요구를 코드 복제 없이 만족 - 같은
+     * 메서드를 그대로 호출하므로 미리보기와 실제 적용 결과가 항상 일치함이 보장된다).
+     * 2026-09-14 핸드오프 브리프 Phase 7 - 동선 액션 배너의 "변경 전/후 미리보기" 시트용.
+     */
+    @Transactional
+    public RouteReorderPreview previewOptimizeRoute(Long itineraryId, LocalDate date,
+                                                     Double originLon, Double originLat, String startTime) {
+        Itinerary itinerary = get(itineraryId);
+        List<RouteStopSummary> before = summarize(itemsOnDate(itinerary, date));
+
+        OptimizeRouteResult result = optimizeRoute(itineraryId, date, originLon, originLat, startTime);
+        List<RouteStopSummary> after = summarize(itemsOnDate(result.itinerary(), date));
+
+        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        return new RouteReorderPreview(before, after, result.message(), result.totalDistanceKm());
+    }
+
+    private static List<RouteStopSummary> summarize(List<ItineraryItem> items) {
+        return items.stream()
+                .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
+                .map(i -> new RouteStopSummary(i.getId(), i.getPlaceName(), i.getScheduledTime()))
+                .toList();
     }
 
     // ── 대안 일정(원본 + 변경 이력) ──────────────────────────────────────────────

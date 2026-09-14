@@ -29,6 +29,8 @@ import DuplicateItineraryModal from './components/DuplicateItineraryModal';
 import PlanHistoryPanel from './components/PlanHistoryPanel';
 import GlobalMenu from './components/GlobalMenu';
 import AlertFeedScreen from './components/AlertFeedScreen';
+import RouteTangleBanner from './components/RouteTangleBanner';
+import RouteReorderPreviewSheet from './components/RouteReorderPreviewSheet';
 import MyTripsScreen from './components/MyTripsScreen';
 import TripRecordDetailScreen from './components/TripRecordDetailScreen';
 import SettingsScreen from './components/SettingsScreen';
@@ -78,7 +80,7 @@ function isTripToday(dateStr) {
 /**
  * 트리거 폴링용 현재 위치 - 실패/권한거부/미지원이면 조용히 null(이동시간 트리거만 생략되고
  * 나머지 트리거는 그대로 동작). 90초마다 도는 백그라운드 폴링이라 GPS를 매번 새로 켜지 않도록
- * maximumAge를 넉넉히 둔다(handleOptimizeFromGps의 수동 재계산과는 다른 용도).
+ * maximumAge를 넉넉히 둔다(동선 재배치 미리보기/재계산 수동 호출과는 다른 용도).
  */
 function getCurrentPositionSafe() {
   return new Promise((resolve) => {
@@ -147,6 +149,12 @@ export default function App() {
   const [addingFestivalId, setAddingFestivalId] = useState(null);
 
   const [altOpen, setAltOpen] = useState(false);
+  const [routePreviewOpen, setRoutePreviewOpen] = useState(false);
+  const [routePreviewLoading, setRoutePreviewLoading] = useState(false);
+  const [routePreviewError, setRoutePreviewError] = useState(null);
+  const [routePreviewData, setRoutePreviewData] = useState(null);
+  const [routePreviewApplying, setRoutePreviewApplying] = useState(false);
+  const routePreviewOriginRef = useRef(null);
   const [altCandidates, setAltCandidates] = useState([]);
   const [altLoading, setAltLoading] = useState(false);
   const [altReason, setAltReason] = useState(null);
@@ -1549,13 +1557,44 @@ export default function App() {
     );
   }
 
-  /** 오늘 동선 「동선 재계산」 — startTime을 지정했으면 GPS 위치와 무관하게 그 시각을
-   *  첫 장소 도착 시각으로 고정한다. */
-  function handleOptimizeFromGps(startTime) {
-    if (!itineraryId || optimizeLoading) return;
+  /**
+   * 동선 액션 배너 「재배치 미리보기」 - 저장 없이 변경 전/후만 보여준다(2026-09-14 핸드오프 브리프
+   * Phase 7). 적용 전까지는 아무것도 바뀌지 않는다.
+   */
+  function handleOpenRoutePreview() {
+    if (!itineraryId || routePreviewLoading) return;
+    setRoutePreviewOpen(true);
+    setRoutePreviewLoading(true);
+    setRoutePreviewError(null);
+    setRoutePreviewData(null);
+    resolveGpsOrigin((origin) => {
+      routePreviewOriginRef.current = origin;
+      api.previewReroute(itineraryId, activeDate, origin)
+        .then(setRoutePreviewData)
+        .catch((e) => setRoutePreviewError(e.message || '순서를 미리 계산하지 못했어요'))
+        .finally(() => setRoutePreviewLoading(false));
+    });
+  }
+
+  function handleCloseRoutePreview() {
+    if (routePreviewApplying) return;
+    setRoutePreviewOpen(false);
+    setRoutePreviewData(null);
+    setRoutePreviewError(null);
+  }
+
+  /** 미리보기에서 확인한 그대로 적용 - 기존 「동선 다시」 로직을 그대로 재사용(같은 origin 사용). */
+  function handleApplyRoutePreview() {
+    if (routePreviewApplying) return;
+    setRoutePreviewApplying(true);
+    beginOptimistic('ROUTE');
     setOptimizeLoading(true);
-    beginOptimistic('ROUTE'); // 클릭 즉시 핀휠을 성공 스킨으로 (API 응답 대기 없이)
-    resolveGpsOrigin((origin) => handleOptimizeRoute(origin, startTime, true));
+    handleOptimizeRoute(routePreviewOriginRef.current, undefined, true)
+      .finally(() => {
+        setRoutePreviewApplying(false);
+        setRoutePreviewOpen(false);
+        setRoutePreviewData(null);
+      });
   }
 
   /** 「이 순서 어때요?」 — 확인 전까지 일정에 쓰지 않는다. */
@@ -1838,8 +1877,14 @@ export default function App() {
                   loading={altLoading}
                   onRerouteSchedule={handleRerouteSchedule}
                   rerouteLoading={rerouteLoading}
-                  onOptimizeRoute={() => handleOptimizeFromGps()}
-                  optimizeLoading={optimizeLoading}
+                  onOptimizeRoute={handleOpenRoutePreview}
+                  optimizeLoading={routePreviewLoading}
+                />
+
+                <RouteTangleBanner
+                  routeTangle={trigger?.routeTangle}
+                  onPreview={handleOpenRoutePreview}
+                  previewLoading={routePreviewLoading}
                 />
 
                 <VisitConfirmationNudge
@@ -1939,7 +1984,12 @@ export default function App() {
                   <header className="trip-section-head">
                     <h2>알림</h2>
                   </header>
-                  <AlertFeedScreen itineraryId={itineraryId} showTitle={false} />
+                  <AlertFeedScreen
+                    itineraryId={itineraryId}
+                    showTitle={false}
+                    items={itinerary.items}
+                    onRequestAlternatives={handleRequestAlternatives}
+                  />
                   <WeatherBanner items={weatherItems} />
                   <MidWeatherBanner forecast={midWeather} />
                 </section>
@@ -1997,6 +2047,16 @@ export default function App() {
                 bulkUrgent={trigger?.level === 'DANGER'}
                 applyLoading={rerouteLoading}
                 onClose={() => setAltOpen(false)}
+              />
+
+              <RouteReorderPreviewSheet
+                open={routePreviewOpen}
+                loading={routePreviewLoading}
+                error={routePreviewError}
+                preview={routePreviewData}
+                applying={routePreviewApplying}
+                onCancel={handleCloseRoutePreview}
+                onApply={handleApplyRoutePreview}
               />
 
               <DocentModal

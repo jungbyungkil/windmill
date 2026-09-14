@@ -145,18 +145,22 @@ export default function ItineraryItemCard({
    */
   const MAX_BADGE_LABELS = 3;
   const CROWD_WARNING_THRESHOLD = 70;
-  function summaryStatusLabel() {
-    if (completed) return '다녀옴';
+  /**
+   * 배지 라벨 목록 - {text, closedDay} 형태로 반환해 "휴무"만 별색으로 렌더링할 수 있게 한다
+   * (2026-09-14 핸드오프 브리프 Phase 5: 우선순위·순서는 그대로, 휴무만 경고색으로 구분).
+   */
+  function summaryStatusLabels() {
+    if (completed) return [{ text: '다녀옴' }];
     const labels = [];
-    if (businessAlerted && closedDayAlerted) labels.push('휴무');
-    if (businessAlerted && hoursEndedAlerted) labels.push('마감');
+    if (businessAlerted && closedDayAlerted) labels.push({ text: '휴무', closedDay: true });
+    if (businessAlerted && hoursEndedAlerted) labels.push({ text: '마감' });
     if (crowdAlert || (item?.crowdRate != null && item.crowdRate >= CROWD_WARNING_THRESHOLD)) {
-      labels.push('혼잡');
+      labels.push({ text: '혼잡' });
     }
-    if (isWeather && rainTrigger) labels.push('우천');
-    if (isWeather && heatTrigger) labels.push('폭염');
-    if (labels.length > 0) return labels.slice(0, MAX_BADGE_LABELS).join(' · ');
-    return STATUS_LABEL[status];
+    if (isWeather && rainTrigger) labels.push({ text: '우천' });
+    if (isWeather && heatTrigger) labels.push({ text: '폭염' });
+    if (labels.length > 0) return labels.slice(0, MAX_BADGE_LABELS);
+    return [{ text: STATUS_LABEL[status] }];
   }
 
   return (
@@ -215,7 +219,13 @@ export default function ItineraryItemCard({
           <span className="item-name">{item.placeName}</span>
           {foodInfo && <span className="item-food-info">{foodInfo}</span>}
         </span>
-        <span className={`item-status-chip ${statusClass}`}>{summaryStatusLabel()}</span>
+        <span className={`item-status-chip ${statusClass}`}>
+          {summaryStatusLabels().map((label, idx) => (
+            <span key={label.text} className={label.closedDay ? 'chip-label-closed-day' : undefined}>
+              {idx > 0 ? ' · ' : ''}{label.text}
+            </span>
+          ))}
+        </span>
         {!completed && tightTimingAlerted && (
           <span
             className="item-tight-timing-badge"

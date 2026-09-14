@@ -1,6 +1,7 @@
 package com.windmill.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.TourApiWebClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,7 +56,7 @@ public class RelatedAttractionClient {
     }
 
     private Mono<List<JsonNode>> fetchWithMonthFallback(int monthsBack, Function<String, Mono<List<JsonNode>>> call) {
-        String baseYm = LocalDate.now().minusMonths(monthsBack).format(YM_FORMAT);
+        String baseYm = KoreaClock.today().minusMonths(monthsBack).format(YM_FORMAT);
         return call.apply(baseYm).flatMap(items -> {
             if (!items.isEmpty() || monthsBack >= MAX_MONTHS_BACK) {
                 if (items.isEmpty()) {
@@ -64,7 +65,7 @@ public class RelatedAttractionClient {
                 return Mono.just(items);
             }
             log.info("연관관광지 {} 월 데이터 없음, {} 월로 재시도", baseYm,
-                    LocalDate.now().minusMonths(monthsBack + 1L).format(YM_FORMAT));
+                    KoreaClock.today().minusMonths(monthsBack + 1L).format(YM_FORMAT));
             return fetchWithMonthFallback(monthsBack + 1, call);
         });
     }

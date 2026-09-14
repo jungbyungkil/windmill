@@ -1674,6 +1674,185 @@
   opacity: 0.7;
 }
 
+/* ---------- 동선 액션 배너 (2026-09-14 핸드오프 브리프 Phase 7) ---------- */
+
+.route-tangle-banner {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fffdf7;
+  border: 1px solid #f3e2bd;
+  border-left: 4px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+.route-tangle-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.route-tangle-banner-text strong {
+  font-size: 13px;
+  color: var(--warning-ink);
+}
+
+.route-tangle-banner-text span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.route-tangle-banner-btn {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--status-warning);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.route-tangle-banner-btn:disabled {
+  opacity: 0.7;
+}
+
+/* ---------- 동선 재배치 미리보기 시트 ---------- */
+
+.route-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 30, 28, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+.route-preview-modal {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--sand-card);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px max(24px, env(safe-area-inset-bottom, 0px));
+}
+
+.route-preview-title {
+  margin: 0 0 14px;
+  padding-right: 34px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.route-preview-loading {
+  color: var(--ink-soft, #8a8478);
+  font-size: 13px;
+}
+
+.route-preview-columns {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.route-preview-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.route-preview-col-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft, #8a8478);
+}
+
+.route-preview-arrow {
+  align-self: center;
+  font-size: 18px;
+  color: var(--ink-soft, #8a8478);
+}
+
+.route-preview-stop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.route-preview-stop-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--sand-bg, #f7f2e9);
+  border-radius: 10px;
+}
+
+.route-preview-stop-time {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea);
+}
+
+.route-preview-stop-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: break-word;
+}
+
+.route-preview-message {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft, #8a8478);
+}
+
+.route-preview-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+}
+
+.route-preview-cancel,
+.route-preview-confirm {
+  flex: 1;
+  padding: 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.route-preview-cancel {
+  background: transparent;
+  border: 1.5px solid var(--sand-border);
+  color: var(--ink);
+}
+
+.route-preview-confirm {
+  border: none;
+  background: var(--sea);
+  color: #fff;
+}
+
+.route-preview-cancel:disabled,
+.route-preview-confirm:disabled {
+  opacity: 0.6;
+}
+
 /* ---------- Weather banner ---------- */
 
 .weather-banner {
@@ -2564,6 +2743,12 @@
 .item-status-chip.status-danger {
   color: var(--status-danger);
   background: color-mix(in srgb, var(--status-danger) 16%, white);
+}
+
+/* 휴무는 배지 우선순위·색 체계는 그대로 두고 글자색만 별도로 구분(2026-09-14 핸드오프 브리프 Phase 5) */
+.chip-label-closed-day {
+  color: var(--status-danger);
+  font-weight: 900;
 }
 
 .item-crowd.status-warning { color: #a86a00; font-weight: 700; }
@@ -3670,6 +3855,35 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--alert-tone);
+}
+
+/* 슬롯이 이미 다른 장소로 교체된 알림 - 회색 처리(2026-09-14 핸드오프 브리프 D5) */
+.alert-feed-card.is-stale {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
+.alert-feed-stale-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft, #8a8478);
+}
+
+.alert-feed-cta {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--alert-tone);
+  background: white;
+  color: var(--alert-tone);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.alert-feed-cta:active {
+  background: color-mix(in srgb, var(--alert-tone) 14%, white);
 }
 
 .situation-pulse {

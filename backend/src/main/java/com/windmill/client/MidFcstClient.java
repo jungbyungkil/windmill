@@ -1,6 +1,7 @@
 package com.windmill.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.windmill.util.KoreaClock;
 import com.windmill.util.TourApiWebClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,7 +49,9 @@ public class MidFcstClient {
         if (!isConfigured() || regId == null || regId.isBlank()) {
             return Mono.just(List.of());
         }
-        String tmFc = latestTmFc(LocalDateTime.now());
+        // 기상청 발표시각(06/18시)은 KST 기준 - Render(UTC 기본 타임존)에서 LocalDateTime.now()를 쓰면
+        // 최대 9시간 어긋난 발표 슬롯을 고른다(2026-09-14 브리프 Phase 1 전수 검색에서 발견).
+        String tmFc = latestTmFc(KoreaClock.now());
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder.path(path)
                         .queryParam("serviceKey", serviceKey)

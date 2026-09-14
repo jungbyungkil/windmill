@@ -3,6 +3,16 @@ import * as api from '../api/windmillApi';
 
 const LEVEL_TONE = { NORMAL: 'normal', WARNING: 'warning', DANGER: 'danger' };
 
+/** 알림 아이콘(AlertIconResolver와 동일 매핑) → 대안 조회 avoidHint - CTA가 어떤 대안을 불러올지 결정 */
+const ICON_TO_AVOID_HINT = {
+  '🌧️': 'WEATHER',
+  '🌡️': 'HEAT',
+  '👥': 'CROWD',
+  '🚫': 'BUSINESS',
+  '🕐': 'BUSINESS',
+  '🔀': 'ROUTE',
+};
+
 /**
  * 서버 시각 파싱.
  * - 오프셋/Z가 있으면 그대로 Instant로 읽는다 (신규: 2026-09-04T14:25:00+09:00).
@@ -30,8 +40,17 @@ export function formatRelativeTime(createdAt, now = Date.now()) {
   return `${days}일 전`;
 }
 
+/**
+ * 알림이 가리키던 슬롯이 지금 일정에도 그대로 있는지 - contentId 기준(2026-09-14 핸드오프 브리프 D5).
+ * affectedContentId가 없으면(구버전 알림) 판단할 근거가 없으니 회색 처리하지 않는다.
+ */
+function slotStillExists(alert, items) {
+  if (!alert.affectedContentId) return true;
+  return (items || []).some((item) => item.contentId === alert.affectedContentId);
+}
+
 /** 알림 - 실제로 발송된 알림 이력을 최신순 리스트로. NudgeCard와 달리 읽기 전용(닫기 없음). */
-export default function AlertFeedScreen({ itineraryId, showTitle = true }) {
+export default function AlertFeedScreen({ itineraryId, showTitle = true, items = [], onRequestAlternatives }) {
   const [alerts, setAlerts] = useState(null); // null = 로딩 중
   const [error, setError] = useState(null);
 
@@ -54,16 +73,36 @@ export default function AlertFeedScreen({ itineraryId, showTitle = true }) {
       )}
       {alerts !== null && alerts.length > 0 && (
         <ul className="alert-feed-list">
-          {alerts.map((a) => (
-            <li key={a.id} className={`alert-feed-card tone-${LEVEL_TONE[a.level] || 'normal'}`}>
-              <span className="alert-feed-pip" aria-hidden="true" />
-              <div className="alert-feed-body">
-                <strong className="alert-feed-headline">{a.headline}</strong>
-                {a.detail && <p className="alert-feed-detail">{a.detail}</p>}
-                <span className="alert-feed-time">{formatRelativeTime(a.createdAt)}</span>
-              </div>
-            </li>
-          ))}
+          {alerts.map((a) => {
+            const stale = !slotStillExists(a, items);
+            const avoidHint = ICON_TO_AVOID_HINT[a.icon];
+            const showCta = Boolean(a.affectedItemId) && !stale && avoidHint && onRequestAlternatives;
+            return (
+              <li
+                key={a.id}
+                className={`alert-feed-card tone-${LEVEL_TONE[a.level] || 'normal'}${stale ? ' is-stale' : ''}`}
+              >
+                <span className="alert-feed-pip" aria-hidden="true" />
+                <div className="alert-feed-body">
+                  <strong className="alert-feed-headline">{a.headline}</strong>
+                  {a.detail && <p className="alert-feed-detail">{a.detail}</p>}
+                  <span className="alert-feed-time">{formatRelativeTime(a.createdAt)}</span>
+                  {showCta && (
+                    <button
+                      type="button"
+                      className="alert-feed-cta"
+                      onClick={() => onRequestAlternatives(avoidHint)}
+                    >
+                      대체 장소 고르기
+                    </button>
+                  )}
+                  {stale && a.affectedItemId && (
+                    <span className="alert-feed-stale-note">이미 다른 장소로 바뀌었어요</span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: windmill
+  jackson:
+    # 시점 필드는 대부분 KoreaClock.toKstOffset()으로 이미 +09:00 오프셋을 붙여 내보내(OffsetDateTime
+    # 자체 오프셋이 우선이라 이 설정은 그 값들엔 영향 없음), 아직 감사 못 한 원시 LocalDateTime/Date
+    # 필드가 있을 경우의 안전망으로 전역 기본값만 KST로 맞춰 둔다(2026-09-14 브리프 Phase 1).
+    time-zone: Asia/Seoul
   mvc:
     async:
       # 목적지 직접 선택 플로우(anchor-plan)가 4단계 파이프라인을 최대 4회 순차 호출한다 -

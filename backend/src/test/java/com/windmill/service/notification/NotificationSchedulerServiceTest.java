@@ -146,6 +146,34 @@ class NotificationSchedulerServiceTest {
         assertTrue(data.getValue().get("url").contains("&item=42"));
     }
 
+    /**
+     * 2026-09-14 핸드오프 브리프 Phase 3/6 - 알림 카드의 "대체 장소 고르기" CTA가 어느 슬롯을 가리키는지
+     * AlertEvent에 스냅샷으로 남아야, 나중에 그 슬롯이 다른 장소로 교체돼도(D5) 프론트가 판단할 수 있다.
+     */
+    @Test
+    void urgentStatus_snapshotsAffectedItemContextOnAlertEvent() {
+        ItineraryItem museum = ItineraryItem.builder()
+                .id(42L).placeName("부엉이전시관").contentId("c-owl").category("문화시설")
+                .scheduledTime("10:00").visitDate(DAY.toLocalDate()).build();
+        Itinerary itinerary = itineraryWithItems(museum);
+        stubActive(itinerary, MID_TRIP);
+        stubSubscriptions(sub("token-1"));
+        stubTrigger(TriggerResult.builder()
+                .level(TriggerLevel.DANGER)
+                .closedDayTrigger(true)
+                .closedDayAffectedItemIds(List.of(42L))
+                .triggerDetails(List.of("부엉이전시관이 오늘 휴무예요. 대체 장소를 골라보세요."))
+                .build());
+
+        scheduler.runTick(MID_TRIP);
+
+        ArgumentCaptor<AlertEvent> saved = ArgumentCaptor.forClass(AlertEvent.class);
+        verify(alertEventRepository).save(saved.capture());
+        assertEquals(42L, saved.getValue().getAffectedItemId());
+        assertEquals("c-owl", saved.getValue().getAffectedContentId());
+        assertEquals("부엉이전시관", saved.getValue().getAffectedPlaceName());
+    }
+
     @Test
     void firstObservationWarning_usesWeatherFlagInSignature() {
         Itinerary itinerary = itineraryWithItems(placeAt("10:00"));

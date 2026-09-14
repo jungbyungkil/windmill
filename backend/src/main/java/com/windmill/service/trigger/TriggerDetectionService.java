@@ -101,7 +101,7 @@ public class TriggerDetectionService {
                                 .map(result -> Map.entry(item.getId(), result)))
                         .collectList()
                         .map(perItem -> {
-                            TriggerResult result = aggregate(perItem);
+                            TriggerResult result = aggregate(perItem, activeItems);
                             attachRouteTangle(result, activeItems, routeAnchor);
                             return result;
                         }))
@@ -316,7 +316,8 @@ public class TriggerDetectionService {
         return ClosingTimeGate.check(close, arrival, buffer).blocked();
     }
 
-    private TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem) {
+    // package-private: 테스트에서 직접 호출
+    TriggerResult aggregate(List<Map.Entry<Long, TriggerResult>> perItem, List<ItineraryItem> items) {
         boolean weather = perItem.stream().anyMatch(e -> e.getValue().isWeatherTrigger());
         boolean heat = perItem.stream().anyMatch(e -> e.getValue().isHeatTrigger());
         boolean heatUrgent = perItem.stream().anyMatch(e -> e.getValue().isHeatUrgent());
@@ -349,15 +350,24 @@ public class TriggerDetectionService {
         businessIds.forEach(id -> { if (!affected.contains(id)) affected.add(id); });
         crowdIds.forEach(id -> { if (!affected.contains(id)) affected.add(id); });
 
+        Map<Long, String> nameById = items == null ? Map.of()
+                : items.stream().collect(Collectors.toMap(ItineraryItem::getId, ItineraryItem::getPlaceName,
+                        (a, b) -> a));
+        List<String> closedDayNames = closedDayIds.stream()
+                .map(nameById::get)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
         return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, closedDay, hoursEnded,
-                affected, weatherIds, businessIds, closedDayIds, hoursEndedIds, crowdIds);
+                affected, weatherIds, businessIds, closedDayIds, hoursEndedIds, crowdIds, closedDayNames);
     }
 
     private TriggerResult buildResult(boolean weather, boolean heat, boolean heatUrgent,
                                       boolean crowd, boolean crowdUrgent,
                                       boolean closedDay, boolean hoursEnded) {
         return buildResult(weather, heat, heatUrgent, crowd, crowdUrgent, closedDay, hoursEnded,
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private TriggerResult buildResult(boolean weather, boolean heat, boolean heatUrgent,
@@ -368,7 +378,8 @@ public class TriggerDetectionService {
                                       List<Long> businessAffectedItemIds,
                                       List<Long> closedDayAffectedItemIds,
                                       List<Long> hoursEndedAffectedItemIds,
-                                      List<Long> crowdAffectedItemIds) {
+                                      List<Long> crowdAffectedItemIds,
+                                      List<String> closedDayPlaceNames) {
         boolean business = closedDay || hoursEnded;
         int count = (weather ? 1 : 0) + (heat ? 1 : 0) + (crowd ? 1 : 0) + (business ? 1 : 0);
         List<String> details = new ArrayList<>();
@@ -390,18 +401,19 @@ public class TriggerDetectionService {
             }
         }
         if (closedDay && hoursEnded) {
-            details.add("방문일에 휴무이거나 마감 시각과 일정이 겹치는 장소가 있어요. 대체 장소를 골라보세요.");
+            details.add(closedDayHeadline(closedDayPlaceNames) + " 마감 시각과 겹치는 장소도 있어요. 대체 장소를 골라보세요.");
         } else if (closedDay) {
-            details.add("방문일이 정기휴무인 장소가 있어요. 대체 장소를 골라보세요.");
+            details.add(closedDayHeadline(closedDayPlaceNames) + " 대체 장소를 골라보세요.");
         } else if (hoursEnded) {
             details.add("방문 시각이 마감에 닿아요. 시간을 바꾸거나 다른 곳을 담아보세요.");
         }
 
         TriggerLevel level = TriggerLevel.NORMAL;
         if (count > 0) {
-            // 비 / 폭염경보(35) / 혼잡 긴급 / 트리거 2개 이상 → DANGER
-            // 폭염주의보(33) 단독·혼잡 주의·휴무 단독 → WARNING
-            if (weather || heatUrgent || crowdUrgent || count >= 2) {
+            // 비 / 폭염경보(35) / 혼잡 긴급 / 휴무 / 트리거 2개 이상 → DANGER
+            // 폭염주의보(33) 단독·혼잡 주의·영업종료 단독 → WARNING
+            // (2026-09-14 핸드오프 브리프: 휴무는 항상 긴급으로 취급)
+            if (weather || heatUrgent || crowdUrgent || closedDay || count >= 2) {
                 level = TriggerLevel.DANGER;
             } else {
                 level = TriggerLevel.WARNING;
@@ -427,5 +439,29 @@ public class TriggerDetectionService {
                 .hoursEndedAffectedItemIds(hoursEndedAffectedItemIds)
                 .crowdAffectedItemIds(crowdAffectedItemIds)
                 .build();
+    }
+
+    /**
+     * 휴무 알림 문구를 장소 특정형으로 - 이름을 못 구하면(레거시 데이터 등) 기존 일반 문구로 폴백.
+     * 2곳 이상이면 전부 나열한다("외 N곳" 축약 금지 - 2026-09-14 핸드오프 브리프 O1 확정).
+     */
+    // package-private: 테스트에서 직접 호출
+    static String closedDayHeadline(List<String> placeNames) {
+        if (placeNames == null || placeNames.isEmpty()) {
+            return "방문일이 정기휴무인 장소가 있어요.";
+        }
+        return String.join(", ", placeNames) + closedDayJosa(placeNames.get(placeNames.size() - 1)) + " 오늘 휴무예요.";
+    }
+
+    /** 마지막 장소명의 받침 유무로 이/가 조사를 고른다. 한글 완성형이 아니면(영문 등) "이"로 둔다. */
+    private static String closedDayJosa(String lastPlaceName) {
+        if (lastPlaceName == null || lastPlaceName.isEmpty()) {
+            return "이";
+        }
+        char last = lastPlaceName.charAt(lastPlaceName.length() - 1);
+        if (last < 0xAC00 || last > 0xD7A3) {
+            return "이";
+        }
+        return (last - 0xAC00) % 28 == 0 ? "가" : "이";
     }
 }
