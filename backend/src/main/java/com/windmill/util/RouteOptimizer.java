@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * 추천 후보 동선 최적화 — Haversine 순열 전수조사(소수 n) / NN 폴백.
- * 시작점은 여유율(혼잡↓)이 가장 좋은 곳으로 고정한 뒤 나머지를 최단으로 잇는다.
+ * 시작점은 혼잡도가 가장 낮은 곳으로 고정한 뒤 나머지를 최단으로 잇는다.
  */
 public final class RouteOptimizer {
 
@@ -32,7 +32,7 @@ public final class RouteOptimizer {
             return new ArrayList<>(candidates);
         }
 
-        // 시작점: 여유율(혼잡↓)이 가장 좋은 곳 — 제품 목표와 맞춤
+        // 시작점: 혼잡도가 가장 낮은 곳 — 제품 목표와 맞춤
         RecommendationCandidate start = withCoords.stream()
                 .min(RouteOptimizer::compareCrowdThenName)
                 .orElse(withCoords.get(0));

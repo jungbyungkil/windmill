@@ -81,9 +81,9 @@ public class Stage4TagMatchingService {
 
     private String buildPrompt(List<RelatedCandidate> candidates, List<String> requestedTags, String query, String childAgeBand) {
         String candidateLines = candidates.stream()
-                .map(c -> String.format("- %s (분류: %s, 여유율: %s, 실내: %s, 우천: %s)",
+                .map(c -> String.format("- %s (분류: %s, 혼잡도: %s, 실내: %s, 우천: %s)",
                         c.getPlaceName(), c.getCategoryLcls(),
-                        c.getCrowdRate() == null ? "정보없음" : String.format("%.0f%%", 100 - c.getCrowdRate()),
+                        c.getCrowdRate() == null ? "정보없음" : String.format("%.0f%%", c.getCrowdRate()),
                         Boolean.TRUE.equals(c.getIndoor()) ? "예" : "아니오",
                         c.getRainSensitivity() == null ? "정보없음" : c.getRainSensitivity().name()))
                 .collect(Collectors.joining("\n"));
@@ -155,7 +155,7 @@ public class Stage4TagMatchingService {
 
     private String defaultOneLiner(RelatedCandidate c) {
         if (c.getCrowdRate() != null) {
-            return String.format("%s, 지금 여유율 %.0f%%예요.", c.getPlaceName(), 100 - c.getCrowdRate());
+            return String.format("%s, 지금 혼잡도 %.0f%%예요.", c.getPlaceName(), c.getCrowdRate());
         }
         return c.getPlaceName() + "을(를) 추천해요.";
     }
@@ -175,7 +175,6 @@ public class Stage4TagMatchingService {
                 .category(c.getCategoryLcls())
                 .thumbnailUrl(c.getThumbnailUrl())
                 .crowdRate(c.getCrowdRate())
-                .freeRatePercent(c.getCrowdRate() == null ? null : 100 - c.getCrowdRate())
                 .matchedTags(tags)
                 .oneLiner(oneLiner)
                 .rank(c.getRank())

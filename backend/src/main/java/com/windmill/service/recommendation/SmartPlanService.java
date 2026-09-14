@@ -1192,7 +1192,7 @@ public class SmartPlanService {
             if (CrowdCongestionEvaluator.fromPeakRelativeRate(c.getCrowdRate()).isTriggered()) {
                 return "인기 명소";
             }
-            return String.format("여유율 %.0f%%", 100 - c.getCrowdRate());
+            return String.format("혼잡도 %.0f%%", c.getCrowdRate());
         }
         return "동선에 맞춰 이어져요";
     }

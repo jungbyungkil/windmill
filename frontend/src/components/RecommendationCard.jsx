@@ -100,8 +100,8 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         {candidate.distanceKm !== null && candidate.distanceKm !== undefined && (
           <span className="reco-distance">👣 {candidate.distanceKm.toFixed(1)}km</span>
         )}
-        {candidate.freeRatePercent !== null && candidate.freeRatePercent !== undefined && (
-          <span className="reco-free-rate">여유율 {Math.round(candidate.freeRatePercent)}%</span>
+        {candidate.crowdRate !== null && candidate.crowdRate !== undefined && (
+          <span className="reco-crowd-rate">혼잡도 {Math.round(candidate.crowdRate)}%</span>
         )}
         {candidate.matchedTags?.map((t) => <span key={t} className="tag-chip">{t}</span>)}
       </div>

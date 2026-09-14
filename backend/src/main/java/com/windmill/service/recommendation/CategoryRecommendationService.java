@@ -214,7 +214,6 @@ public class CategoryRecommendationService {
                 .category(category.getLabel())
                 .thumbnailUrl(thumb)
                 .crowdRate(crowdRate)
-                .freeRatePercent(crowdRate == null ? null : 100.0 - crowdRate)
                 .matchedTags(tags)
                 .oneLiner(oneLiner(category, s.getTitle(), crowdRate))
                 .addr1(s.getAddr1())
@@ -239,10 +238,10 @@ public class CategoryRecommendationService {
 
     private String oneLiner(PlaceCategory category, String placeName, Double crowdRate) {
         if (crowdRate != null && crowdRate < 50) {
-            return placeName + " · 지금 여유로워요 (혼잡 " + Math.round(crowdRate) + "%)";
+            return placeName + " · 지금 여유로워요 (혼잡도 " + Math.round(crowdRate) + "%)";
         }
         if (crowdRate != null) {
-            return placeName + " · 여유율 " + Math.round(100 - crowdRate) + "% " + category.getSubLabel();
+            return placeName + " · 혼잡도 " + Math.round(crowdRate) + "% " + category.getSubLabel();
         }
         return category.getSubLabel() + "으로 추천하는 " + placeName;
     }

@@ -17,8 +17,7 @@ public class RecommendationCandidate {
     private String placeName;
     private String category;
     private String thumbnailUrl;       // firstimage, 없으면 null
-    private Double crowdRate;          // 원본 집중률 (0~100), 없으면 null
-    private Double freeRatePercent;    // 여유율 = 100 - crowdRate (응답 시점 가공)
+    private Double crowdRate;          // 원본 집중률 (0~100), 없으면 null - 화면 표기는 "혼잡도"로 통일
     private List<String> matchedTags;  // Stage4 LLM 매칭 결과
     private String oneLiner;           // Stage4 LLM 생성 한 문장
     private int rank;                  // 연관순위 (Stage1)
