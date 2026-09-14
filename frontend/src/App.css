@@ -625,7 +625,8 @@
   justify-content: flex-start;
   text-align: center;
   gap: 14px;
-  padding: 16px 18px 40px;
+  /* 하단 탭바(2026-09-14 사용자 요청으로 홈 화면에도 추가)에 가리지 않게 */
+  padding: 16px 18px max(112px, calc(92px + env(safe-area-inset-bottom, 0px)));
   max-width: 520px;
   margin: 0 auto;
   width: 100%;

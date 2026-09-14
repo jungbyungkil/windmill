@@ -205,6 +205,7 @@ export default function App() {
   const geoDeniedRef = useRef(false);
   const [activeDate, setActiveDate] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [homeTabHint, setHomeTabHint] = useState(null);
   const [tripSection, setTripSection] = useState('home');
 
   useEffect(() => {
@@ -332,6 +333,17 @@ export default function App() {
     setMenuOpen(false);
     leaveItineraryView();
     navigate('/');
+  }
+
+  /**
+   * 홈 화면(아직 일정 없음)의 하단 탭 - "홈"만 실제 이동이고 나머지(일정/지도/검색/알림/프로필)는
+   * 진행 중인 일정이 있어야 의미가 있는 화면이라 안내 토스트만 띄운다(2026-09-14 사용자 요청,
+   * 동작 방식은 사용자가 직접 선택함).
+   */
+  function handleHomeTabSelect(key) {
+    if (key === 'main') return;
+    setHomeTabHint('먼저 여행을 만들어주세요');
+    setTimeout(() => setHomeTabHint(null), 2000);
   }
 
   /**
@@ -1764,6 +1776,11 @@ export default function App() {
                   onOverwrite={handleOverwriteDuplicate}
                   onClose={() => setDuplicateConflict(null)}
                 />
+                <Toast
+                  toast={homeTabHint ? { text: homeTabHint, tone: 'success' } : null}
+                  onDismiss={() => setHomeTabHint(null)}
+                />
+                <BottomTabBar active="main" onSelect={handleHomeTabSelect} />
               </>
             )
         }
