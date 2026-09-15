@@ -58,4 +58,13 @@ public final class KoreaClock {
         }
         return utcWall.atOffset(ZoneOffset.UTC).atZoneSameInstant(ZONE).toOffsetDateTime();
     }
+
+    /**
+     * 지금 KST를 ISO-8601 문자열로("2026-09-15T19:16:30+09:00") - 제안·이력·검증 응답 등 API에
+     * 그대로 내려주는 타임스탬프용. PlanHistoryService/ProposalService/PlaceBatchCheckService가
+     * 각자 들고 있던 동일 로직을 여기 하나로 합쳤다(2026-09-15 코드 리뷰에서 중복 발견).
+     */
+    public static String nowKstIso() {
+        return OffsetDateTime.now(ZONE).withNano(0).toString();
+    }
 }

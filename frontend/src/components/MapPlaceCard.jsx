@@ -3,7 +3,8 @@ import { HOURS_PHASE_LABEL } from '../utils/hoursPhase';
 import { isPlaceInItinerary } from '../utils/itineraryMembership';
 
 /**
- * 지도 마커/리스트에서 고른 장소 카드.
+ * 지도 마커/리스트에서 고른 장소 카드. 상태 3단계(2026-09-15 핸드오프 브리프 9.4):
+ * 미담김 → 장바구니에 담김 → 일정에 반영됨(=기존 itineraryItems 포함, disabled).
  * 포함 여부는 일정 항목 목록으로 이 안에서 계산한다(호출부가 boolean을 잘못 넘기지 못하게).
  */
 export default function MapPlaceCard({
@@ -11,9 +12,10 @@ export default function MapPlaceCard({
   itineraryItems = [],
   pendingAddedIds,
   pendingRemovedIds,
+  inBasket = false,
   hoursPhase = 'UNKNOWN',
   busy = false,
-  onAdd,
+  onToggleBasket,
   onRemove,
   onClose,
 }) {
@@ -44,7 +46,7 @@ export default function MapPlaceCard({
           {place.category && <span className="map-place-chip">{place.category}</span>}
           <span className={`map-place-hours phase-${phaseClass}`}>{label}</span>
           {dist && <span className="map-place-chip muted">{dist}</span>}
-          {inItinerary && <span className="map-place-chip added">담김</span>}
+          {inItinerary && <span className="map-place-chip added">이미 담김</span>}
         </div>
         {place.addr1 && <p className="map-place-card-addr">{place.addr1}</p>}
         <div className="map-place-card-actions">
@@ -60,11 +62,10 @@ export default function MapPlaceCard({
           ) : (
             <button
               type="button"
-              className="map-place-card-cta"
-              onClick={() => onAdd?.(place)}
-              disabled={busy}
+              className={`map-place-card-cta${inBasket ? ' in-basket' : ''}`}
+              onClick={() => onToggleBasket?.(place)}
             >
-              {busy ? '담는 중…' : '일정에 추가'}
+              {inBasket ? '담김' : '바구니에 담기'}
             </button>
           )}
           {canOpenInKakaoMap(place) && (

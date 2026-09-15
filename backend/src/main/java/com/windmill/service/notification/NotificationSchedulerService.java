@@ -9,6 +9,7 @@ import com.windmill.dto.TriggerResult;
 import com.windmill.repository.AlertEventRepository;
 import com.windmill.repository.ItineraryRepository;
 import com.windmill.repository.PushSubscriptionRepository;
+import com.windmill.service.itinerary.ProposalService;
 import com.windmill.service.push.PushSenderService;
 import com.windmill.service.trigger.TriggerDetectionService;
 import com.windmill.util.ClosingTimeGate;
@@ -18,6 +19,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -49,6 +53,9 @@ public class NotificationSchedulerService {
     static final int START_LEAD_MINUTES = 30;
     /** 마지막 일정 종료 후 이 안에 들어오면 마무리 알림. 넘으면 발송 없이 마킹만(캐치업 스팸 방지). */
     static final int DAY_END_GRACE_MINUTES = 120;
+    /** 한 틱에서 동시에 처리할 일정 수 상한 - 하나가 느려도(외부 API 최대 20초) 나머지가 순서대로
+     *  막히지 않게 한다(2026-09-15 코드 리뷰에서 발견 - 이전엔 for 루프로 완전 순차 처리했다). */
+    static final int TICK_CONCURRENCY = 5;
 
     private final ItineraryRepository itineraryRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
@@ -56,44 +63,106 @@ public class NotificationSchedulerService {
     private final TriggerDetectionService triggerDetectionService;
     private final NotificationComposer composer;
     private final PushSenderService pushSenderService;
+    private final ProposalService proposalService;
 
     @Scheduled(initialDelay = 1, fixedDelay = 2, timeUnit = TimeUnit.MINUTES)
     void tick() {
         runTick(KoreaClock.now());
     }
 
-    /** 실제 처리 본문 - KoreaClock을 목킹하지 않고 명시적 now로 테스트하기 위해 분리. */
+    /**
+     * 실제 처리 본문 - KoreaClock을 목킹하지 않고 명시적 now로 테스트하기 위해 분리.
+     *
+     * <p>일정별 처리를 {@link Schedulers#boundedElastic()}에서 최대 {@value #TICK_CONCURRENCY}건
+     * 동시에 돌린다. 예전엔 for 루프로 완전 순차 처리해서, detectForItinerary 하나가 외부 API
+     * 지연으로 20초 가까이 걸리면 뒤 순서 일정들이 그만큼 밀렸다(2026-09-15 코드 리뷰에서 발견 -
+     * 구독 없는 일정도 매 틱 감지를 도는 것 자체는 의도한 변경이라 되돌리지 않고, 대신 서로 막지
+     * 않게 병렬화했다).
+     */
     void runTick(LocalDateTime now) {
         LocalDate today = now.toLocalDate();
         List<Itinerary> active = itineraryRepository.findActiveTodayForNotification(today);
-        for (Itinerary itinerary : active) {
-            if (itinerary.getStartDate() != null && !itinerary.getStartDate().equals(today)) {
-                continue;
-            }
-            try {
-                processItinerary(itinerary, now);
-            } catch (Exception e) {
-                log.warn("[Notification] itinerary={} 처리 실패: {}", itinerary.getId(), e.toString());
-            }
-        }
+        Flux.fromIterable(active)
+                .filter(itinerary -> itinerary.getStartDate() == null || itinerary.getStartDate().equals(today))
+                .flatMap(itinerary -> Mono.fromRunnable(() -> {
+                            try {
+                                processItinerary(itinerary, now);
+                            } catch (Exception e) {
+                                log.warn("[Notification] itinerary={} 처리 실패: {}", itinerary.getId(), e.toString());
+                            }
+                        }).subscribeOn(Schedulers.boundedElastic()),
+                        TICK_CONCURRENCY)
+                .blockLast(Duration.ofMinutes(1));
     }
 
     private void processItinerary(Itinerary itinerary, LocalDateTime now) {
-        List<PushSubscription> subs = resolveSubscriptions(itinerary);
-        if (subs.isEmpty()) {
-            return;
-        }
-
         TriggerResult result = triggerDetectionService.detectForItinerary(itinerary)
                 .blockOptional(Duration.ofSeconds(20)).orElse(null);
         if (result == null) {
             return;
         }
 
-        handleUrgentStatus(itinerary, subs, result, now);
-        handleDayBookends(itinerary, subs, result, now);
+        // 푸시 구독이 없어도(권한 미허용 등) 상태 감지·제안 생성은 그대로 돈다 - 알림 발송만 구독에 의존한다.
+        List<PushSubscription> subs = resolveSubscriptions(itinerary);
+        if (!subs.isEmpty()) {
+            handleUrgentStatus(itinerary, subs, result, now);
+            handleDayBookends(itinerary, subs, result, now);
+            persistNotificationState(itinerary);
+        }
 
-        itineraryRepository.save(itinerary);
+        // 제안 생성은 별도 트랜잭션(ProposalService)에서 자신만의 Itinerary 사본을 읽고 저장한다 -
+        // persistNotificationState() 이후에 호출해야 이 메서드가 들고 있는(제안 필드를 모르는)
+        // 사본으로 나중에 덮어써서 방금 만든 제안을 없애 버리는 사고를 피한다(2026-09-15 핸드오프
+        // 브리프 작업 중 발견).
+        if (result.isRouteTangleTrigger()) {
+            try {
+                boolean freshProposal = proposalService.generateRouteProposalIfNeeded(itinerary.getId());
+                // 긴급(DANGER)일 때만 제안 전용 푸시 - 나머지는 인앱 카드로만 노출(핸드오프 브리프
+                // 결정 #5). fresh=true는 "새 추천으로 바뀐 순간"만 가리키므로(직전 제안과 내용이
+                // 같으면 false) 같은 제안을 붙잡고 있는 동안 2분마다 재발송되지 않는다 - 별도
+                // dedup 없이도 handleUrgentStatus와 같은 급의 "새 이벤트"로 취급해도 안전하다.
+                if (freshProposal && result.getLevel() == TriggerLevel.DANGER && !subs.isEmpty()) {
+                    notifyRouteProposal(itinerary, subs, result, now);
+                }
+            } catch (Exception e) {
+                log.warn("[Notification] itinerary={} 동선 제안 생성 실패: {}", itinerary.getId(), e.toString());
+            }
+        }
+    }
+
+    /**
+     * handleUrgentStatus/handleDayBookends가 이 tick에서 실제로 바꾼 4개 필드만 최신 엔티티에
+     * 반영해 저장한다 - staleSnapshot을 통째로 save()하지 않는다.
+     *
+     * <p>detectForItinerary가 최대 20초 블로킹하는 동안 사용자가 ProposalService.accept/reject를
+     * 호출해 pendingProposal·routeProposalCooldownUntil을 바꾸고 먼저 커밋할 수 있다. 그 뒤 이
+     * 메서드가 tick 시작 시점(20초 전)의 스냅샷을 그대로 save()하면 방금 커밋된 변경을 덮어써
+     * 사용자가 막 승인/거절한 제안이 되살아난다(2026-09-15 코드 리뷰에서 발견 - pendingProposal
+     * 생성 경로는 이미 이 패턴으로 고쳐뒀었는데 이 일반 save 경로는 놓쳤었다). findById로 다시 읽어
+     * 그 사이의 변경 위에 이 tick의 결과만 얹는다 - 경쟁 창을 20초에서 findById~save 사이의
+     * 수 밀리초로 줄인다(낙관적 락 없이 완전히 없애려면 @Version이 필요하지만 이 앱 규모에선
+     * 과함).
+     */
+    private void persistNotificationState(Itinerary staleSnapshot) {
+        itineraryRepository.findById(staleSnapshot.getId()).ifPresent(fresh -> {
+            fresh.setLastKnownTriggerLevel(staleSnapshot.getLastKnownTriggerLevel());
+            fresh.setLastKnownTriggerSignature(staleSnapshot.getLastKnownTriggerSignature());
+            fresh.setDayStartNotified(staleSnapshot.isDayStartNotified());
+            fresh.setDayEndNotified(staleSnapshot.isDayEndNotified());
+            itineraryRepository.save(fresh);
+        });
+    }
+
+    /** 긴급 동선 제안 전용 푸시 - handleUrgentStatus의 일반 "상태 변화" 알림과는 별개 채널(다른
+     *  nudgeId, 별도 dedup 필드)이라 같은 틱에 둘 다 뜰 수 있다. DANGER는 route 단독으로는 못 오르고
+     *  (비·폭염·혼잡 긴급 등과 겹쳐야 함) 실제로는 드물게만 겹쳐 뜨므로 허용했다(2026-09-15
+     *  핸드오프 브리프 P2). */
+    private void notifyRouteProposal(Itinerary itinerary, List<PushSubscription> subs, TriggerResult result,
+                                     LocalDateTime now) {
+        String title = "🔴 동선을 다시 짤 수 있어요";
+        String body = "이동을 줄일 수 있는 새 동선을 제안했어요. 앱에서 확인하고 적용해보세요.";
+        recordAlertEvent(itinerary, "PROPOSAL", result, title, body, now, null);
+        dispatch(itinerary, subs, title, body, "PROPOSAL:ROUTE@" + minuteKey(now), now, false, null, true);
     }
 
     /**
@@ -327,6 +396,18 @@ public class NotificationSchedulerService {
 
     private void dispatch(Itinerary itinerary, List<PushSubscription> subs, String title, String body,
                           String nudgeId, LocalDateTime now, boolean finish, Long highlightItemId) {
+        dispatch(itinerary, subs, title, body, nudgeId, now, finish, highlightItemId, false);
+    }
+
+    /**
+     * @param proposalChannel true면 PushSubscription.lastProposalSentKey로 dedup한다(일반
+     *                        lastSentKey와 별개 필드) - 같은 틱에 STATUS 알림과 제안 전용 알림이
+     *                        둘 다 나가면 하나의 필드를 같이 쓸 때 나중 것이 먼저 것의 dedup
+     *                        마커를 덮어써 버렸다(2026-09-15 코드 리뷰에서 발견).
+     */
+    private void dispatch(Itinerary itinerary, List<PushSubscription> subs, String title, String body,
+                          String nudgeId, LocalDateTime now, boolean finish, Long highlightItemId,
+                          boolean proposalChannel) {
         String todayKey = now.toLocalDate() + ":" + nudgeId;
         String url = "/?open=" + itinerary.getId()
                 + (highlightItemId != null ? "&item=" + highlightItemId : "")
@@ -335,13 +416,18 @@ public class NotificationSchedulerService {
                 "itineraryId", String.valueOf(itinerary.getId()),
                 "url", url);
         for (PushSubscription sub : subs) {
-            if (todayKey.equals(sub.getLastSentKey())) {
+            String lastKey = proposalChannel ? sub.getLastProposalSentKey() : sub.getLastSentKey();
+            if (todayKey.equals(lastKey)) {
                 log.info("[Notification] 중복 스킵 itinerary={} nudgeId={}", itinerary.getId(), nudgeId);
                 continue;
             }
             boolean sent = pushSenderService.send(sub.getFcmToken(), title, body, data);
             log.info("[Notification] itinerary={} nudgeId={} sent={}", itinerary.getId(), nudgeId, sent);
-            sub.setLastSentKey(todayKey);
+            if (proposalChannel) {
+                sub.setLastProposalSentKey(todayKey);
+            } else {
+                sub.setLastSentKey(todayKey);
+            }
             pushSubscriptionRepository.save(sub);
         }
     }

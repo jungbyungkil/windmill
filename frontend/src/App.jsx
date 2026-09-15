@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import useSession from './hooks/useSession';
+import useTripBasket from './hooks/useTripBasket';
 import * as api from './api/windmillApi';
 import CreateTripScreen from './components/CreateTripScreen';
 import SmartPlanScreen from './components/SmartPlanScreen';
@@ -8,6 +9,9 @@ import CategoryRecommendScreen from './components/CategoryRecommendScreen';
 import AutoPlanScreen from './components/AutoPlanScreen';
 import BackHeader from './components/BackHeader';
 import PinwheelHero from './components/PinwheelHero';
+import ProposalCard from './components/ProposalCard';
+import TripBasketBar from './components/TripBasketBar';
+import TripBasketSheet from './components/TripBasketSheet';
 import PinwheelLoader from './components/PinwheelLoader';
 import Toast from './components/Toast';
 import VisitConfirmationNudge from './components/VisitConfirmationNudge';
@@ -38,6 +42,7 @@ import GuideScreen from './components/GuideScreen';
 import TravelerProfileScreen from './components/TravelerProfileScreen';
 import { recordView } from './utils/viewHistory';
 import { placeSnapshotFields } from './utils/placeSnapshot';
+import { readContentId } from './utils/itineraryMembership';
 import { syncPushSubscription } from './utils/webPush';
 import { hasValidCoords } from './utils/kakaoMap';
 import { useResolveFeedback } from './hooks/useResolveFeedback';
@@ -125,6 +130,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const { sessionId, itineraryId, setItineraryId, draftItineraryId, leaveItineraryView, resumeDraftItinerary } = useSession();
+  const basket = useTripBasket();
 
   const [shareToken, setShareToken] = useState(() => readShareTokenFromHash());
   const [itinerary, setItinerary] = useState(null);
@@ -140,6 +146,28 @@ export default function App() {
   const [trigger, setTrigger] = useState(null);
   const triggerRef = useRef(null);
   useEffect(() => { triggerRef.current = trigger; }, [trigger]);
+  // 승인 대기 중인 자동 변경 제안(2026-09-15 핸드오프 브리프: 동선 변경 승인제 전환) - 백엔드가
+  // 동선 꼬임 등을 감지해도 여기 채워지기만 할 뿐, 사용자가 [일정에 적용]을 눌러야 실제로 바뀐다.
+  const [proposal, setProposal] = useState(null);
+  const [proposalApplying, setProposalApplying] = useState(false);
+  const [proposalDismissing, setProposalDismissing] = useState(false);
+  // 여행 바구니(2026-09-15 핸드오프 브리프: 지도 다중 선택 → 확인 팝업 일괄 추가) - basket 자체는
+  // useTripBasket이 localStorage로 들고 있고, 여기는 바텀시트 UI 상태만.
+  const [basketSheetOpen, setBasketSheetOpen] = useState(false);
+  const [basketConfirming, setBasketConfirming] = useState(false);
+  const [basketError, setBasketError] = useState(null);
+  const [basketFailedContentId, setBasketFailedContentId] = useState(null);
+  const [basketSuccessNotice, setBasketSuccessNotice] = useState(null);
+  // Phase B: 바텀시트를 열 때(또는 재오픈 시) 일괄 공공데이터 검증(9.5) - contentId로 매칭.
+  const [basketCheckResults, setBasketCheckResults] = useState({});
+  const [basketChecking, setBasketChecking] = useState(false);
+  const [basketCheckedAt, setBasketCheckedAt] = useState(null);
+  // 검증 API 자체가 실패했을 때(네트워크 오류 등) - urgentCount만 보면 0이라 경고 없이 그냥
+  // 넘어갈 뻔했다(2026-09-15 코드 리뷰에서 발견). 확정 전에 별도로 한 번 더 물어본다.
+  const [basketCheckFailed, setBasketCheckFailed] = useState(false);
+  // 바텀시트를 빠르게 닫았다 다시 열면 먼저 보낸(느린) 검증 응답이 나중에 도착해 최신 결과를
+  // 덮어쓸 수 있다 - 요청마다 증가하는 id로 "지금 유효한 요청인지" 판별한다(코드 리뷰에서 발견).
+  const basketCheckRequestIdRef = useRef(0);
   const [weatherItems, setWeatherItems] = useState(null);
   const [midWeather, setMidWeather] = useState(null);
 
@@ -198,7 +226,6 @@ export default function App() {
   const [suggestError, setSuggestError] = useState(null);
   const [sortByTimeLoading, setSortByTimeLoading] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
-  const autoOptimizedRef = useRef(false);
   const autoRecordPromptedRef = useRef(false);
   // 동선 최적화용 GPS 권한 거부를 세션(이 컴포넌트 생존 기간) 내에서 기억 - 한 번 거부하면
   // "동선 최적화"/"이 순서 어때요?"를 다시 눌러도 재요청하지 않고 서버 폴백(남은 첫 슬롯)으로 보낸다.
@@ -207,6 +234,15 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [homeTabHint, setHomeTabHint] = useState(null);
   const [tripSection, setTripSection] = useState('home');
+  // 지도/검색 화면은 한 번 방문하면 계속 마운트 상태로 두고 CSS로만 숨긴다(2026-09-15 핸드오프
+  // 브리프 4.1 - 카메라 위치·검색어·검색 결과가 탭 전환마다 초기화되던 문제). 처음 방문하기 전까지는
+  // 지도 SDK를 미리 로드하지 않도록 "방문한 적 있음"만 true로 바꾸고 되돌리지 않는다.
+  const [mapVisited, setMapVisited] = useState(false);
+  const [searchVisited, setSearchVisited] = useState(false);
+  useEffect(() => {
+    if (tripSection === 'map') setMapVisited(true);
+    if (tripSection === 'search') setSearchVisited(true);
+  }, [tripSection]);
 
   useEffect(() => {
     function onHash() {
@@ -488,6 +524,45 @@ export default function App() {
     api.getTriggerStatus(itineraryId, origin).then(setTrigger).catch(() => {});
   }, [itineraryId]);
 
+  const refreshProposal = useCallback(() => {
+    if (!itineraryId) return;
+    api.getProposal(itineraryId).then(setProposal).catch(() => {});
+  }, [itineraryId]);
+
+  async function handleApplyProposal() {
+    if (!proposal || proposalApplying) return;
+    setProposalApplying(true);
+    try {
+      const result = await api.acceptProposal(itineraryId, proposal.proposalId);
+      setItinerary(result);
+      setProposal(null);
+      setAutoReplaceNotice('일정을 변경하고 이력에 기록했어요');
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+      refreshTrigger();
+    } catch (e) {
+      setAutoReplaceNotice(
+        e?.status === 409 ? '제안이 만료됐어요.' : `적용하지 못했어요. ${e?.message || ''}`,
+      );
+      setProposal(null);
+      setTimeout(() => setAutoReplaceNotice(null), 5000);
+    } finally {
+      setProposalApplying(false);
+    }
+  }
+
+  async function handleDismissProposal() {
+    if (!proposal || proposalDismissing) return;
+    setProposalDismissing(true);
+    try {
+      await api.rejectProposal(itineraryId, proposal.proposalId);
+    } catch {
+      /* 이미 없어졌어도(만료 등) 카드는 어차피 걷어낸다 */
+    } finally {
+      setProposal(null);
+      setProposalDismissing(false);
+    }
+  }
+
   // 액션 즉시 피드백(낙관적 UI · 즉시 트리거 해소 · 실패 롤백 · 2초 토스트) 공통 훅.
   // 동선 최적화 / 혼잡도(비·폭염) 대안이 같은 패턴을 공유한다.
   const {
@@ -498,15 +573,168 @@ export default function App() {
   useEffect(() => {
     if (!itineraryId) return;
     refreshTrigger();
+    refreshProposal();
     if (itinerary?.weatherNx && itinerary?.weatherNy) {
       api.getWeather(itinerary.weatherNx, itinerary.weatherNy).then(setWeatherItems).catch(() => setWeatherItems(null));
     }
     if (itinerary?.signguFullCode) {
       api.getMidWeather(itinerary.signguFullCode).then(setMidWeather).catch(() => setMidWeather(null));
     }
-    const id = setInterval(refreshTrigger, TRIGGER_POLL_MS);
+    const id = setInterval(() => {
+      refreshTrigger();
+      refreshProposal();
+    }, TRIGGER_POLL_MS);
     return () => clearInterval(id);
-  }, [itineraryId, itinerary?.weatherNx, itinerary?.weatherNy, itinerary?.signguFullCode, refreshTrigger]);
+  }, [itineraryId, itinerary?.weatherNx, itinerary?.weatherNy, itinerary?.signguFullCode, refreshTrigger, refreshProposal]);
+
+  // 여행 바구니에 저장된 지역이 현재 일정 지역과 다르면 다이얼로그 없이 조용히 폐기한다(9.7절
+  // 마지막 항목 - "앱 재진입 시"). 지역 변경 자체를 가로채 확인 다이얼로그를 띄우는 건
+  // CreateTripScreen의 handleSignguChange 쪽(생성 폼에서 직접 바꿀 때)에서 한다.
+  useEffect(() => {
+    if (itinerary?.signguFullCode) {
+      basket.discardIfRegionMismatch(itinerary.signguFullCode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itinerary?.signguFullCode]);
+
+  const basketContentIds = useMemo(
+    () => new Set(basket.items.map(readContentId).filter(Boolean)),
+    [basket.items],
+  );
+
+  function handleToggleBasket(place) {
+    basket.toggle(place, itinerary?.signguFullCode);
+  }
+
+  /**
+   * 새 여행 만들기 폼에서 지역을 바꾸기 직전에 호출된다(9.7절) - 여행 바구니에 담긴 게 있고 그
+   * 지역이 새로 고르려는 지역과 다르면 확인 다이얼로그. 취소하면 지역 변경 자체도 취소돼야 하므로
+   * boolean을 돌려주고, 호출부(CreateTripScreen)가 false면 setState를 하지 않는다.
+   */
+  function handleBeforeRegionChange(nextSignguFullCode) {
+    if (basket.count > 0 && basket.regionCode && basket.regionCode !== nextSignguFullCode) {
+      const ok = window.confirm(
+        `지역을 바꾸면 여행 바구니에 담은 ${basket.count}곳이 모두 사라져요. 계속할까요?`,
+      );
+      if (!ok) return false;
+      basket.resetForRegionChange(nextSignguFullCode);
+    }
+    return true;
+  }
+
+  function toBatchAddRequest(place) {
+    return {
+      contentId: place.contentId,
+      contentTypeId: Number.isFinite(Number(place.contentTypeId)) ? Number(place.contentTypeId) : undefined,
+      placeName: place.placeName,
+      thumbnailUrl: place.thumbnailUrl,
+      tags: place.matchedTags || place.tags,
+      crowdRate: place.crowdRate,
+      addr1: place.addr1,
+      tel: place.tel,
+      useFeeText: place.useFeeText,
+      isFree: place.isFree,
+      estimatedCostPerPerson: place.estimatedCostPerPerson,
+      restDateText: place.restDateText,
+      closeTime: place.closeTime,
+      useTimeText: place.useTimeText,
+      homepageUrl: place.homepageUrl,
+      strollerFriendly: place.strollerFriendly,
+      accessibleFriendly: place.accessibleFriendly,
+      category: place.category,
+      mapX: place.mapX,
+      mapY: place.mapY,
+      ...placeSnapshotFields(place),
+    };
+  }
+
+  function toBatchCheckRequest(place) {
+    return {
+      contentId: place.contentId,
+      contentTypeId: Number.isFinite(Number(place.contentTypeId)) ? Number(place.contentTypeId) : undefined,
+      placeName: place.placeName,
+      category: place.category,
+      tags: place.matchedTags || place.tags,
+      restDateText: place.restDateText,
+      closeTime: place.closeTime,
+      useTimeText: place.useTimeText,
+      ...placeSnapshotFields(place),
+    };
+  }
+
+  /**
+   * 바텀시트를 열 때(또는 다시 열 때)마다 일괄 재검증한다(9.5절 - 검증은 바텀시트를 열 때 수행).
+   * 요청마다 증가하는 id를 캡처해, 응답이 도착했을 때 더 이상 "최신 요청"이 아니면 반영하지 않는다
+   * (빠르게 닫았다 다시 열어 두 번째 요청이 먼저 도착하는 경우의 stale override 방지 - 코드 리뷰에서
+   * 발견).
+   */
+  async function handleOpenBasketSheet() {
+    setBasketSheetOpen(true);
+    if (basket.items.length === 0) return;
+    const requestId = ++basketCheckRequestIdRef.current;
+    setBasketChecking(true);
+    try {
+      const res = await api.checkItemsBatch(itineraryId, basket.items.map(toBatchCheckRequest));
+      if (requestId !== basketCheckRequestIdRef.current) return; // 그새 새 요청이 시작됨 - 버린다
+      const byContentId = {};
+      (res.results || []).forEach((r) => { byContentId[r.contentId] = r; });
+      setBasketCheckResults(byContentId);
+      setBasketCheckedAt(res.checkedAt);
+      setBasketCheckFailed(false);
+    } catch {
+      if (requestId !== basketCheckRequestIdRef.current) return;
+      // 검증 API 자체가 실패했다 - urgentCount만 보면 0이라 경고 없이 넘어갈 뻔했다. 확정 시점에
+      // basketCheckFailed를 따로 물어본다(담기 자체는 막지 않는다).
+      setBasketCheckResults({});
+      setBasketCheckedAt(null);
+      setBasketCheckFailed(true);
+    } finally {
+      if (requestId === basketCheckRequestIdRef.current) setBasketChecking(false);
+    }
+  }
+
+  async function handleConfirmBasket() {
+    // basketChecking 중엔 확정 자체를 막는다 - 안 그러면 검증 결과가 아직 없는 채로(urgentCount=0
+    // 취급) 휴무·마감 경고 없이 그대로 담길 수 있었다(코드 리뷰에서 발견). 버튼도 TripBasketSheet
+    // 쪽에서 checking일 때 disabled 처리했지만, 더블탭 등 경합에 대비해 여기서도 한 번 더 막는다.
+    if (!itineraryId || basketConfirming || basketChecking || basket.items.length === 0) return;
+    if (basketCheckFailed) {
+      const ok = window.confirm('공공데이터 검증에 실패했어요. 확인 없이 그대로 일정에 넣을까요?');
+      if (!ok) return;
+    } else {
+      // 🔴 긴급 상태 장소가 섞여 있으면 확정 전 확인 한 번(결정 10.4) - 차단은 아니고 인지만 시킨다.
+      const urgentCount = basket.items.filter(
+        (it) => basketCheckResults[readContentId(it)]?.urgent,
+      ).length;
+      if (urgentCount > 0) {
+        const ok = window.confirm(
+          `상태가 좋지 않은 ${urgentCount}곳이 포함돼 있어요. 그대로 일정에 넣을까요?`,
+        );
+        if (!ok) return;
+      }
+    }
+    setBasketConfirming(true);
+    setBasketError(null);
+    setBasketFailedContentId(null);
+    try {
+      const result = await api.addItemsBatch(itineraryId, basket.items.map(toBatchAddRequest));
+      const count = basket.items.length;
+      setItinerary(result);
+      basket.clear();
+      setBasketSheetOpen(false);
+      setBasketCheckResults({});
+      setBasketCheckedAt(null);
+      setBasketCheckFailed(false);
+      setBasketSuccessNotice(`${count}곳을 일정에 추가했어요`);
+      setTimeout(() => setBasketSuccessNotice(null), 6000);
+      refreshTrigger();
+    } catch (e) {
+      setBasketFailedContentId(e?.data?.failedContentId || null);
+      setBasketError(e?.message || '일정에 반영하지 못했어요. 다시 시도해주세요.');
+    } finally {
+      setBasketConfirming(false);
+    }
+  }
 
   async function handleCreate(formData) {
     setCreating(true);
@@ -548,7 +776,7 @@ export default function App() {
   async function autoApplySmartPlan(created) {
     let stops = [];
     try {
-      setCreatingStage('이 지역 축제와 인기 스팟으로 오전·오후 일정을 만들고 있어요...');
+      setCreatingStage('이 지역 축제와 인기 스팟으로 일정을 만들고 있어요');
       const plan = await api.getSmartPlan(created.itineraryId, { date: created.startDate, standard: true });
       stops = plan?.stops || [];
     } catch {
@@ -986,46 +1214,8 @@ export default function App() {
     }
   }
 
-  async function handleAddRecommendation(candidate) {
-    setAddingContentId(candidate.contentId);
-    try {
-      const result = await addCandidateToItinerary(candidate, activeDate, false, { logHistory: true });
-      // 검색 탭에서 담으면 방금 담은 걸 바로 확인할 수 있게 "일정" 탭으로 이동한다(2026-09-11
-      // 사용자 요청). 마감 경고를 취소해 실제로 안 담겼으면(result=null) 이동하지 않는다.
-      if (result) selectTripSection('home');
-    } catch {
-      /* 마감 게이트 등 — ClosingGateModal / 서버 메시지로 안내 */
-    } finally {
-      setAddingContentId(null);
-    }
-  }
-
-  async function handleMapAddPlace(place) {
-    setAddingContentId(place.contentId);
-    try {
-      const result = await addCandidateToItinerary({
-        contentId: place.contentId,
-        contentTypeId: Number.isFinite(Number(place.contentTypeId)) ? Number(place.contentTypeId) : undefined,
-        placeName: place.placeName,
-        thumbnailUrl: place.thumbnailUrl,
-        addr1: place.addr1,
-        tel: place.tel,
-        mapX: place.mapX,
-        mapY: place.mapY,
-        category: place.category,
-        cat3: place.cat3,
-      }, activeDate, false, { logHistory: true });
-      // 휴무 경고를 취소하면 null — 지도 낙관적 "담김"을 되돌려야 해서 throw
-      if (!result) {
-        throw new Error('not-added');
-      }
-      // 지도 탭에서 담으면 방금 담은 걸 바로 확인할 수 있게 "일정" 탭으로 이동한다(2026-09-11 사용자 요청).
-      selectTripSection('home');
-      return result;
-    } finally {
-      setAddingContentId(null);
-    }
-  }
+  // 지도·검색의 단건 즉시 추가는 제거됐다(2026-09-15 핸드오프 브리프 10.2 - "모든 추가는 여행
+  // 바구니 확정을 경유"). handleToggleBasket이 그 자리를 대신한다.
 
   async function handleMapRemovePlace(contentId) {
     const item = visibleItems.find((i) => String(i.contentId) === String(contentId));
@@ -1118,6 +1308,11 @@ export default function App() {
    * 대안을 담거나 교체한 뒤, 스마트/자동 일정 확정 때(confirmSmartPlanCore)와 똑같이
    * 실제 이동시간 기준으로 그날 동선·시간표를 다시 잡는다. 고정(pin)한 앵커는 백엔드가
    * 자리·시각을 그대로 유지한다.
+   *
+   * applyReroute를 쓴다(예전엔 optimizeRoute라 순서가 바뀌어도 이력에 안 남았다 - 2026-09-15
+   * 핸드오프 브리프에서 "자동 변경이 change_history에 안 남는다"로 지적된 경로 중 하나. 대안 추가는
+   * 이미 사용자가 확인한 동작이라 별도 승인 단계 없이 즉시 반영하되, 실제로 바뀐 경우에만 사유와
+   * 함께 이력에 남긴다).
    */
   async function replanTimelineAfterAlternative(current) {
     const day = activeDate || current?.startDate;
@@ -1126,7 +1321,7 @@ export default function App() {
     ).length;
     if (dayItemCount < 2) return current;
     try {
-      const replanned = await api.optimizeRoute(itineraryId, day);
+      const replanned = await api.applyReroute(itineraryId, day, null, null, '대안 반영 재배치');
       setItinerary(replanned);
       setAutoReplaceNotice(
         replanned.routeHint || '대안을 반영해 이동시간·체류 기준으로 시간표를 다시 짰어요.',
@@ -1533,7 +1728,6 @@ export default function App() {
    *  startTime("HH:mm")을 주면 첫 장소 시각을 사용자가 지정한 그대로 고정한다. */
   async function handleOptimizeRoute(origin, startTime, recordHistory = false) {
     if (!itineraryId || optimizeLoading) return;
-    autoOptimizedRef.current = true;
     setOptimizeLoading(true);
     setAutoReplaceNotice(null);
     // 사용자가 명시적으로 누른 "동선 재계산"만 변경 이력(ROUTE)으로 남기고, 낙관적 UI·즉시
@@ -1688,16 +1882,10 @@ export default function App() {
     }
   }
 
-  // 동선 꼬임 감지 시 한 번 자동 재계산
-  useEffect(() => {
-    if (!trigger?.routeTangleTrigger) {
-      autoOptimizedRef.current = false;
-      return;
-    }
-    if (autoOptimizedRef.current || optimizeLoading) return;
-    handleOptimizeRoute();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trigger?.routeTangleTrigger]);
+  // 동선 꼬임은 더 이상 프론트가 조용히 자동 재계산하지 않는다 - 백엔드(NotificationSchedulerService
+  // → ProposalService)가 감지해 제안(proposal)만 만들고, 사용자가 ProposalCard에서 [일정에 적용]을
+  // 눌러야 실제로 바뀐다(2026-09-15 핸드오프 브리프: 동선 변경 승인제 전환 - 이전엔 여기서 이력 없이
+  // handleOptimizeRoute()를 호출해 사용자 모르게 순서가 바뀌었다).
 
   async function handleShareItinerary() {
     if (!itineraryId || shareBusy) return;
@@ -1788,6 +1976,7 @@ export default function App() {
                   error={createError}
                   draftItineraryId={draftItineraryId}
                   onResumeDraft={handleResumeDraft}
+                  onBeforeRegionChange={handleBeforeRegionChange}
                 />
                 <DuplicateItineraryModal
                   open={Boolean(duplicateConflict)}
@@ -1907,6 +2096,13 @@ export default function App() {
               <main className="app-main">
                 {tripSection === 'home' && (
                 <section className="trip-page-section">
+                <ProposalCard
+                  proposal={proposal}
+                  onApply={handleApplyProposal}
+                  onDismiss={handleDismissProposal}
+                  applying={proposalApplying}
+                  dismissing={proposalDismissing}
+                />
                 <PinwheelHero
                   compactWhenIdle
                   trigger={trigger}
@@ -1936,14 +2132,15 @@ export default function App() {
 
                 <Toast toast={toast} onDismiss={dismissToast} />
 
-                {itinerary.changeHistory?.length > 0 && (
+                {(itinerary.changeHistory?.length > 0 || proposal) && (
                   <div className="daytrip-chip-row">
                     <button
                       type="button"
                       className="plan-history-open-btn"
                       onClick={() => setHistoryOpen(true)}
                     >
-                      🕓 변경 이력 {itinerary.changeHistory.length}
+                      🕓 변경 이력 {itinerary.changeHistory?.length || 0}
+                      {proposal && <span className="plan-history-proposal-badge" aria-label="대기 중인 제안 있음" />}
                     </button>
                   </div>
                 )}
@@ -1981,8 +2178,11 @@ export default function App() {
                 </section>
                 )}
 
-                {tripSection === 'map' && (
-                <section className="trip-page-section">
+                {mapVisited && (
+                <section
+                  className="trip-page-section"
+                  style={tripSection === 'map' ? undefined : { display: 'none' }}
+                >
                   <header className="trip-section-head">
                     <h2>지도</h2>
                     <p className="trip-section-lead">지도에서 마커를 눌러 일정에 추가해보세요</p>
@@ -1993,28 +2193,37 @@ export default function App() {
                     closedDayAffectedItemIds={trigger?.closedDayAffectedItemIds}
                     hoursEndedAffectedItemIds={trigger?.hoursEndedAffectedItemIds}
                     crowdAffectedItemIds={trigger?.crowdAffectedItemIds}
-                    onAddPlace={handleMapAddPlace}
+                    basketContentIds={basketContentIds}
+                    onToggleBasket={handleToggleBasket}
                     onRemovePlace={handleMapRemovePlace}
                     busyContentId={addingContentId}
+                    visible={tripSection === 'map'}
                   />
+                  <TripBasketBar count={basket.count} onOpen={handleOpenBasketSheet} />
                 </section>
                 )}
 
-                {tripSection === 'search' && (
-                <section className="trip-page-section">
+                {searchVisited && (
+                <section
+                  className="trip-page-section"
+                  style={tripSection === 'search' ? undefined : { display: 'none' }}
+                >
                   <header className="trip-section-head">
                     <h2>검색</h2>
                     <p className="trip-section-lead">원하는 카테고리로 근처 장소를 찾아보세요</p>
                   </header>
                   <RecommendationSearch
                     onSearch={handleSearch}
-                    onAdd={handleAddRecommendation}
+                    onAdd={handleToggleBasket}
                     results={recoResults}
                     loading={recoLoading}
                     addingId={addingContentId}
                     originPlaces={searchOriginPlaces}
                     defaultOriginItemId={defaultSearchOriginId}
+                    itineraryItems={itinerary.items}
+                    basketContentIds={basketContentIds}
                   />
+                  <TripBasketBar count={basket.count} onOpen={handleOpenBasketSheet} />
                 </section>
                 )}
 
@@ -2049,6 +2258,38 @@ export default function App() {
               </main>
 
               <BottomTabBar active={tripSection} onSelect={selectTripSection} />
+
+              <TripBasketSheet
+                open={basketSheetOpen}
+                items={basket.items}
+                onClose={() => setBasketSheetOpen(false)}
+                onRemove={basket.remove}
+                onClearAll={basket.clear}
+                onConfirm={handleConfirmBasket}
+                confirming={basketConfirming}
+                failedContentId={basketFailedContentId}
+                errorMessage={basketError}
+                checkResults={basketCheckResults}
+                checking={basketChecking}
+                checkedAt={basketCheckedAt}
+                checkFailed={basketCheckFailed}
+              />
+
+              {basketSuccessNotice && (
+                <div className="trip-basket-toast" role="status">
+                  <span>{basketSuccessNotice}</span>
+                  <button
+                    type="button"
+                    className="trip-basket-toast-action"
+                    onClick={() => {
+                      setBasketSuccessNotice(null);
+                      selectTripSection('home');
+                    }}
+                  >
+                    일정 보기
+                  </button>
+                </div>
+              )}
 
               <PlanHistoryPanel
                 open={historyOpen}

@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 변경 이력 한 건. {@code Itinerary.changeHistory}에 FIFO(최대 9개)로 쌓인다. 원본은 별도 필드
  * ({@code Itinerary.originalSnapshot})라 FIFO 대상이 아니다.
@@ -40,4 +43,29 @@ public class PlanChangeEntry {
 
     /** 이 변경 직후의 일정 전체 스냅샷 - 되돌리기 대상 */
     private PlanSnapshot snapshot;
+
+    /**
+     * 이 변경이 반영된 경로 - MANUAL(직접 조작·CTA 클릭 즉시 적용) | PROPOSAL_ACCEPTED(승인제 제안을
+     * 사용자가 확인 후 적용). 과거 항목엔 없을 수 있어(스키마 진화 전) null-safe하게 다룬다
+     * (2026-09-15 핸드오프 브리프: 동선 변경 승인제 전환).
+     */
+    private String source;
+
+    /**
+     * 검증에 쓴 공공데이터 근거(혼잡률·영업상태 등) - 승인제 제안에서 넘어온 항목만 채워진다.
+     * 심사 시연에서 "공공데이터 실시간 확인" 차별화 포인트를 변경 이력 화면에서도 보여주기 위함.
+     */
+    @Builder.Default
+    private List<Evidence> evidence = new ArrayList<>();
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Evidence {
+        private String source;
+        private String label;
+        private String value;
+    }
 }

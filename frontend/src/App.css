@@ -180,6 +180,10 @@
   box-shadow: var(--shadow-soft);
 }
 
+.draft-resume-banner > div {
+  min-width: 0;
+}
+
 .draft-resume-banner strong {
   display: block;
   font-size: 14px;
@@ -320,11 +324,21 @@
   flex-shrink: 0;
 }
 
-.draft-resume-delete {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  font-size: 12px;
+/* 2026-09-15 핸드오프 브리프(UI 개선): "삭제" 2글자를 28px 정사각 아이콘 버튼에 욱여넣어
+   세로 2줄("삭"/"제")로 깨지던 문제 - 아이콘이 아니라 텍스트 라벨이므로 폭을 내용에 맞춰
+   늘린다(.icon-btn 기본 34x34 정사각을 이 화면에서만 덮어써야 해서 .icon-btn보다 높은
+   특이도로 클래스 2개를 겹쳐 셀렉터를 건다). 터치 타겟 44px 확보. */
+.icon-btn.draft-resume-delete {
+  width: auto;
+  height: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-finish {
@@ -507,6 +521,41 @@
   text-shadow: var(--text-shadow-priority);
 }
 
+/* 여행 바구니 확정 성공 토스트 - "일정 보기" 액션 포함(2026-09-15 핸드오프 브리프 10.1).
+   wf-toast와 같은 위치·톤이지만 액션 버튼이 있어 클릭해도 안 닫히게 별도 클래스로 둔다. */
+.trip-basket-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 420px);
+  padding: 10px 10px 10px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--level-normal) 90%, white) 0%, var(--level-normal) 100%);
+  box-shadow: 0 12px 28px -10px rgba(6, 40, 52, 0.5);
+  white-space: nowrap;
+}
+
+.trip-basket-toast-action {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* ---------- Buttons / inputs (shared) ---------- */
 
 .btn-primary {
@@ -600,9 +649,18 @@
   text-shadow: var(--text-shadow-notice);
 }
 
-.icon-btn.danger:hover {
-  background: color-mix(in srgb, var(--level-danger) 12%, white);
-  border-color: color-mix(in srgb, var(--level-danger) 45%, var(--sand-border));
+/* 2026-09-15 핸드오프 브리프(UI 개선): 기본(hover 아닌) 상태 스타일이 없어 .icon-btn의 중립
+   회색을 그대로 물려받아 카드 배경과 구분이 안 되고 비활성처럼 보이던 문제. 채움이 아닌
+   아웃라인(흰 배경 + 붉은 테두리 + 붉은 글자)으로 "이어하기"(primary teal 채움)보다 위계를 낮춘다. */
+.icon-btn.danger {
+  background: white;
+  border-color: color-mix(in srgb, var(--destructive) 45%, var(--sand-border));
+  color: var(--destructive);
+}
+
+.icon-btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--destructive) 12%, white);
+  border-color: color-mix(in srgb, var(--destructive) 60%, var(--sand-border));
 }
 
 .tag-chip {
@@ -1521,10 +1579,21 @@
   fill: var(--sea-deep);
 }
 
+/* 2026-09-15 핸드오프 브리프(UI 개선) - max-width 없이 한 줄로 렌더되면서 긴 문구가 뷰포트
+   밖으로 넘쳐 좌측이 잘려 보이던 문제. keep-all로 어절 단위 줄바꿈, min-height로 문구 길이가
+   바뀌어도(순환 단계별 문구) 바람개비 아이콘 위치가 흔들리지 않게 고정. */
 .pinwheel-loading-message {
+  max-width: min(90vw, 340px);
+  margin: 0 auto;
+  padding: 0 24px;
+  min-height: 48px;
   font-size: 15px;
   font-weight: 600;
   color: var(--sea-deep);
+  text-align: center;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   animation: pinwheel-message-fade 0.4s ease;
 }
 
@@ -3605,6 +3674,25 @@
   opacity: 0.6;
 }
 
+/* 장바구니에 담긴 상태(2026-09-15 핸드오프 브리프 9.4) - 채움으로 눈에 띄게, 탭하면 토글(빼기) */
+.btn-add.in-basket {
+  background: var(--sea);
+  color: #fff;
+}
+
+/* 이미 일정에 반영된 상태 - 회색 처리 + disabled(결정 #6) */
+.btn-add-disabled {
+  align-self: flex-start;
+  background: var(--panel-muted, #f1f5f9);
+  border: 1.5px solid var(--sand-border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: default;
+}
+
 /* ---------- Modals ---------- */
 
 .modal-overlay {
@@ -3769,6 +3857,110 @@
   font-size: 13px;
   align-items: center;
   padding: 12px 14px;
+}
+
+/* ---------- Proposal card (승인 대기 중인 자동 변경 제안 - 2026-09-15 핸드오프 브리프) ---------- */
+
+.proposal-card {
+  --nudge-tone: var(--level-warning);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 16px 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--nudge-tone) 24%, var(--sand-border));
+  background: color-mix(in srgb, var(--nudge-tone) 7%, var(--sand-card));
+  animation: fade-up 0.45s ease;
+}
+
+.proposal-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proposal-card-tag {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--nudge-tone);
+  background: color-mix(in srgb, var(--nudge-tone) 14%, white);
+  border-radius: 999px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+  box-shadow: var(--chip-shadow);
+}
+
+.proposal-card-reason {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  text-shadow: var(--text-shadow-notice);
+}
+
+.proposal-card-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.proposal-evidence-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: white;
+  border: 1px solid var(--sand-border);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.proposal-card-preview {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nudge-tone) 12%, white);
+  border: 1px solid color-mix(in srgb, var(--nudge-tone) 26%, var(--sand-border));
+}
+
+.proposal-card-arrow {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.proposal-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-proposal-apply,
+.btn-proposal-dismiss {
+  flex: 1;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-proposal-apply {
+  border: none;
+  background: var(--nudge-tone);
+  color: white;
+}
+
+.btn-proposal-dismiss {
+  border: 1.5px solid var(--sand-border);
+  background: white;
+  color: var(--ink);
+}
+
+.btn-proposal-apply:disabled,
+.btn-proposal-dismiss:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* ---------- Alert feed (알림 화면 - 발송된 알림 이력 리스트) ---------- */
@@ -4629,6 +4821,74 @@
   font-size: 12px;
   color: var(--muted);
 }
+
+/* ---------- InfoTooltip(2026-09-15 핸드오프 브리프 8.4 - 상황 태그 탭 툴팁) ---------- */
+
+.info-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-tooltip-trigger {
+  display: inline-flex;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* 배지 자체에 "탭하면 더 보여요" 느낌을 살짝 주는 점선 밑줄 - 새 인터랙션이 생겼다는 신호 */
+.info-tooltip-trigger .situational-chip {
+  border-bottom: 1px dashed color-mix(in srgb, var(--sea) 55%, transparent);
+}
+
+.info-tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(70vw, 220px);
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  word-break: keep-all;
+  box-shadow: 0 8px 20px -8px rgba(6, 40, 52, 0.5);
+  animation: fade-up 0.15s ease both;
+}
+
+.info-tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+  transform: rotate(45deg);
+  margin-top: -4px;
+}
+
+.info-tooltip-bubble.align-center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.info-tooltip-bubble.align-center::after { left: 50%; margin-left: -4px; }
+
+.info-tooltip-bubble.align-left {
+  left: 0;
+}
+.info-tooltip-bubble.align-left::after { left: 12px; }
+
+.info-tooltip-bubble.align-right {
+  right: 0;
+}
+.info-tooltip-bubble.align-right::after { right: 12px; }
 
 .item-edit-hint {
   font-size: 12px;
@@ -6205,6 +6465,14 @@
   border: 1px solid #fecaca;
 }
 
+/* 장바구니에 담긴 상태(2026-09-15 핸드오프 브리프 9.4) - 담기 버튼(채움 teal)과 구분되게
+   아웃라인으로 낮춘다. 탭하면 토글(빼기)이라 danger 톤은 피한다. */
+.map-place-card-cta.in-basket {
+  background: color-mix(in srgb, var(--sea) 10%, white);
+  color: var(--sea-deep);
+  border: 1.5px solid var(--sea);
+}
+
 .map-place-card-cta:disabled {
   opacity: 0.65;
   cursor: wait;
@@ -7042,6 +7310,279 @@
   cursor: not-allowed;
 }
 
+/* ---------- 여행 바구니(2026-09-15 핸드오프 브리프: 지도 다중 선택 → 확인 팝업 일괄 추가) ---------- */
+
+.trip-basket-bar {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+  margin: 0 auto;
+  max-width: 488px;
+  padding: 13px 18px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sea) 92%, white) 0%, var(--sea) 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 10px 24px -12px rgba(6, 85, 106, 0.55);
+  cursor: pointer;
+}
+
+.trip-basket-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 82;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.trip-basket-sheet {
+  width: min(100%, 460px);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.22);
+}
+
+@media (min-width: 520px) {
+  .trip-basket-backdrop { align-items: center; }
+  .trip-basket-sheet { border-radius: 18px; }
+}
+
+.trip-basket-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.trip-basket-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.trip-basket-close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px;
+}
+
+.trip-basket-lead {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Phase B: 일괄 공공데이터 검증(2026-09-15 핸드오프 브리프 4.1/9.5/10.3/10.4) */
+.trip-basket-checking {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.trip-basket-checked {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--level-normal);
+}
+
+/* 검증 API 자체가 실패했을 때 - 코드 리뷰에서 발견한 "경고 없이 조용히 통과" 문제의 시각적 보완 */
+.trip-basket-check-failed {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--warning-ink);
+}
+
+.trip-basket-urgent-banner {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--level-danger) 8%, white);
+  border: 1px solid color-mix(in srgb, var(--level-danger) 28%, var(--sand-border));
+  color: var(--level-danger);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.trip-basket-item-check {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--warning-ink);
+  background: color-mix(in srgb, var(--level-warning) 14%, white);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.trip-basket-item-check.is-urgent {
+  color: var(--level-danger);
+  background: color-mix(in srgb, var(--level-danger) 12%, white);
+}
+
+.trip-basket-error {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--destructive) 8%, white);
+  border: 1px solid color-mix(in srgb, var(--destructive) 30%, var(--sand-border));
+  color: var(--destructive);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.trip-basket-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* 긴 목록 대응(2026-09-15 핸드오프 브리프 10.3) - 이 값들이 없으면 flex column 안에서 리스트가
+     콘텐츠 높이만큼 늘어나 시트 전체가 max-height를 넘겨버리고, 헤더/확정 버튼이 안 고정된다.
+     flex:1 1 auto가 남는 공간을 차지하고 min-height:0이 그 공간 안에서 실제로 줄어들게 허용해야
+     overflow-y:auto가 리스트 내부에서만 스크롤을 만든다. */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.trip-basket-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--sand-border);
+  background: var(--sand-card);
+}
+
+.trip-basket-item.is-failed {
+  border-color: color-mix(in srgb, var(--destructive) 50%, var(--sand-border));
+  background: color-mix(in srgb, var(--destructive) 6%, white);
+}
+
+.trip-basket-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.trip-basket-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-muted, #f1f5f9);
+  font-size: 18px;
+}
+
+.trip-basket-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trip-basket-item-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-basket-item-category {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.trip-basket-item-failed-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--destructive);
+}
+
+.trip-basket-item-remove {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--panel-muted, #f1f5f9);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.trip-basket-item-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.trip-basket-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sand-border);
+  flex-shrink: 0;
+}
+
+.trip-basket-clear-btn {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--sand-border);
+  background: white;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trip-basket-confirm-btn {
+  flex: 1;
+  min-height: 46px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sea) 92%, white) 0%, var(--sea) 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trip-basket-clear-btn:disabled,
+.trip-basket-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ---------- 대안 일정 변경 이력 패널 ---------- */
 
 .plan-history-backdrop {
@@ -7179,6 +7720,20 @@
   color: var(--muted);
 }
 
+/* 승인제 제안이 적용된 이력 항목의 공공데이터 근거 뱃지(2026-09-15 핸드오프 브리프 - 심사 시연 포인트) */
+.plan-history-evidence {
+  margin: 6px 0;
+}
+
+.plan-history-source-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sea, #1d6b8a);
+  background: color-mix(in srgb, var(--sea, #1d6b8a) 12%, white);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
 .plan-history-item .barami-bubble {
   margin-top: 8px;
 }
@@ -7262,6 +7817,14 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* PENDING 제안이 있을 때 변경 이력 칩에 붙는 점 표시(2026-09-15 핸드오프 브리프) */
+.plan-history-proposal-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--level-warning);
 }
 
 .item-changed-badge {
@@ -7639,6 +8202,8 @@
   padding: 9px 14px;
   font-size: 13px;
   border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .my-trips-resume-disabled {
@@ -7661,8 +8226,10 @@
   border-color: color-mix(in srgb, var(--sea) 28%, var(--sand-border));
 }
 
+/* 색상은 .icon-btn.danger가 --destructive 토큰으로 전부 관리(2026-09-15 핸드오프 브리프) -
+   여기선 레이아웃만 */
 .my-trips-delete {
-  color: var(--level-danger, #dc2626);
+  flex-shrink: 0;
 }
 
 .my-trips-ended-item {

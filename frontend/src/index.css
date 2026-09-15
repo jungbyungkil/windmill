@@ -36,6 +36,11 @@
   --status-warning: var(--level-warning);
   --status-danger: var(--level-danger);
 
+  /* 파괴적 액션(삭제 등) 전용 - 상태 배지(--level-danger, 긴급 상태 "정보")와 의미가 달라 별도
+     토큰으로 분리한다(2026-09-15 핸드오프 브리프: UI 개선). --level-danger보다 톤을 낮춰
+     형광톤을 피하고 브랜드 teal과 채도 균형을 맞췄다. 흰 배경 위 대비 약 4.9:1. */
+  --destructive: #b3261e;
+
   --display: 'Outfit', 'Noto Sans KR', sans-serif;
   --sans: 'Noto Sans KR', system-ui, sans-serif;
   color-scheme: light;

@@ -439,8 +439,8 @@ export default function ItineraryItemCard({
                 onChange={(e) => setDraft((prev) => ({ ...prev, rainSensitivity: e.target.value }))}
               >
                 <option value="">자동</option>
-                <option value="SENSITIVE">우천 민감</option>
-                <option value="INSENSITIVE">우천 둔감</option>
+                <option value="SENSITIVE">비 영향 큼</option>
+                <option value="INSENSITIVE">비 영향 적음</option>
               </select>
             </label>
             <label className="item-edit-label">
@@ -450,8 +450,8 @@ export default function ItineraryItemCard({
                 onChange={(e) => setDraft((prev) => ({ ...prev, congestionSensitivity: e.target.value }))}
               >
                 <option value="">자동</option>
-                <option value="SENSITIVE">혼잡 민감</option>
-                <option value="INSENSITIVE">혼잡 둔감</option>
+                <option value="SENSITIVE">혼잡 영향 큼</option>
+                <option value="INSENSITIVE">혼잡 영향 적음</option>
               </select>
             </label>
 

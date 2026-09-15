@@ -135,6 +135,16 @@ export default function PlanHistoryPanel({
                 {entry.changedPlaceName && (
                   <p className="plan-history-changed">→ {entry.changedPlaceName}</p>
                 )}
+                {entry.evidence?.length > 0 && (
+                  <div className="proposal-card-evidence plan-history-evidence">
+                    {entry.evidence.map((e, i) => (
+                      <span key={`${e.source}-${i}`} className="proposal-evidence-badge">
+                        {e.label} {e.value} · 공공데이터 실시간 확인
+                      </span>
+                    ))}
+                    <span className="plan-history-source-tag">사용자 승인</span>
+                  </div>
+                )}
                 <p className="plan-history-stops">{stopsSummary(entry.snapshot)}</p>
                 <BaramiBubble compact comment={baramiComment(entry)} />
                 {!isCurrent && (

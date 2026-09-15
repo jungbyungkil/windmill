@@ -8,7 +8,11 @@ import SituationalChips from './SituationalChips';
 
 const BADGE_ICON = { WEATHER: '🌧️', CONGESTION: '🚶', HOURS: '🕐', RESERVATION: '📅' };
 
-export default function RecommendationCard({ candidate, onAdd, adding, nextCandidates = [], addLabel = '+ 일정에 추가', addingLabel = '담는 중...' }) {
+export default function RecommendationCard({
+  candidate, onAdd, adding, nextCandidates = [],
+  inItinerary = false, inBasket = false,
+  addLabel = '바구니에 담기', addingLabel = '담는 중...',
+}) {
   const food = isFoodPlace(candidate);
   const mealHint = food
     && candidate.estimatedCostPerPerson !== null
@@ -106,9 +110,18 @@ export default function RecommendationCard({ candidate, onAdd, adding, nextCandi
         {candidate.matchedTags?.map((t) => <span key={t} className="tag-chip">{t}</span>)}
       </div>
 
-      <button type="button" className="btn-add" onClick={() => onAdd(candidate)} disabled={adding}>
-        {adding ? addingLabel : addLabel}
-      </button>
+      {inItinerary ? (
+        <button type="button" className="btn-add btn-add-disabled" disabled>이미 담김</button>
+      ) : (
+        <button
+          type="button"
+          className={`btn-add${inBasket ? ' in-basket' : ''}`}
+          onClick={() => onAdd(candidate)}
+          disabled={adding}
+        >
+          {adding ? addingLabel : inBasket ? '담김' : addLabel}
+        </button>
+      )}
 
       {nextCandidates.length > 0 && (
         <div className="reco-chain">

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import RecommendationCard from './RecommendationCard';
 import TagGroupPicker from './TagGroupPicker';
 import { BUDGET_OPTIONS, isFoodSearch } from '../constants';
+import { isPlaceInItinerary, readContentId } from '../utils/itineraryMembership';
 
 export default function RecommendationSearch({
   onSearch,
@@ -11,6 +12,8 @@ export default function RecommendationSearch({
   addingId,
   originPlaces = [],
   defaultOriginItemId = '',
+  itineraryItems = [],
+  basketContentIds,
 }) {
   const [tags, setTags] = useState([]);
   const [freeOnly, setFreeOnly] = useState(false);
@@ -131,6 +134,8 @@ export default function RecommendationSearch({
                 onAdd={onAdd}
                 adding={addingId === c.contentId}
                 nextCandidates={visibleResults.slice(i + 1, i + 3)}
+                inItinerary={isPlaceInItinerary(c, itineraryItems) === true}
+                inBasket={Boolean(basketContentIds?.has(readContentId(c)))}
               />
             ))}
           </div>

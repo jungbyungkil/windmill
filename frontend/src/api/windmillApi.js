@@ -85,6 +85,23 @@ export function addItem(itineraryId, item) {
   return request(`/itineraries/${itineraryId}/items`, { method: 'POST', body: item });
 }
 
+/**
+ * 여행 바구니 확정 - 일괄 추가. 한 트랜잭션으로 전체 성공/전체 롤백된다(2026-09-15 핸드오프
+ * 브리프: 지도 다중 선택 → 확인 팝업 일괄 추가). 실패 시 err.data.failedContentId로 어떤 장소가
+ * 문제였는지 알 수 있다(422).
+ */
+export function addItemsBatch(itineraryId, items) {
+  return request(`/itineraries/${itineraryId}/items/batch`, { method: 'POST', body: { items } });
+}
+
+/**
+ * 여행 바구니 바텀시트 - 일괄 공공데이터 검증(휴무·혼잡·날씨를 한 번에). 바텀시트를 열 때(또는
+ * 재오픈 시) 호출한다(2026-09-15 핸드오프 브리프 4.1/9.5). 응답의 각 result는 contentId로 매칭.
+ */
+export function checkItemsBatch(itineraryId, items) {
+  return request(`/itineraries/${itineraryId}/items/batch-check`, { method: 'POST', body: { items } });
+}
+
 /** 일정 추가/시간 수정 직전 휴무·마감 경고. 저장을 막지 않는다. */
 export function checkPlaceHours(itineraryId, body) {
   return request(`/itineraries/${itineraryId}/hours-check`, { method: 'POST', body });
@@ -250,6 +267,24 @@ export function applyReroute(itineraryId, date, origin, startTime, reason) {
   }
   if (startTime) params.startTime = startTime;
   return request(`/itineraries/${itineraryId}/apply-reroute${qs(params)}`, { method: 'POST' });
+}
+
+/**
+ * 대기 중인 자동 변경 제안 조회(승인제) - 없거나 만료됐으면 null.
+ * 2026-09-15 핸드오프 브리프: 동선 변경 승인제 전환.
+ */
+export function getProposal(itineraryId) {
+  return request(`/itineraries/${itineraryId}/proposal`);
+}
+
+/** 제안 적용 - 순서 변경 + 사유 포함 변경 이력 기록. 만료·이미 처리된 제안이면 409. */
+export function acceptProposal(itineraryId, proposalId) {
+  return request(`/itineraries/${itineraryId}/proposal/${proposalId}/accept`, { method: 'POST' });
+}
+
+/** 제안 거절 - 순서는 그대로 두고, 동일 trigger 재제안 쿨다운을 시작한다. */
+export function rejectProposal(itineraryId, proposalId) {
+  return request(`/itineraries/${itineraryId}/proposal/${proposalId}/reject`, { method: 'POST' });
 }
 
 /** 되돌리기 - targetSequence가 없으면 원본으로. 되돌리기 자체도 새 이력(REVERT)으로 쌓인다. */

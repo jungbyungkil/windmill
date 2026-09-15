@@ -83,15 +83,27 @@ function DayRouteMapCanvas({
   jsKey,
   mode,
   itineraryItems = [],
-  onAddPlace,
+  basketContentIds,
+  onToggleBasket,
   onRemovePlace,
   busyContentId,
+  visible = true,
 }) {
   const [loading, error] = useKakaoLoader({
     appkey: jsKey,
     libraries: ['services'],
   });
   const mapRef = useRef(null);
+
+  // 2026-09-15 코드 리뷰에서 발견 - 지도 탭을 언마운트 대신 display:none으로 숨기게 바꾸면서(App.jsx,
+  // 탭 전환 시 지도 상태 보존), 컨테이너가 0x0이 됐다가 다시 보이는 상황이 생겼다. 카카오맵 SDK는
+  // ResizeObserver 등으로 이걸 스스로 감지하지 못해(react-kakao-maps-sdk 소스에도 relayout 자동
+  // 호출이 없음), 숨김→표시 전환마다 명시적으로 relayout()을 불러줘야 타일이 안 깨진다.
+  useEffect(() => {
+    if (visible && mapRef.current) {
+      mapRef.current.relayout();
+    }
+  }, [visible]);
   const userMovedRef = useRef(false);
   const [stops, setStops] = useState([]);
   const [resolving, setResolving] = useState(true);
@@ -329,33 +341,9 @@ function DayRouteMapCanvas({
     setMovedSinceSearch(false);
   }
 
-  async function handleAdd(place) {
-    const id = readContentId(place);
-    if (!id) return;
-    setOptimisticAdded((prev) => new Set(prev).add(id));
-    setOptimisticRemoved((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    try {
-      const saved = await onAddPlace?.(place);
-      if (saved === null || saved === false) {
-        setOptimisticAdded((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }
-    } catch {
-      setOptimisticAdded((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }
+  // 지도에서의 단건 즉시 추가는 제거됐다(2026-09-15 핸드오프 브리프 10.2) - "바구니에 담기"는
+  // 동기적으로 로컬 상태만 바꾸는 토글이라(네트워크 호출 없음) 낙관적 업데이트가 필요 없다.
+  // MapPlaceCard가 onToggleBasket을 직접 부른다.
 
   async function handleRemove(place) {
     const id = readContentId(place);
@@ -565,9 +553,10 @@ function DayRouteMapCanvas({
               itineraryItems={itineraryItems}
               pendingAddedIds={optimisticAdded}
               pendingRemovedIds={optimisticRemoved}
+              inBasket={Boolean(basketContentIds?.has(readContentId(selectedPlace)))}
               hoursPhase={selectedHours}
               busy={busyContentId != null && readContentId(busyContentId) === readContentId(selectedPlace)}
-              onAdd={handleAdd}
+              onToggleBasket={onToggleBasket}
               onRemove={handleRemove}
               onClose={() => setSelectedPlaceId(null)}
             />
@@ -610,6 +599,7 @@ function DayRouteMapCanvas({
             {nearby.map((place) => {
               const id = readContentId(place);
               const added = isInItinerary(place);
+              const basketed = !added && Boolean(basketContentIds?.has(id));
               const phase = hoursPhaseForPlace(place, { inItinerary: added });
               return (
                 <li key={id || place.placeName}>
@@ -627,7 +617,7 @@ function DayRouteMapCanvas({
                     <span className="map-nearby-row-meta">
                       {place.category || '장소'}
                       {place.dist != null ? ` · ${place.dist}m` : ''}
-                      {added ? ' · 담김' : ''}
+                      {added ? ' · 이미 담김' : basketed ? ' · 바구니' : ''}
                     </span>
                     <span className={`map-nearby-row-hours phase-${String(phase).toLowerCase().replace('_', '-')}`}>
                       {phase === 'UNKNOWN' ? '' : HOURS_PHASE_LABEL[phase]}
@@ -653,9 +643,11 @@ export default function DayRouteMap({
   closedDayAffectedItemIds = [],
   hoursEndedAffectedItemIds = [],
   crowdAffectedItemIds = [],
-  onAddPlace,
+  basketContentIds,
+  onToggleBasket,
   onRemovePlace,
   busyContentId,
+  visible = true,
 }) {
   const [jsKey, setJsKey] = useState(BUILD_TIME_JS_KEY);
   const [keyChecked, setKeyChecked] = useState(Boolean(BUILD_TIME_JS_KEY));
@@ -709,9 +701,11 @@ export default function DayRouteMap({
             jsKey={jsKey}
             mode={mode}
             itineraryItems={items}
-            onAddPlace={onAddPlace}
+            basketContentIds={basketContentIds}
+            onToggleBasket={onToggleBasket}
             onRemovePlace={onRemovePlace}
             busyContentId={busyContentId}
+            visible={visible}
           />
         )}
       </div>

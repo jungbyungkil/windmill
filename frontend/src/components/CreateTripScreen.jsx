@@ -55,6 +55,7 @@ export default function CreateTripScreen({
   error,
   draftItineraryId,
   onResumeDraft,
+  onBeforeRegionChange,
 }) {
   // 동반·접근성 저장 프로필(2026-09-12 브리프) - 한 번 입력하면 다음부터 자동으로 채워 넣고
   // 접힌 상태로 시작한다. 마운트 시 1회만 읽고, 이후 갱신은 각 필드 변경 시점에 persistProfile로.
@@ -233,6 +234,11 @@ export default function CreateTripScreen({
   }
 
   function handleSignguChange(nextSignguFullCode) {
+    // 여행 바구니에 담긴 게 있으면 확인 다이얼로그 - 취소하면 지역 select 값도 그대로 둔다
+    // (2026-09-15 핸드오프 브리프 9.7 - "취소 시 지역 변경도 함께 취소").
+    if (onBeforeRegionChange && !onBeforeRegionChange(nextSignguFullCode)) {
+      return;
+    }
     setSignguFullCode(nextSignguFullCode);
     const sigungu = signguOptions.find((s) => s.signguFullCode === nextSignguFullCode);
     if (selectedSido && sigungu) {
@@ -457,7 +463,7 @@ export default function CreateTripScreen({
             loadingStage
               || (anchorCandidate
                 ? `${anchorCandidate.placeName} 기준으로 장소를 찾고 있어요...`
-                : '이 지역 축제와 인기 스팟으로 오전·오후 일정을 만들고 있어요...')
+                : '이 지역 축제와 인기 스팟으로 일정을 만들고 있어요')
           }
         />
       )}

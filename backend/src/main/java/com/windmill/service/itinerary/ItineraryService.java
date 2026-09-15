@@ -8,6 +8,7 @@ import com.windmill.dto.AddItineraryItemRequest;
 import com.windmill.dto.ApplyAlternativeRequest;
 import com.windmill.dto.ApplySuggestedRouteRequest;
 import com.windmill.dto.CreateItineraryRequest;
+import com.windmill.dto.PlanChangeEntry;
 import com.windmill.dto.PlanSnapshot;
 import com.windmill.dto.ItineraryItemResponse;
 import com.windmill.dto.ItineraryListItemResponse;
@@ -38,6 +39,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
@@ -386,6 +388,43 @@ public class ItineraryService {
         log.info("[addItem] 저장 itineraryId={} place={} contentId={} time={} logHistory={}",
                 itineraryId, item.getPlaceName(), item.getContentId(), scheduledTime, logHistory);
         return itineraryRepository.save(itinerary);
+    }
+
+    /**
+     * 여행 바구니 확정 - 일괄 추가(2026-09-15 핸드오프 브리프: 지도 다중 선택 → 확인 팝업 일괄 추가).
+     * {@link #addItem}을 그대로 N번 재사용한다(검증·슬롯배정 로직이 그 메서드에 이미 있어 복제하지
+     * 않음) - 한 트랜잭션이라 도중에 하나라도 실패(마감·시간겹침 등)하면 전체 롤백되고, 어떤 장소가
+     * 문제였는지 {@link com.windmill.exception.BatchAddItemException}으로 감싸 올린다(결정 #9).
+     * 이미 담긴 장소는 addItem이 조용히 건너뛰므로 히스토리 집계에서도 제외한다(중복 정책, 결정 #6).
+     * 이력은 개별 MANUAL이 아니라 "N곳 추가" 한 건으로 합쳐 남긴다(결정 #7).
+     */
+    @Transactional
+    public Itinerary addItemsBatch(Long itineraryId, List<AddItineraryItemRequest> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("담을 장소가 없어요.");
+        }
+        Itinerary itinerary = get(itineraryId);
+        PlanSnapshot before = planHistoryService.snapshotOf(itinerary);
+        int addedCount = 0;
+        Itinerary current = itinerary;
+        for (AddItineraryItemRequest req : items) {
+            req.setLogHistory(false);
+            LocalDate visitDate = req.getVisitDate() != null ? req.getVisitDate() : itinerary.getStartDate();
+            boolean alreadyIn = alreadyHasPlace(current, req.getContentId(), visitDate);
+            try {
+                current = addItem(itineraryId, req);
+            } catch (RuntimeException e) {
+                throw new com.windmill.exception.BatchAddItemException(req.getContentId(), req.getPlaceName(), e);
+            }
+            if (!alreadyIn) {
+                addedCount++;
+            }
+        }
+        if (addedCount > 0) {
+            planHistoryService.recordChange(current, before, "MANUAL", addedCount + "곳 추가", null, null);
+            current = itineraryRepository.save(current);
+        }
+        return current;
     }
 
     /** 같은 날 같은 contentId가 이미 있으면 중복 행을 만들지 않는다. */
@@ -938,7 +977,7 @@ public class ItineraryService {
                 .sorted(Comparator.comparingInt(ItineraryItem::getDisplayOrder))
                 .collect(Collectors.toList());
         if (dayItems.size() < 2) {
-            return new OptimizeRouteResult(itinerary, null, null, List.of());
+            return new OptimizeRouteResult(itinerary, null, null, List.of(), true);
         }
 
         // 다녀온(완료) 곳은 재정렬 후보에서 빼고, 출발 앵커로만 쓴다 - 자리·시각을 바꾸지 않는다.
@@ -954,7 +993,7 @@ public class ItineraryService {
                 .collect(Collectors.toList());
         if (remaining.size() < 2) {
             // 남은 곳이 하나뿐(또는 없음) - 다시 잡을 게 없다
-            return new OptimizeRouteResult(itinerary, null, null, List.of());
+            return new OptimizeRouteResult(itinerary, null, null, List.of(), true);
         }
 
         // 고정(pin)한 앵커 - 시각이 박혀 있으면 자리·시각을 그대로 두고, 나머지만 최단 순서로 다시 잡는다.
@@ -971,6 +1010,9 @@ public class ItineraryService {
         RouteAnchorResolver.Anchor anchor = null;
         List<ItineraryItem> reorderedForKm = List.of();
         List<Long> flaggedItemIds = List.of();
+        // 실제 도로 데이터(카카오모빌리티) 기준으로 재배치했는지 - 직선거리 폴백이면 false.
+        // 자동 제안(ProposalService)이 근거 신뢰도 부족한 폴백 결과로는 제안을 만들지 않도록 노출한다.
+        boolean roadBased = true;
         if (movable.size() < 2) {
             // 다시 잡을 게 없다(전부 고정이거나 이동 가능 1곳뿐) - 순서만 유지
             finalOrder = dayItems;
@@ -985,9 +1027,11 @@ public class ItineraryService {
                         routeRecalculationService.recalculate(movable, originLon, originLat, overrideStartTime);
                 reordered = recalc.ordered();
                 message = recalc.message();
+                roadBased = recalc.roadBased();
             } else {
                 RouteRecalculationService.SlotResult slotResult =
                         routeRecalculationService.recalculateSlotPreserving(movable, anchor.lon(), anchor.lat());
+                roadBased = slotResult.roadBased();
                 if (slotResult.applied()) {
                     reordered = slotResult.ordered();
                     message = slotResult.message();
@@ -1000,6 +1044,7 @@ public class ItineraryService {
                             routeRecalculationService.recalculate(movable, anchor.lon(), anchor.lat(), overrideStartTime);
                     reordered = recalc.ordered();
                     message = recalc.message();
+                    roadBased = recalc.roadBased();
                 } else {
                     // 이동시간이 빠듯한 구간이 과반 - 무리한 배치를 강행하지 않고 그대로 둔다
                     reordered = movable;
@@ -1036,7 +1081,7 @@ public class ItineraryService {
                 reorderedForKm.stream().filter(this::itemHasCoords).toList(),
                 kmOriginLon, kmOriginLat,
                 ItineraryItem::getMapX, ItineraryItem::getMapY);
-        return new OptimizeRouteResult(saved, message, km, flaggedItemIds);
+        return new OptimizeRouteResult(saved, message, km, flaggedItemIds, roadBased);
     }
 
     /**
@@ -1120,16 +1165,17 @@ public class ItineraryService {
     }
 
     /** @param flaggedItemIds 이동시간이 슬롯 간격보다 긴(무리한 배치) 항목 id - 슬롯 보존 재배치가 실제로
-     *                        적용됐을 때만 채워진다(선택). */
+     *                        적용됐을 때만 채워진다(선택).
+     *  @param roadBased      카카오모빌리티 실제 도로 데이터 기준이면 true, 직선거리 폴백이면 false. */
     public record OptimizeRouteResult(Itinerary itinerary, String message, Double totalDistanceKm,
-                                      List<Long> flaggedItemIds) {
+                                      List<Long> flaggedItemIds, boolean roadBased) {
     }
 
     public record RouteStopSummary(Long itemId, String placeName, String scheduledTime) {
     }
 
     public record RouteReorderPreview(List<RouteStopSummary> before, List<RouteStopSummary> after,
-                                      String message, Double totalDistanceKm) {
+                                      String message, Double totalDistanceKm, boolean roadBased) {
     }
 
     /**
@@ -1137,8 +1183,12 @@ public class ItineraryService {
      * 롤백해 아무것도 저장하지 않는다("적용 시 기존 로직 재사용" 요구를 코드 복제 없이 만족 - 같은
      * 메서드를 그대로 호출하므로 미리보기와 실제 적용 결과가 항상 일치함이 보장된다).
      * 2026-09-14 핸드오프 브리프 Phase 7 - 동선 액션 배너의 "변경 전/후 미리보기" 시트용.
+     *
+     * <p>REQUIRES_NEW: 항상 자신만의 새 트랜잭션에서 롤백한다 - 호출자가 이미 트랜잭션 안에 있으면
+     * (예: ProposalService의 제안 생성) 기본 전파(REQUIRED)로는 이 메서드의 rollbackOnly가 호출자의
+     * 트랜잭션까지 통째로 무효화해 버린다(2026-09-15 핸드오프 브리프: 동선 변경 승인제 전환 작업 중 발견).
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public RouteReorderPreview previewOptimizeRoute(Long itineraryId, LocalDate date,
                                                      Double originLon, Double originLat, String startTime) {
         Itinerary itinerary = get(itineraryId);
@@ -1148,7 +1198,7 @@ public class ItineraryService {
         List<RouteStopSummary> after = summarize(itemsOnDate(result.itinerary(), date));
 
         TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-        return new RouteReorderPreview(before, after, result.message(), result.totalDistanceKm());
+        return new RouteReorderPreview(before, after, result.message(), result.totalDistanceKm(), result.roadBased());
     }
 
     private static List<RouteStopSummary> summarize(List<ItineraryItem> items) {
@@ -1204,13 +1254,25 @@ public class ItineraryService {
 
     /**
      * "바람이가 동선 최적화" 전용 - 동선을 재계산하고, 실제로 순서·시각이 바뀐 경우에만 변경 이력
-     * (triggerType=ROUTE)으로 남긴다. optimize-route는 GPS 시작·일자 확정 등 여러 곳에서 불려서
-     * 이력을 남기지 않는다. 사용자가 여러 번 눌러도 바뀐 게 없으면 이력이 쌓이지 않는다.
+     * (triggerType=ROUTE, source=MANUAL)으로 남긴다. optimize-route는 GPS 시작·일자 확정 등 여러
+     * 곳에서 불려서 이력을 남기지 않는다. 사용자가 여러 번 눌러도 바뀐 게 없으면 이력이 쌓이지 않는다.
      */
     @Transactional
     public OptimizeRouteResult applyReroute(Long itineraryId, LocalDate date,
                                             Double originLon, Double originLat, String startTime,
                                             String reason) {
+        return applyReroute(itineraryId, date, originLon, originLat, startTime, reason, "MANUAL", List.of());
+    }
+
+    /**
+     * 승인제 제안(ProposalService) 적용 전용 - source="PROPOSAL_ACCEPTED"와 제안의 공공데이터 근거를
+     * 함께 이력에 남긴다(2026-09-15 핸드오프 브리프: 심사 시연에서 변경 이력 화면에도 근거를
+     * 노출하기 위함). 계산·중복 판정 로직은 위 6-인자 오버로드와 완전히 같다.
+     */
+    @Transactional
+    public OptimizeRouteResult applyReroute(Long itineraryId, LocalDate date,
+                                            Double originLon, Double originLat, String startTime,
+                                            String reason, String source, List<PlanChangeEntry.Evidence> evidence) {
         Itinerary itinerary = get(itineraryId);
         PlanSnapshot before = planHistoryService.snapshotOf(itinerary);
         OptimizeRouteResult r = optimizeRoute(itineraryId, date, originLon, originLat, startTime);
@@ -1218,11 +1280,11 @@ public class ItineraryService {
         boolean changed = !planHistoryService.sameStops(before, planHistoryService.snapshotOf(after));
         if (changed) {
             planHistoryService.recordChange(after, before, "ROUTE",
-                    reason != null && !reason.isBlank() ? reason : "동선 재계산", null, null);
+                    reason != null && !reason.isBlank() ? reason : "동선 재계산", null, null, source, evidence);
         }
         Itinerary saved = itineraryRepository.save(after);
         String msg = changed ? r.message() : "이미 이동을 최소화한 순서예요. 그대로 두었어요.";
-        return new OptimizeRouteResult(saved, msg, r.totalDistanceKm(), r.flaggedItemIds());
+        return new OptimizeRouteResult(saved, msg, r.totalDistanceKm(), r.flaggedItemIds(), r.roadBased());
     }
 
     /**

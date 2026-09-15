@@ -8,9 +8,9 @@ import com.windmill.util.KoreaClock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 대안 일정 "원본 + 변경 이력" 관리.
@@ -32,7 +32,9 @@ public class PlanHistoryService {
     public static final int MAX_HISTORY = 9;
 
     /**
-     * 변경이 이미 {@code itinerary.getItems()}에 반영된 뒤 호출한다.
+     * 변경이 이미 {@code itinerary.getItems()}에 반영된 뒤 호출한다. source는 "MANUAL"로 채운다
+     * (직접 조작·CTA 클릭 즉시 적용) - 승인제 제안 적용 경로만 아래 8-인자 오버로드로
+     * source="PROPOSAL_ACCEPTED"와 evidence를 넘긴다.
      *
      * @param beforeSnapshot 변경 직전 스냅샷 - 원본이 아직 없으면 이 값으로 지연 캡처한다.
      *                       (호출자가 변경 전에 {@link #snapshotOf(Itinerary)}로 떠 둬야 한다)
@@ -42,6 +44,19 @@ public class PlanHistoryService {
     public void recordChange(Itinerary itinerary, PlanSnapshot beforeSnapshot,
                              String triggerType, String reason,
                              String changedPlaceId, String changedPlaceName) {
+        recordChange(itinerary, beforeSnapshot, triggerType, reason, changedPlaceId, changedPlaceName,
+                "MANUAL", List.of());
+    }
+
+    /**
+     * @param source   MANUAL | PROPOSAL_ACCEPTED
+     * @param evidence 검증에 쓴 공공데이터 근거 - 승인제 제안에서만 채워진다(2026-09-15 핸드오프
+     *                 브리프: 심사 시연에서 변경 이력 화면에도 근거를 노출하기 위함)
+     */
+    public void recordChange(Itinerary itinerary, PlanSnapshot beforeSnapshot,
+                             String triggerType, String reason,
+                             String changedPlaceId, String changedPlaceName,
+                             String source, List<PlanChangeEntry.Evidence> evidence) {
         if (itinerary.getOriginalSnapshot() == null) {
             itinerary.setOriginalSnapshot(beforeSnapshot);
         }
@@ -50,15 +65,22 @@ public class PlanHistoryService {
             history = new ArrayList<>();
             itinerary.setChangeHistory(history);
         }
+        List<PlanChangeEntry.Evidence> safeEvidence = evidence == null ? List.of() : evidence;
 
         // 직전 이력이 곧바로 앞선 "동선 재계산(ROUTE)"이면 새로 쌓지 않고 그 이력을 갱신한다 -
         // "바람이가 동선 최적화"를 짧은 시간 안에 여러 번 눌러도 이력이 한 건만 남는다. 사이에 다른
         // 종류의 변경(대안 추가·수동 삭제 등)이 끼면 직전 이력의 triggerType이 달라져 자연히 새로 쌓인다.
+        // source까지 같을 때만 병합한다 - 안 그러면 PROPOSAL_ACCEPTED(공공데이터 근거 있음) 바로
+        // 뒤에 MANUAL 재계산이 와서 병합될 때 근거·출처가 조용히 사라진다(2026-09-15 코드 리뷰에서
+        // 발견 - 심사 시연에서 "제안 승인으로 바뀜"을 증명하는 evidence가 지워지면 안 됨).
         PlanChangeEntry last = history.isEmpty() ? null : history.get(history.size() - 1);
-        if ("ROUTE".equals(triggerType) && last != null && "ROUTE".equals(last.getTriggerType())) {
-            last.setChangedAt(nowKst());
+        if ("ROUTE".equals(triggerType) && last != null && "ROUTE".equals(last.getTriggerType())
+                && Objects.equals(last.getSource(), source)) {
+            last.setChangedAt(KoreaClock.nowKstIso());
             last.setSnapshot(snapshotOf(itinerary));
             last.setReason(reason);
+            last.setSource(source);
+            last.setEvidence(safeEvidence);
             log.info("[PlanHistory] 변경 이력 #{} 갱신(연속 ROUTE 병합) itineraryId={} reason={}",
                     last.getSequence(), itinerary.getId(), reason);
             return;
@@ -68,10 +90,12 @@ public class PlanHistoryService {
                 .sequence(nextSequence(history))
                 .triggerType(triggerType)
                 .reason(reason)
-                .changedAt(nowKst())
+                .changedAt(KoreaClock.nowKstIso())
                 .changedPlaceId(changedPlaceId)
                 .changedPlaceName(changedPlaceName)
                 .snapshot(snapshotOf(itinerary))
+                .source(source)
+                .evidence(safeEvidence)
                 .build();
         history.add(entry);
         while (history.size() > MAX_HISTORY) {
@@ -136,7 +160,7 @@ public class PlanHistoryService {
                     .build());
         }
         return PlanSnapshot.builder()
-                .capturedAt(nowKst())
+                .capturedAt(KoreaClock.nowKstIso())
                 .stops(stops)
                 .build();
     }
@@ -220,7 +244,4 @@ public class PlanHistoryService {
         }
     }
 
-    private static String nowKst() {
-        return OffsetDateTime.now(KoreaClock.ZONE).withNano(0).toString();
-    }
 }

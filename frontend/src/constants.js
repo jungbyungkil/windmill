@@ -77,3 +77,21 @@ export const CHILD_AGE_OPTIONS = Array.from({ length: 18 }, (_, age) => ({
   value: age,
   label: `만 ${age}세`,
 }));
+
+/**
+ * 상황 태그 표시 라벨(2026-09-15 핸드오프 브리프 8: 상황 태그 라벨 직관성 개선).
+ * "둔감/민감"은 내부 데이터 관점 용어라 사용자에게 "그래서 지금 가도 되나?"가 바로 안 와닿는다는
+ * 지적에 따라 표시 문구만 바꾼다 - 내부 코드값(SENSITIVE/INSENSITIVE, RainSensitivity/
+ * CongestionSensitivity enum)과 API 응답은 그대로 두고(백엔드 무변경) 이 매핑 레이어만 추가.
+ * 배지는 짧게, 상세 설명은 InfoTooltip으로 위임(8.2).
+ */
+export const SITUATIONAL_LABELS = {
+  RAIN: {
+    INSENSITIVE: { label: '비 영향 적음', tooltip: '비가 와도 이용할 수 있어요' },
+    SENSITIVE: { label: '비 영향 큼', tooltip: '비가 오면 이용이 어려워요. 맑은 날 추천' },
+  },
+  CROWD: {
+    INSENSITIVE: { label: '혼잡 영향 적음', tooltip: '붐벼도 이용 가능해요' },
+    SENSITIVE: { label: '혼잡 영향 큼', tooltip: '한산할 때 방문을 추천해요' },
+  },
+};

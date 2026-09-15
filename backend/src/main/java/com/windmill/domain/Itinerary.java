@@ -1,5 +1,6 @@
 package com.windmill.domain;
 
+import com.windmill.dto.PendingProposal;
 import com.windmill.dto.PlanChangeEntry;
 import com.windmill.dto.PlanSnapshot;
 import com.windmill.dto.TriggerLevel;
@@ -168,6 +169,18 @@ public class Itinerary {
     @Convert(converter = PlanChangeHistoryConverter.class)
     @Column(columnDefinition = "TEXT")
     private List<PlanChangeEntry> changeHistory = new ArrayList<>();
+
+    /**
+     * 대기 중인 자동 변경 제안(승인제, 2026-09-15 핸드오프 브리프) - 사용자가 "적용"을 누르기 전까지
+     * 일정을 바꾸지 않는다. 세션당 최대 1건. 적용·거절·만료되면 null로 되돌아간다.
+     */
+    @Convert(converter = PendingProposalConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private PendingProposal pendingProposal;
+
+    /** ROUTE 제안을 거절한 뒤 재제안하지 않는 쿨다운 종료 시각(KST ISO) - null이면 쿨다운 없음 */
+    @Column(length = 40)
+    private String routeProposalCooldownUntil;
 
     @PrePersist
     void onCreate() {

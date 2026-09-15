@@ -36,9 +36,16 @@ public class PushSubscription {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /** 같은 nudgeId로는 하루 1회만 발송 - "YYYY-MM-DD:nudgeId" 형태로 마지막 발송 키를 기록 */
+    /** 같은 nudgeId로는 하루 1회만 발송 - "YYYY-MM-DD:nudgeId" 형태로 마지막 발송 키를 기록.
+     *  STATUS/DAY_START/DAY_END 채널 전용 - 아래 lastProposalSentKey와 필드를 분리했다. */
     @Column(length = 200)
     private String lastSentKey;
+
+    /** 긴급 제안(PROPOSAL:*) 전용 마지막 발송 키 - lastSentKey와 같은 필드를 썼다면 한 틱에서
+     *  STATUS 푸시 다음에 PROPOSAL 푸시가 또 나갈 때 STATUS의 dedup 마커를 덮어써 버렸다
+     *  (2026-09-15 코드 리뷰에서 발견). */
+    @Column(length = 200)
+    private String lastProposalSentKey;
 
     @PrePersist
     void onCreate() {

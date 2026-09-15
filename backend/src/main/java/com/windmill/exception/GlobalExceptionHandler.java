@@ -1,5 +1,6 @@
 package com.windmill.exception;
 
+import com.windmill.dto.BatchAddItemErrorResponse;
 import com.windmill.dto.ClosingTimeInfeasibleResponse;
 import com.windmill.dto.DuplicateItineraryResponse;
 import com.windmill.dto.TimeSlotConflictResponse;
@@ -42,6 +43,31 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ClosingTimeInfeasibleResponse> handleClosingTimeInfeasible(
             ClosingTimeInfeasibleException e) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(ClosingTimeInfeasibleResponse.from(e));
+    }
+
+    /**
+     * 여행 바구니 일괄 추가 중 한 장소에서 실패 - 트랜잭션은 전체 롤백되고, 어떤 장소가 문제였는지
+     * failedContentId로, 왜 실패했는지는 원인 예외의 구조화된 필드(대안 시각 등)까지 그대로 내려
+     * 단건 추가와 동일한 정보를 준다(2026-09-15 핸드오프 브리프: 지도 다중 선택 → 확인 팝업 일괄
+     * 추가, 결정 #9). 상태 코드도 단건 추가와 같은 규칙(TIME_OVERLAP=409, 그 외=422)을 따른다 -
+     * 이전엔 항상 422 + message만 있는 즉석 HashMap이라 배치에서만 이 정보를 잃었다(코드 리뷰에서
+     * 발견).
+     */
+    @ExceptionHandler(BatchAddItemException.class)
+    public ResponseEntity<BatchAddItemErrorResponse> handleBatchAddItem(BatchAddItemException e) {
+        HttpStatus status = e.getCause() instanceof TimeSlotConflictException
+                ? HttpStatus.CONFLICT
+                : HttpStatus.UNPROCESSABLE_ENTITY;
+        return ResponseEntity.status(status).body(BatchAddItemErrorResponse.from(e));
+    }
+
+    /**
+     * 제안이 이미 적용·거절·만료된 뒤 오래된 카드를 눌렀을 때 - 409로 내려 프론트가
+     * "제안이 만료됐어요"를 안내하고 카드를 걷어내게 한다.
+     */
+    @ExceptionHandler(ProposalStaleException.class)
+    public ResponseEntity<Map<String, String>> handleProposalStale(ProposalStaleException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
     }
 
     /**

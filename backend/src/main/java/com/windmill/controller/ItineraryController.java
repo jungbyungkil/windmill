@@ -3,6 +3,9 @@ package com.windmill.controller;
 import com.windmill.domain.Itinerary;
 import com.windmill.domain.ItineraryItem;
 import com.windmill.dto.AddItineraryItemRequest;
+import com.windmill.dto.AddItineraryItemsBatchRequest;
+import com.windmill.dto.BatchPlaceCheckRequest;
+import com.windmill.dto.BatchPlaceCheckResponse;
 import com.windmill.dto.AlertEventResponse;
 import com.windmill.dto.AlternativesResponse;
 import com.windmill.dto.AnchorPlanRequest;
@@ -15,6 +18,7 @@ import com.windmill.dto.ItineraryListItemResponse;
 import com.windmill.dto.ItineraryResponse;
 import com.windmill.dto.ItineraryStatus;
 import com.windmill.dto.OngoingItineraryResponse;
+import com.windmill.dto.PendingProposal;
 import com.windmill.dto.PlaceHoursCheckRequest;
 import com.windmill.dto.PlaceHoursCheckResponse;
 import com.windmill.dto.RevertPlanRequest;
@@ -26,7 +30,9 @@ import com.windmill.dto.TriggerResult;
 import com.windmill.dto.UpdateItineraryItemRequest;
 import com.windmill.service.itinerary.GreedyRouteSuggestService;
 import com.windmill.service.itinerary.ItineraryService;
+import com.windmill.service.itinerary.PlaceBatchCheckService;
 import com.windmill.service.itinerary.PlaceHoursCheckService;
+import com.windmill.service.itinerary.ProposalService;
 import com.windmill.service.itinerary.RouteAnchorResolver;
 import com.windmill.util.ItineraryItemStatus;
 import com.windmill.util.KoreaClock;
@@ -48,6 +54,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -58,6 +65,7 @@ public class ItineraryController {
 
     private final ItineraryService itineraryService;
     private final PlaceHoursCheckService placeHoursCheckService;
+    private final PlaceBatchCheckService placeBatchCheckService;
     private final GreedyRouteSuggestService greedyRouteSuggestService;
     private final TriggerDetectionService triggerDetectionService;
     private final RecommendationPipeline recommendationPipeline;
@@ -67,6 +75,7 @@ public class ItineraryController {
     private final TripRecordService tripRecordService;
     private final AlertFeedService alertFeedService;
     private final SiblingTripExclusionResolver siblingTripExclusionResolver;
+    private final ProposalService proposalService;
 
     @PostMapping
     public Mono<ResponseEntity<ItineraryResponse>> create(
@@ -133,6 +142,37 @@ public class ItineraryController {
         return Mono.fromCallable(() -> itineraryService.addItem(id, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(this::toResponse)
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 여행 바구니 확정 - 일괄 추가. 한 트랜잭션으로 전체 성공/전체 롤백(2026-09-15 핸드오프 브리프:
+     * 지도 다중 선택 → 확인 팝업 일괄 추가). 실패 시 422 + failedContentId(GlobalExceptionHandler).
+     */
+    @PostMapping("/{id}/items/batch")
+    public Mono<ResponseEntity<ItineraryResponse>> addItemsBatch(
+            @PathVariable Long id,
+            @Valid @RequestBody AddItineraryItemsBatchRequest request) {
+        return Mono.fromCallable(() -> toResponse(itineraryService.addItemsBatch(id, request.getItems())))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 여행 바구니 바텀시트 - 일괄 공공데이터 검증(Phase B, 2026-09-15 핸드오프 브리프 4.1/9.5/10.3).
+     * 바텀시트를 열 때(또는 재오픈 시) 호출 - 담는 시점엔 개별 호출하지 않는다.
+     */
+    @PostMapping("/{id}/items/batch-check")
+    public Mono<ResponseEntity<BatchPlaceCheckResponse>> checkItemsBatch(
+            @PathVariable Long id,
+            @Valid @RequestBody BatchPlaceCheckRequest request) {
+        return Mono.defer(() -> placeBatchCheckService.checkBatch(id, request))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(results -> BatchPlaceCheckResponse.builder()
+                        .results(results)
+                        .urgentCount((int) results.stream().filter(com.windmill.dto.PlaceCheckResult::isUrgent).count())
+                        .checkedAt(KoreaClock.nowKstIso())
+                        .build())
                 .map(ResponseEntity::ok);
     }
 
@@ -341,6 +381,43 @@ public class ItineraryController {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(ResponseEntity::ok);
+    }
+
+    /**
+     * 대기 중인 자동 변경 제안 조회(승인제) - 없거나 만료됐으면 204.
+     * 2026-09-15 핸드오프 브리프: 동선 변경 승인제 전환.
+     *
+     * <p>{@code Mono.fromCallable}이 null을 "빈 Mono"로 취급해(리액티브 스트림 규약상 onNext(null)
+     * 금지) map()이 아예 안 불리고 204 대신 200(빈 바디)로 나가는 함정이 있었다 - 실제로 서버를
+     * 띄워 curl로 확인하다 발견. {@link Optional}로 감싸 null 유무를 명시적인 값으로 다룬다.
+     */
+    @GetMapping("/{id}/proposal")
+    public Mono<ResponseEntity<PendingProposal>> getProposal(@PathVariable Long id) {
+        return Mono.fromCallable(() -> Optional.ofNullable(proposalService.getProposal(id)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(opt -> opt.<ResponseEntity<PendingProposal>>map(ResponseEntity::ok)
+                        .orElseGet(() -> ResponseEntity.noContent().build()));
+    }
+
+    /**
+     * 제안 적용 - 순서 변경 + 사유 포함 변경 이력 기록. proposalId가 이미 적용·거절·만료된 것과
+     * 다르면(오래된 카드 클릭) 409.
+     */
+    @PostMapping("/{id}/proposal/{proposalId}/accept")
+    public Mono<ResponseEntity<ItineraryResponse>> acceptProposal(
+            @PathVariable Long id, @PathVariable String proposalId) {
+        return Mono.fromCallable(() -> toResponse(proposalService.accept(id, proposalId)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(ResponseEntity::ok);
+    }
+
+    /** 제안 거절 - 순서는 그대로 두고, 동일 trigger 재제안 쿨다운을 시작한다. */
+    @PostMapping("/{id}/proposal/{proposalId}/reject")
+    public Mono<ResponseEntity<Void>> rejectProposal(
+            @PathVariable Long id, @PathVariable String proposalId) {
+        return Mono.<Void>fromRunnable(() -> proposalService.reject(id, proposalId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(ResponseEntity.noContent().build());
     }
 
     /**
