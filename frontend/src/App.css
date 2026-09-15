@@ -324,20 +324,10 @@
   flex-shrink: 0;
 }
 
-/* 2026-09-15 핸드오프 브리프(UI 개선): "삭제" 2글자를 28px 정사각 아이콘 버튼에 욱여넣어
-   세로 2줄("삭"/"제")로 깨지던 문제 - 아이콘이 아니라 텍스트 라벨이므로 폭을 내용에 맞춰
-   늘린다(.icon-btn 기본 34x34 정사각을 이 화면에서만 덮어써야 해서 .icon-btn보다 높은
-   특이도로 클래스 2개를 겹쳐 셀렉터를 건다). 터치 타겟 44px 확보. */
+/* 2026-09-16 사용자 요청 - "내 여행 관리"(my-trips-delete)의 휴지통 아이콘 버튼이 더 낫다고 해서
+   같은 모양으로 통일. 텍스트 "삭제" 대신 TrashIcon을 쓰므로 .icon-btn 기본 34x34 정사각 그대로
+   두면 된다(전엔 텍스트 라벨이라 폭을 넓혔었는데 이제 아이콘이라 불필요). */
 .icon-btn.draft-resume-delete {
-  width: auto;
-  height: auto;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
   flex-shrink: 0;
 }
 

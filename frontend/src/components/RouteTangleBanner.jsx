@@ -5,17 +5,26 @@
  */
 const MIN_SAVINGS_MINUTES = 10;
 
+/**
+ * "67분(3.2km)" 형태로 합친다. 카카오 API가 구간 하나라도 거리(distanceMeters)를 못 주면
+ * 백엔드(RouteTangleDetector)가 distanceKm을 null로 내려보낸다(소요시간만은 믿을 수 있어서) -
+ * km이 없으면 괄호를 통째로 생략한다. 이전엔 null?.toFixed(1)이 undefined가 되고 그게 템플릿
+ * 문자열에 그대로 박혀 "67분(undefinedkm)"으로 보였다(2026-09-15 사용자 제보).
+ */
+function formatLeg(minutes, km) {
+  const kmText = km != null ? `${km.toFixed(1)}km` : null;
+  if (minutes != null && kmText != null) return `${minutes}분(${kmText})`;
+  if (minutes != null) return `${minutes}분`;
+  return kmText || '';
+}
+
 export default function RouteTangleBanner({ routeTangle, onPreview, previewLoading }) {
   if (!routeTangle?.tangled) return null;
   const savings = routeTangle.savingsMinutes;
   if (savings == null || savings < MIN_SAVINGS_MINUTES) return null;
 
-  const currentText = routeTangle.currentDurationMinutes != null
-    ? `${routeTangle.currentDurationMinutes}분(${routeTangle.currentDistanceKm?.toFixed(1)}km)`
-    : `${routeTangle.currentDistanceKm?.toFixed(1)}km`;
-  const optimizedText = routeTangle.optimizedDurationMinutes != null
-    ? `${routeTangle.optimizedDurationMinutes}분(${routeTangle.optimizedDistanceKm?.toFixed(1)}km)`
-    : `${routeTangle.optimizedDistanceKm?.toFixed(1)}km`;
+  const currentText = formatLeg(routeTangle.currentDurationMinutes, routeTangle.currentDistanceKm);
+  const optimizedText = formatLeg(routeTangle.optimizedDurationMinutes, routeTangle.optimizedDistanceKm);
 
   return (
     <div className="route-tangle-banner">

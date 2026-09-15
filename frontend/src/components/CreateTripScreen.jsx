@@ -435,7 +435,7 @@ export default function CreateTripScreen({
                   disabled={deletingDraftId === trip.itineraryId}
                   onClick={() => handleDeleteDraft(trip)}
                 >
-                  {deletingDraftId === trip.itineraryId ? '…' : '삭제'}
+                  {deletingDraftId === trip.itineraryId ? '…' : <TrashIcon size={16} />}
                 </button>
               </div>
             </li>
